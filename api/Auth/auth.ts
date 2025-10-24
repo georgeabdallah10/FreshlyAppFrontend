@@ -56,13 +56,15 @@ export async function registerUser(
     });
 
     const json = await res.json().catch(() => ({}));
+    console.log("[REGISTER] Payload:", input);
+    console.log("[REGISTER] Password length:", input.password.length);
     if (!res.ok) {
       const message =
         (json && (json.detail || json.message)) ||
         `Request failed with status ${res.status}`;
       return { ok: false, status: res.status, message };
     }
-    console.log("Registering with:",json as UserOut);
+    console.log("Registering with:", json as UserOut);
     return { ok: true, data: json as UserOut };
   } catch (err: any) {
     return {
@@ -148,7 +150,14 @@ type User = {
 };
 
 export const updateUserInfo = async (
-  patch: Partial<{ name: string; email: string; phone_number: string; location: string; avatar_path: string; status: string;}>
+  patch: Partial<{
+    name: string;
+    email: string;
+    phone_number: string;
+    location: string;
+    avatar_path: string;
+    status: string;
+  }>
 ): Promise<User> => {
   const token = await Storage.getItem("access_token");
   if (!token) throw new Error("Not authenticated");
@@ -174,35 +183,31 @@ export const updateUserInfo = async (
   return json as User;
 };
 
-export async function deleteAccount(){
-    const token = await Storage.getItem("access_token");
-    const res = await fetch(`${BASE_URL}/me`, 
-      {
-        method: "DELETE",
-        headers: {
-          "Content-type": "application/json",
-          Authorization: `Bearer ${token}`
-        }
-      }
-    )
-    const json = await res.json().catch(() => {})
-    if (!res.ok){
-      return `ERROR, ${json}`
-    }
-    return json
-
+export async function deleteAccount() {
+  const token = await Storage.getItem("access_token");
+  const res = await fetch(`${BASE_URL}/me`, {
+    method: "DELETE",
+    headers: {
+      "Content-type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const json = await res.json().catch(() => {});
+  if (!res.ok) {
+    return `ERROR, ${json}`;
+  }
+  return json;
 }
 
-export async function sendVerificationCode(email: string): Promise<ApiResult<{ message: string }>> {
+export async function sendVerificationCode(
+  email: string
+): Promise<ApiResult<{ message: string }>> {
   try {
-    const res = await fetch(
-      `${BASE_URL}/auth/send-code`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({email})
-      }
-    );
+    const res = await fetch(`${BASE_URL}/auth/send-code`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -243,14 +248,20 @@ export async function verifyCode(
   }
 }
 
-export async function resendCode(email: string): Promise<ApiResult<{ message: string }>> {
+export async function resendCode(
+  email: string
+): Promise<ApiResult<{ message: string }>> {
   try {
-    const res = await fetch(`${BASE_URL}/auth/send-code?email=${encodeURIComponent(email)}`, {
-      method: "POST",
-    });
+    const res = await fetch(
+      `${BASE_URL}/auth/send-code?email=${encodeURIComponent(email)}`,
+      {
+        method: "POST",
+      }
+    );
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const message = json?.detail || json?.message || `Failed to resend (${res.status})`;
+      const message =
+        json?.detail || json?.message || `Failed to resend (${res.status})`;
       return { ok: false, status: res.status, message };
     }
     return { ok: true, data: json };
@@ -258,7 +269,9 @@ export async function resendCode(email: string): Promise<ApiResult<{ message: st
     return { ok: false, status: -1, message: err?.message || "Network error" };
   }
 }
-export async function requestPasswordReset(email: string): Promise<ApiResult<{ message: string }>> {
+export async function requestPasswordReset(
+  email: string
+): Promise<ApiResult<{ message: string }>> {
   try {
     const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
       method: "POST",
@@ -276,7 +289,10 @@ export async function requestPasswordReset(email: string): Promise<ApiResult<{ m
   }
 }
 
-export async function verifyPasswordResetCode(email: string, code: string): Promise<ApiResult<{ reset_token: string }>> {
+export async function verifyPasswordResetCode(
+  email: string,
+  code: string
+): Promise<ApiResult<{ reset_token: string }>> {
   try {
     const res = await fetch(`${BASE_URL}/auth/forgot-password/verify`, {
       method: "POST",
@@ -294,7 +310,10 @@ export async function verifyPasswordResetCode(email: string, code: string): Prom
   }
 }
 
-export async function resetPassword(reset_token: string, new_password: string): Promise<ApiResult<{ message: string }>> {
+export async function resetPassword(
+  reset_token: string,
+  new_password: string
+): Promise<ApiResult<{ message: string }>> {
   try {
     const res = await fetch(`${BASE_URL}/auth/reset-password`, {
       method: "POST",

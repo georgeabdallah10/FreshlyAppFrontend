@@ -62,6 +62,7 @@ export async function registerUser(
         `Request failed with status ${res.status}`;
       return { ok: false, status: res.status, message };
     }
+    console.log("Registering with:",json as UserOut);
     return { ok: true, data: json as UserOut };
   } catch (err: any) {
     return {

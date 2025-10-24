@@ -554,6 +554,8 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     color: "#111111",
     fontFamily: "System",
+    outlineWidth: 0,
+    borderWidth: 0,
   },
   eyeButton: {
     padding: scale(4),

@@ -4,11 +4,11 @@
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/_expo/*",
+      "source": "/_expo/:splat*",
       "destination": "/_expo/:splat"
     },
     {
-      "source": "/assets/*",
+      "source": "/assets/:splat*",
       "destination": "/assets/:splat"
     },
     {

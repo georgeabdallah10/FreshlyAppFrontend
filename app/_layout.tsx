@@ -23,11 +23,9 @@ export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
-    Splash.hideAsync();
-  }, []);
-
-  useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), 2000);
+        Splash.hideAsync();
+
     return () => clearTimeout(timer);
   }, []);
 

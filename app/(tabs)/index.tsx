@@ -43,9 +43,9 @@ export default function App(): React.JSX.Element {
 
   if (loggedIn === null) {
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <Text>Loading...</Text>
-      </SafeAreaView>
+      </View>
     );
   }
 

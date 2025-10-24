@@ -6,17 +6,16 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { useState, useEffect } from "react";
 import "react-native-reanimated";
-import { Stack } from "expo-router";
+import { Slot } from "expo-router";
 import SplashScreen from "@/components/loadingpage";
 import * as Splash from "expo-splash-screen";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/context/usercontext";
 
 export const unstable_settings = {
-  initialRouteName: "index",
+  initialRouteName: "(tabs)",
 };
 
-// Hide the native (app.json) splash immediately once JS loads
 Splash.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -28,24 +27,22 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2000); // show your custom splash for 2s
+    const timer = setTimeout(() => setShowSplash(false), 2000);
     return () => clearTimeout(timer);
   }, []);
 
   if (showSplash) {
-    return <SplashScreen />; // your custom splash component
+    return <SplashScreen />;
   }
 
   return (
     <>
-    <StatusBar hidden={true}/>
-    <UserProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        {/* expo-router supplies the NavigationContainer; do not nest another */}
-        <Stack screenOptions={{ headerShown: false }} />
-        <StatusBar style="auto" />
-      </ThemeProvider>
-    </UserProvider>
+      <StatusBar hidden={true} />
+      <UserProvider>
+        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+          <Slot /> {/* This renders the active route */}
+        </ThemeProvider>
+      </UserProvider>
     </>
   );
 }

@@ -21,6 +21,7 @@ export default function RootLayout() {
   const [showSplash, setShowSplash] = useState(true);
 
 useEffect(() => {
+  console.log("TRY TRY TRY")
   const timer = setTimeout(() => {
     setShowSplash(false);
   }, 2000);

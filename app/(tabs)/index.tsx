@@ -25,7 +25,7 @@ export default function App(): React.JSX.Element {
   useEffect(() => {
     const checkLogged = async () => {
       try {
-        const token = await SecureStore.getItemAsync("access_token");
+        //const token = await SecureStore.getItemAsync("access_token");
         const test = await getCurrentUser();
         if (test.ok) {
           setLoggedIn(true);
@@ -40,6 +40,7 @@ export default function App(): React.JSX.Element {
 
     checkLogged();
   }, []);
+  
 
   if (loggedIn === null) {
     return (

@@ -9,8 +9,18 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]        // fixes imports like "@/components/themed-text"
+      "@/*": [
+        "./*"
+      ]
     },
-    "types": ["expo-router"] // good for router types
-  }
+    "types": [
+      "expo-router"
+    ]
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
 }

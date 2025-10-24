@@ -4,12 +4,31 @@
     "slug": "MyApp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "splash": {
+        "backgroundColor": "#ffffff"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs your location to find nearby grocery stores.",
+        "NSCameraUsageDescription": "Allow Freshly to use the camera for barcode scanning."
+      },
+      "plugins": [
+        [
+          "expo-camera",
+          {
+            "cameraPermission": "Allow Freshly to use the camera for barcode scanning."
+          }
+        ]
+      ],
+      "bundleIdentifier": "com.george.MyApp"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +38,10 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "splash": {
+        "backgroundColor": "#ffffff"
+      }
     },
     "web": {
       "output": "static",
@@ -27,16 +49,11 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       [
-        "expo-splash-screen",
+        "expo-camera",
         {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "cameraPermission": "Allow Freshly to use the camera for barcode scanning."
         }
       ]
     ],

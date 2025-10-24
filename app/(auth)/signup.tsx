@@ -133,7 +133,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         return;
       }
       await Storage.setItem("access_token", login.data.access_token);
-      showToast("error", "Sign up failed. Please try again.");
+      showToast("success", "Account createed successfully");
       // Send verification code before navigating
       try {
         const sent = await sendVerificationCode(email);
@@ -155,46 +155,46 @@ export default function CreateAccountScreen(): React.JSX.Element {
     }
   }
   const getMissingFields = (): string[] => {
-  const missing: string[] = [];
-  if (!username?.trim()) missing.push("Username");
-  if (!email?.trim()) missing.push("Email");
-  if (!mobile?.trim()) missing.push("Mobile");
-  if (!password?.trim()) missing.push("Password");
-  if (!confirmPassword?.trim()) missing.push("Confirm Password");
-  if (!agreedToTerms) missing.push("Terms & Conditions");
-  return missing;
-};
+    const missing: string[] = [];
+    if (!username?.trim()) missing.push("Username");
+    if (!email?.trim()) missing.push("Email");
+    if (!mobile?.trim()) missing.push("Mobile");
+    if (!password?.trim()) missing.push("Password");
+    if (!confirmPassword?.trim()) missing.push("Confirm Password");
+    if (!agreedToTerms) missing.push("Terms & Conditions");
+    return missing;
+  };
 
-const handleCreateAccount = () => {
-  // 1) Validate required fields first
-  const missing = getMissingFields();
-  if (missing.length > 0) {
-    showToast("error", `Please fill: ${missing.join(", ")}`);
-    return;
-  }
+  const handleCreateAccount = () => {
+    // 1) Validate required fields first
+    const missing = getMissingFields();
+    if (missing.length > 0) {
+      showToast("error", `Please fill: ${missing.join(", ")}`);
+      return;
+    }
 
-  // 2) Validate password match
-  if (password !== confirmPassword) {
-    showToast("error", "Passwords must match.");
-    return;
-  }
+    // 2) Validate password match
+    if (password !== confirmPassword) {
+      showToast("error", "Passwords must match.");
+      return;
+    }
 
-  // 3) Play tap animation then submit
-  Animated.sequence([
-    Animated.timing(buttonScale, {
-      toValue: 0.9,
-      duration: 100,
-      useNativeDriver: true,
-    }),
-    Animated.spring(buttonScale, {
-      toValue: 1,
-      friction: 3,
-      useNativeDriver: true,
-    }),
-  ]).start(() => {
-    onsubmit();
-  });
-};
+    // 3) Play tap animation then submit
+    Animated.sequence([
+      Animated.timing(buttonScale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(buttonScale, {
+        toValue: 1,
+        friction: 3,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onsubmit();
+    });
+  };
 
   const handleSignIn = () => {
     console.log("Navigate to sign in");
@@ -340,8 +340,8 @@ const handleCreateAccount = () => {
                 />
               </View>
               <TextInput
-                style={styles.input}
-                placeholder="Enter password"
+
+placeholder="Enter password"
                 placeholderTextColor="#B0B0B0"
                 value={password}
                 onChangeText={setPassword}
@@ -549,12 +549,12 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(16),
     color: "#00C853",
   },
+
   input: {
     flex: 1,
-    fontSize: moderateScale(14),
+    fontSize: 14,
     color: "#111111",
     fontFamily: "System",
-    outlineWidth: 0,
     borderWidth: 0,
   },
   eyeButton: {

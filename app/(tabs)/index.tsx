@@ -1,47 +1,25 @@
 // app/(tabs)/index.tsx
-import React, { useMemo, useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ImageBackground,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Animated,
-} from "react-native";
-import * as SecureStore from "expo-secure-store";
-import HomeDashboard from "../(home)/main";
-import LoginScreen from "../(auth)/Login";
-import CreateAccountScreen from "../(auth)/signup";
-import PantryDashboard from "../(home)/pantry";
+import { useEffect, useState } from "react";
+import { Redirect, useRouter } from "expo-router";
+import { View, Text } from "react-native";
 import { getCurrentUser } from "@/api/Auth/auth";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ...
-
-export default function App(): React.JSX.Element {
-  const [loggedIn, setLoggedIn] = useState<boolean | null>(null); // null = still loading
+export default function IndexPage() {
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const checkLogged = async () => {
       try {
-        console.log("TRY TRY TRY TRY RTY TRY RTYT RYRT YTR Y")
-        //const token = await SecureStore.getItemAsync("access_token");
-        const test = await getCurrentUser();
-        if (test.ok) {
-          setLoggedIn(true);
-        } else {
-          setLoggedIn(false);
-        }
+        const res = await getCurrentUser();
+        setLoggedIn(res.ok);
       } catch (err) {
-        console.error("Login check failed:", err);
         setLoggedIn(false);
       }
     };
 
     checkLogged();
   }, []);
-
 
   if (loggedIn === null) {
     return (
@@ -51,5 +29,5 @@ export default function App(): React.JSX.Element {
     );
   }
 
-  return loggedIn ? <HomeDashboard /> : <LoginScreen />;
+  return <Redirect href={loggedIn ? "/(home)/main" : "/(auth)/Login"} />;
 }

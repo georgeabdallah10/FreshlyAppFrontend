@@ -15,21 +15,39 @@ import LoginScreen from "../(auth)/Login";
 import CreateAccountScreen from "../(auth)/signup";
 import PantryDashboard from "../(home)/pantry";
 import { getCurrentUser } from "@/api/Auth/auth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// ...
 
 export default function App(): React.JSX.Element {
-  const [loggedIn, setLoggedIn] = useState(false);
+  const [loggedIn, setLoggedIn] = useState<boolean | null>(null); // null = still loading
 
   useEffect(() => {
     const checkLogged = async () => {
-      const token = await SecureStore.getItemAsync("access_token");
-      console.log("Hello")
-      const test = await getCurrentUser()
-      if (test.ok){
-        setLoggedIn(true)
+      try {
+        const token = await SecureStore.getItemAsync("access_token");
+        const test = await getCurrentUser();
+        if (test.ok) {
+          setLoggedIn(true);
+        } else {
+          setLoggedIn(false);
+        }
+      } catch (err) {
+        console.error("Login check failed:", err);
+        setLoggedIn(false);
       }
     };
+
     checkLogged();
-  });
+  }, []);
+
+  if (loggedIn === null) {
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <Text>Loading...</Text>
+      </SafeAreaView>
+    );
+  }
+
   return loggedIn ? <HomeDashboard /> : <LoginScreen />;
 }

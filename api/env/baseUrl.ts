@@ -1,4 +1,4 @@
-export const BASE_URL = "https://backend.duckdns.org";
+export const BASE_URL = "https://freshlybackend.duckdns.org";
 
 //For iphone: http://172.20.10.2:8000 
 // Run backend on uvicorn main:app --host 0.0.0.0 --port 8000 --reload

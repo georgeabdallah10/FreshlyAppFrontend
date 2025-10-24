@@ -27,7 +27,7 @@ type MenuItem = {
 };
 
 const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
-  const router = useRouter();
+  const router = useRouter(); 
   const { user, logout} = useUser();
 
   // Accept whichever key your backend/context uses for the avatar URL
@@ -83,16 +83,7 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
   };
 
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        onPress: () => {
-          handleLogoutConfirm();
-        },
-        style: "destructive",
-      },
-    ]);
+    await handleLogoutConfirm();
   };
 
   return (

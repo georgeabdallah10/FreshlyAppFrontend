@@ -1,5 +1,6 @@
-import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
 import { BASE_URL } from "../env/baseUrl";
+import { Storage } from "../utils/storage";
 
 export type PreferenceInput = {
   diet_codes?: string[];
@@ -112,7 +113,7 @@ export async function loginUser(
 }
 
 export async function getCurrentUser() {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
 
   try {
     const res = await fetch(`${BASE_URL}/auth/me`, {
@@ -148,7 +149,7 @@ type User = {
 export const updateUserInfo = async (
   patch: Partial<{ name: string; email: string; phone_number: string; location: string; avatar_path: string; status: string;}>
 ): Promise<User> => {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
   if (!token) throw new Error("Not authenticated");
 
   const res = await fetch(`${BASE_URL}/users/me`, {
@@ -173,7 +174,7 @@ export const updateUserInfo = async (
 };
 
 export async function deleteAccount(){
-    const token = await SecureStore.getItemAsync("access_token");
+    const token = await Storage.getItem("access_token");
     const res = await fetch(`${BASE_URL}/me`, 
       {
         method: "DELETE",

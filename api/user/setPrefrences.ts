@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import { Storage } from "../utils/storage";
 import { BASE_URL } from "../env/baseUrl";
 
 export type setPrefrencesInput = {
@@ -29,7 +29,7 @@ export async function setPrefrences(
   input: setPrefrencesInput
 ): Promise<ApiResult<UserPreferenceOut>> {
   try {
-    const token = await SecureStore.getItemAsync("access_token");
+    const token = await Storage.getItem("access_token");
 
     const res = await fetch(`${BASE_URL}/preferences/me`, {
       method: "POST",
@@ -60,7 +60,7 @@ export async function setPrefrences(
 
 export async function getMyprefrences() {
   try {
-    const token = await SecureStore.getItemAsync("access_token");
+    const token = await Storage.getItem("access_token");
     const res = await fetch(`${BASE_URL}/preferences/me`, {
       method: "GET",
       headers: {

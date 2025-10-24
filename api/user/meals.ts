@@ -1,9 +1,9 @@
-import * as SecureStore from "expo-secure-store";
 import { BASE_URL } from "../env/baseUrl";
+import { Storage } from "../utils/storage";
 
 
 export async function getAllmealsforSignelUser(){
-    const token = await SecureStore.getItemAsync("access_token");
+    const token = await Storage.getItem("access_token");
     try {
         const res = await fetch(`${BASE_URL}/meals/me`,
         {
@@ -63,7 +63,7 @@ export type CreateMealInput = {
 };
 
 export async function createMealForSignleUser(input: CreateMealInput) {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
   const body = toApiMeal(input);
 
   const res = await fetch(`${BASE_URL}/meals/me`, {
@@ -122,7 +122,7 @@ function toApiMeal(meal: CreateMealInput) {
 }
 
 export async function updateMealForSignleUser(mealId: number, input: CreateMealInput) {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
   const body = toApiMeal(input); // backend expects full payload, not partial
 
   const res = await fetch(`${BASE_URL}/meals/me/${mealId}`, {
@@ -144,7 +144,7 @@ export async function updateMealForSignleUser(mealId: number, input: CreateMealI
 }
 
 export async function deleteMealForSignleUser(mealId: number) {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
 
   const res = await fetch(`${BASE_URL}/meals/me/${mealId}`, {
     method: "DELETE",

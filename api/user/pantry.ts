@@ -1,8 +1,8 @@
-import * as SecureStore from "expo-secure-store";
+import { Storage } from "../utils/storage";
 import { BASE_URL } from "../env/baseUrl";
 
 async function getAuthHeaders() {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
   if (!token) throw new Error("Not authenticated: missing access token");
   return {
     "Content-Type": "application/json",

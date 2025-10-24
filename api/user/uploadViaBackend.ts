@@ -1,6 +1,6 @@
 // api/user/uploadViaBackend.ts
 import * as ImageManipulator from "expo-image-manipulator";
-import * as SecureStore from "expo-secure-store";
+import { Storage } from "../utils/storage";
 import { BASE_URL } from "../env/baseUrl";
 
 export async function uploadAvatarViaProxy({
@@ -14,7 +14,7 @@ export async function uploadAvatarViaProxy({
   const manipulated = await ImageManipulator.manipulateAsync(
     uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
   );
-    const token = await SecureStore.getItemAsync("access_token");
+    const token = await Storage.getItem("access_token");
 
 
   const data = new FormData();

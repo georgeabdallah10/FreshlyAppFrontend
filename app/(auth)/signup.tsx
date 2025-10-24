@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import * as SecureStore from "expo-secure-store";
+import { Storage } from "@/api/utils/storage";
 
 import {
   View,
@@ -132,7 +132,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         );
         return;
       }
-      await SecureStore.setItemAsync("access_token", login.data.access_token);
+      await Storage.setItem("access_token", login.data.access_token);
       showToast("error", "Sign up failed. Please try again.");
       // Send verification code before navigating
       try {

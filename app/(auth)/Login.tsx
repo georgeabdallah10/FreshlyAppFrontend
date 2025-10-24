@@ -13,8 +13,8 @@ import {
 } from "react-native";
 import { loginUser } from "@/api/Auth/auth";
 import { useRouter } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import ToastBanner from "@/components/generalMessage";
+import { Storage } from "@/api/utils/storage";
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -82,7 +82,7 @@ export default function LoginScreen(): React.JSX.Element {
       password: password,
     });
     if (result.ok) {
-      await SecureStore.setItemAsync("access_token", result.data.access_token);
+      await Storage.setItem("access_token", result.data.access_token);
       showToast("success", "Login successful! Redirecting...");
       router.replace("/(auth)/emailVerficationCode");
     } else {

@@ -11,8 +11,8 @@ import {
   Animated,
 } from "react-native";
 import { useRouter, useSegments } from "expo-router";
-import * as SecureStore from "expo-secure-store";
 import { AddProductModal } from "@/components/quickAddModal";
+import { Storage } from "@/api/utils/storage";
 
 type MenuItem = {
   id: string;

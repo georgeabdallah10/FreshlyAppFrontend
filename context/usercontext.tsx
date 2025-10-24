@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import * as SecureStore from "expo-secure-store";
 import { getCurrentUser } from "@/api/Auth/auth";
 import { updateUserInfo as updateUserInfoApi } from "@/api/Auth/auth";
 import { getMyprefrences } from "@/api/user/setPrefrences";
 import { listMyPantryItems } from "@/api/user/pantry";
+import { Storage } from "@/api/utils/storage";
 
 type PantryItem = {
   id: number;
@@ -116,7 +116,7 @@ useEffect(() => {
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync("access_token");
+    await Storage.deleteItem("access_token");
     setUser(null);
   };
 

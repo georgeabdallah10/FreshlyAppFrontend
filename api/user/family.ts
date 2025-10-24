@@ -1,8 +1,9 @@
 // api/user/family.ts
-import * as SecureStore from "expo-secure-store";
 import { BASE_URL as API_URL } from "../env/baseUrl";
+import { Storage } from "../utils/storage";
+
 async function getAuthHeader() {
-  const token = await SecureStore.getItemAsync("access_token");
+  const token = await Storage.getItem("access_token");
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",

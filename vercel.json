@@ -1,7 +1,23 @@
 {
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "web-build",
-  "routes": [
-    { "src": "/(.*)", "dest": "/" }
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/_expo/*",
+      "destination": "/_expo/:splat"
+    },
+    {
+      "source": "/assets/*",
+      "destination": "/assets/:splat"
+    },
+    {
+      "source": "/favicon.ico",
+      "destination": "/favicon.ico"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }

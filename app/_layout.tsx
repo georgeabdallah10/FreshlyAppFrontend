@@ -22,17 +22,17 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [showSplash, setShowSplash] = useState(true);
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowSplash(false), 2000);
-        Splash.hideAsync();
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setShowSplash(false);
+  }, 2000);
 
-    return () => clearTimeout(timer);
-  }, []);
+  return () => clearTimeout(timer);
+}, []);
 
-  if (showSplash) {
-    return <SplashScreen />;
-  }
-
+if (showSplash) {
+  return <SplashScreen />;
+}
   return (
     <>
       <StatusBar hidden={true} />

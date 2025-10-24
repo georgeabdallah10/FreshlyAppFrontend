@@ -16,8 +16,6 @@ export const unstable_settings = {
   initialRouteName: "(tabs)",
 };
 
-Splash.preventAutoHideAsync();
-
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [showSplash, setShowSplash] = useState(true);

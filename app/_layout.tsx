@@ -37,7 +37,7 @@ if (showSplash) {
       <StatusBar hidden={true} />
       <UserProvider>
         <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-          <Slot /> {/* This renders the active route */}
+          <Slot /> 
         </ThemeProvider>
       </UserProvider>
     </>

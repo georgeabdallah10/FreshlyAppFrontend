@@ -84,7 +84,7 @@ export default function LoginScreen(): React.JSX.Element {
     if (result.ok) {
       await Storage.setItem("access_token", result.data.access_token);
       showToast("success", "Login successful! Redirecting...");
-      router.replace("/(auth)/emailVerficationCode");
+      router.replace("/(home)/main");
     } else {
       showToast("error", result.message ?? "Login failed. Please try again.");
     }

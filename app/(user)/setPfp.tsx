@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
 } from "react-native";
+import { Platform } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { getCurrentUser } from "@/api/Auth/auth";
@@ -131,9 +132,17 @@ export const SetPfp = () => {
       if (!userID)
         throw new Error("No user ID; make sure the user is signed in.");
 
+      let finalUri: string | File = assetUri;      if (Platform.OS === "web") {
+        // Fetch blob and convert to File for web upload
+        const response = await fetch(assetUri);
+        const blob = await response.blob();
+        const file = new File([blob], "avatar.jpg", { type: blob.type });
+        finalUri = file;
+      }
+
       // Upload via backend proxy (uses x-user-id and SERVICE_ROLE on server)
       const { publicUrl } = await uploadAvatarViaProxy({
-        uri: assetUri,
+        uri: finalUri,
         appUserId: userID,
       });
 
@@ -173,8 +182,16 @@ export const SetPfp = () => {
       if (!userID)
         throw new Error("No user ID; make sure the user is signed in.");
 
+      let finalUri: string | File = assetUri;      if (Platform.OS === "web") {
+        // Fetch blob and convert to File for web upload
+        const response = await fetch(assetUri);
+        const blob = await response.blob();
+        const file = new File([blob], "avatar.jpg", { type: blob.type });
+        finalUri = file;
+      }
+
       const { publicUrl } = await uploadAvatarViaProxy({
-        uri: assetUri,
+        uri: finalUri,
         appUserId: userID,
       });
 

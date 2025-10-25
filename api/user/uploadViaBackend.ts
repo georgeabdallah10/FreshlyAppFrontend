@@ -6,27 +6,30 @@ import { Platform } from "react-native";
 
 export async function uploadAvatarViaProxy({
   uri,
-  appUserId,       // <-- pass your app's user id here
+  appUserId,
 }: {
-  uri: string;
+  uri: string | File;
   appUserId: string;
 }) {
   const token = await Storage.getItem("access_token");
 
   const data = new FormData();
 
-  if (Platform.OS === "web") {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
-    data.append("file", file);
+  if (typeof uri === "string") {
+    if (Platform.OS === "web") {
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      const file = new File([blob], "profile.jpg", { type: "image/jpeg" });
+      data.append("file", file);
+    } else {
+      const manipulated = await ImageManipulator.manipulateAsync(
+        uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+      );
+      // @ts-ignore
+      data.append("file", { uri: manipulated.uri, name: "profile.jpg", type: "image/jpeg" });
+    }
   } else {
-    // normalize to JPEG for consistency
-    const manipulated = await ImageManipulator.manipulateAsync(
-      uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
-    );
-    // @ts-ignore: RN FormData shape
-    data.append("file", { uri: manipulated.uri, name: "profile.jpg", type: "image/jpeg" });
+    data.append("file", uri); // File object from web
   }
 
   const res = await fetch(`${BASE_URL}/storage/avatar/proxy`, {

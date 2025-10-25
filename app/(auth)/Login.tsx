@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 56,
     fontWeight: "700",
-    color: "#00C853",
+    color: "#00A86B",
     fontFamily: "System",
     letterSpacing: -1,
     marginTop: -30,

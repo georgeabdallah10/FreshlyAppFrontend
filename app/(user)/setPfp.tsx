@@ -16,11 +16,39 @@ import { getCurrentUser } from "@/api/Auth/auth";
 import { uploadAvatarViaProxy } from "@/api/user/uploadViaBackend";
 import { useUser } from "@/context/usercontext";
 import Icon from "@/components/profileSection/components/icon";
+import ToastBanner from "@/components/generalMessage";
+
 
 type Step = "initial" | "scanning" | "captured" | "success";
+type ToastType = "success" | "error";
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+  duration?: number;
+  topOffset?: number;
+}
 
 // Cache-bust helper to avoid stale images when re-uploading the same path
 const cacheBust = (url: string) => `${url}${url.includes('?') ? '&' : '?'}v=${Date.now()}`;
+
+const toErrorText = (err: any): string => {
+  if (!err) return "Something went wrong. Please try again.";
+  if (typeof err === "string") return err;
+  if (Array.isArray(err)) {
+    return err.map((e) => (e?.msg ?? e?.message ?? String(e))).join("\n");
+  }
+  if (typeof err === "object") {
+    if ((err as any).msg) return String((err as any).msg);
+    if ((err as any).message) return String((err as any).message);
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "An unexpected error occurred.";
+    }
+  }
+  return String(err);
+};
 
 export const SetPfp = () => {
   const router = useRouter();
@@ -31,6 +59,23 @@ export const SetPfp = () => {
   const [progress, setProgress] = useState(0);
   const [userID, setUserID] = useState("");
   const { user, updateUserInfo, refreshUser } = useUser();
+
+  const [toast, setToast] = useState<ToastState>({
+    visible: false,
+    type: "success",
+    message: "",
+    duration: 3000,
+    topOffset: 40,
+  });
+  const showToast = (
+    type: ToastType,
+    message: unknown,
+    duration: number = 3000,
+    topOffset: number = 40
+  ) => {
+    const text = toErrorText(message);
+    setToast({ visible: true, type, message: text, duration, topOffset });
+  };
 
   const scanAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
@@ -58,6 +103,7 @@ export const SetPfp = () => {
     // 3) Give the backend a tick to commit, then refresh local user data
     await new Promise((r) => setTimeout(r, 300));
     await Promise.resolve(refreshUser());
+    showToast("success", "Profile photo updated!");
   };
 
   // Animated scanning circle
@@ -113,7 +159,7 @@ export const SetPfp = () => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Camera permission is required");
+        showToast("error", "Camera permission is required");
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -124,15 +170,22 @@ export const SetPfp = () => {
       });
       if (result.canceled) return;
 
+      // Pre-check userID before starting scanning/upload
+      if (!userID) {
+        showToast("error", "No user ID; please sign in and try again.");
+        setCurrentStep("initial");
+        setUploading(false);
+        return;
+      }
+
       setCurrentStep("scanning");
       setUploading(true);
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from camera.");
-      if (!userID)
-        throw new Error("No user ID; make sure the user is signed in.");
 
-      let finalUri: string | File = assetUri;      if (Platform.OS === "web") {
+      let finalUri: string | File = assetUri;
+      if (Platform.OS === "web") {
         // Fetch blob and convert to File for web upload
         const response = await fetch(assetUri);
         const blob = await response.blob();
@@ -153,7 +206,7 @@ export const SetPfp = () => {
       setCurrentStep("captured");
     } catch (err: any) {
       setUploading(false);
-      Alert.alert("Upload failed", err?.message || "Please try again.");
+      showToast("error", err?.message ?? "Upload failed. Please try again.");
       setCurrentStep("initial");
     }
   };
@@ -163,7 +216,7 @@ export const SetPfp = () => {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission needed", "Gallery permission is required");
+        showToast("error", "Gallery permission is required");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -174,15 +227,22 @@ export const SetPfp = () => {
       });
       if (result.canceled) return;
 
+      // Pre-check userID before starting scanning/upload
+      if (!userID) {
+        showToast("error", "No user ID; please sign in and try again.");
+        setCurrentStep("initial");
+        setUploading(false);
+        return;
+      }
+
       setCurrentStep("scanning");
       setUploading(true);
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from gallery.");
-      if (!userID)
-        throw new Error("No user ID; make sure the user is signed in.");
 
-      let finalUri: string | File = assetUri;      if (Platform.OS === "web") {
+      let finalUri: string | File = assetUri;
+      if (Platform.OS === "web") {
         // Fetch blob and convert to File for web upload
         const response = await fetch(assetUri);
         const blob = await response.blob();
@@ -202,7 +262,7 @@ export const SetPfp = () => {
       setCurrentStep("captured");
     } catch (err: any) {
       setUploading(false);
-      Alert.alert("Upload failed", err?.message || "Please try again.");
+      showToast("error", err?.message ?? "Upload failed. Please try again.");
       setCurrentStep("initial");
     }
   };
@@ -214,7 +274,7 @@ export const SetPfp = () => {
       if (currentStep === "captured") {
         setCurrentStep("success");
       } else if (currentStep === "success") {
-        Alert.alert("Success", "Account created successfully!");
+        showToast("success", "Account created successfully!");
         router.replace("/(auth)/familyAuth");
       }
     }
@@ -413,6 +473,14 @@ export const SetPfp = () => {
       {currentStep === "scanning" && renderScanningScreen()}
       {currentStep === "captured" && renderCapturedScreen()}
       {currentStep === "success" && renderSuccessScreen()}
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        duration={toast.duration ?? 3000}
+        topOffset={toast.topOffset ?? 40}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 };

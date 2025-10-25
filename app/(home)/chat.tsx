@@ -55,7 +55,7 @@ function parseIngredientToJson(ingredient: string) {
     /^(.+?)\s*-\s*(\d+(?:\.\d+)?)\s*(cups?|tbsp|tsp|g|grams?|kg|ml|l|oz|lbs?|pounds?)$/i,
     /^(\d+(?:\.\d+)?)\s+(.+)$/,
   ];
-  
+
   for (const pattern of patterns) {
     const match = ingredient.match(pattern);
     if (match) {
@@ -63,34 +63,37 @@ function parseIngredientToJson(ingredient: string) {
         return {
           ingredient_name: match[3].trim(),
           quantity: match[1],
-          unit: match[2].toLowerCase()
+          unit: match[2].toLowerCase(),
         };
       } else if (patterns.indexOf(pattern) === 1) {
         return {
           ingredient_name: match[1].trim(),
           quantity: match[2],
-          unit: match[3].toLowerCase()
+          unit: match[3].toLowerCase(),
         };
       } else {
         return {
           ingredient_name: match[2].trim(),
           quantity: match[1],
-          unit: ""
+          unit: "",
         };
       }
     }
   }
-  
+
   return {
     ingredient_name: ingredient.trim(),
     quantity: "",
-    unit: ""
+    unit: "",
   };
 }
 
 // Animated Text Component for typing effect (memoized)
 const AnimatedTypingTextBase = ({ text }: { text: string }) => {
-  useEffect(() => { console.log('MOUNT typing'); return () => console.log('UNMOUNT typing'); }, []);
+  useEffect(() => {
+    console.log("MOUNT typing");
+    return () => console.log("UNMOUNT typing");
+  }, []);
   const [displayedText, setDisplayedText] = useState("");
   const [index, setIndex] = useState(0);
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -119,12 +122,13 @@ const AnimatedTypingTextBase = ({ text }: { text: string }) => {
   }, []);
 
   return (
-    <Animated.Text style={[styles.messageText, { opacity: fadeAnim }]}> 
+    <Animated.Text style={[styles.messageText, { opacity: fadeAnim }]}>
       {displayedText}
     </Animated.Text>
   );
 };
 const AnimatedTypingText = React.memo(AnimatedTypingTextBase);
+
 function extractJson(s: string) {
   const trimmed = s
     .trim()
@@ -147,6 +151,177 @@ function tryParseRecipe(s: string): RecipeCard | null {
   } catch {}
   return null;
 }
+
+/** --- HOISTED: TypingIndicator (memoized) --- */
+const TypingIndicator = React.memo(function TypingIndicator() {
+  const dot1 = useRef(new Animated.Value(0)).current;
+  const dot2 = useRef(new Animated.Value(0)).current;
+  const dot3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = (dot: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(dot, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 400, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    animate(dot1, 0);
+    animate(dot2, 150);
+    animate(dot3, 300);
+  }, []);
+
+  return (
+    <View style={styles.typingIndicator}>
+      <Animated.View
+        style={[
+          styles.typingDot,
+          {
+            opacity: dot1,
+            transform: [
+              {
+                translateY: dot1.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -8],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.typingDot,
+          {
+            opacity: dot2,
+            transform: [
+              {
+                translateY: dot2.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -8],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+      <Animated.View
+        style={[
+          styles.typingDot,
+          {
+            opacity: dot3,
+            transform: [
+              {
+                translateY: dot3.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -8],
+                }),
+              },
+            ],
+          },
+        ]}
+      />
+    </View>
+  );
+});
+
+/** --- HOISTED: RecipeCardView (memoized) --- */
+type RecipeCardViewProps = { data: RecipeCard; onMatchGrocery: (r: RecipeCard) => void };
+
+function RecipeCardViewBase({ data, onMatchGrocery }: RecipeCardViewProps) {
+  const cardFadeAnim = useRef(new Animated.Value(0)).current;
+  const cardSlideAnim = useRef(new Animated.Value(30)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(cardFadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.spring(cardSlideAnim, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
+  return (
+    <Animated.View
+      style={[
+        styles.messageBubble,
+        styles.aiMessage,
+        styles.cardRoot,
+        { opacity: cardFadeAnim, transform: [{ translateY: cardSlideAnim }] },
+      ]}
+    >
+      <Text style={styles.headerSummaryText}>{data.headerSummary}</Text>
+
+      <View style={styles.cardSection}>
+        <Text style={styles.sectionTitle}>Ingredients</Text>
+        {data.ingredients.map((sec, i) => (
+          <View key={i} style={{ marginTop: 8 }}>
+            {!!sec.title && <Text style={styles.subTitle}>{sec.title}</Text>}
+            {sec.items.map((line, j) => (
+              <Text key={j} style={styles.bulletText}>• {line}</Text>
+            ))}
+          </View>
+        ))}
+      </View>
+
+      <View style={styles.cardSection}>
+        <Text style={styles.sectionTitle}>Instructions</Text>
+        {data.instructions.map((stepLines, idx) => (
+          <View key={idx} style={{ marginTop: 10 }}>
+            <Text style={styles.stepNumber}>{idx + 1}.</Text>
+            {stepLines.map((ln, k) => (
+              <Text key={k} style={styles.bulletText}>{ln}</Text>
+            ))}
+          </View>
+        ))}
+      </View>
+
+      {data.optionalAdditions?.length ? (
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionTitle}>Optional Additions</Text>
+          {data.optionalAdditions.map((ln, i) => (
+            <Text key={i} style={styles.bulletText}>• {ln}</Text>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={styles.cardSection}>
+        <Text style={styles.sectionTitle}>Pantry Check</Text>
+        <Text style={styles.bulletText}>
+          Used from pantry: {data.pantryCheck?.usedFromPantry?.join(", ") || "None"}
+        </Text>
+      </View>
+
+      <View style={styles.cardSection}>
+        <Text style={styles.sectionTitle}>Shopping List (Minimal)</Text>
+        {data.shoppingListMinimal?.length ? (
+          data.shoppingListMinimal.map((ln, i) => (
+            <Text key={i} style={styles.bulletText}>• {ln}</Text>
+          ))
+        ) : (
+          <Text style={styles.bulletText}>Nothing needed</Text>
+        )}
+      </View>
+
+      {data.finalNote ? (
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionTitle}>Final Note</Text>
+          <Text style={styles.bulletText}>{data.finalNote}</Text>
+        </View>
+      ) : null}
+
+      <TouchableOpacity
+        style={styles.matchGroceryButton}
+        onPress={() => onMatchGrocery(data)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="cart-outline" size={20} color="#FFF" />
+        <Text style={styles.matchGroceryText}>Match My Grocery</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+const RecipeCardView = React.memo(RecipeCardViewBase);
 
 export default function ChatAIScreen() {
   const { prefrences } = useUser();
@@ -318,7 +493,8 @@ Rules:
         setShowActionSheet(false);
       }
     } else if (selectedAction === "gallery") {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Denied", "Gallery permission is required.");
         return;
@@ -342,15 +518,21 @@ Rules:
     const userId = uid();
     const typingId = "__typing__"; // stable id for typing indicator
 
-    setMessages((prev) => [...prev, { id: userId, kind: "user", text: userText }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: userId, kind: "user", text: userText },
+    ]);
     setMessage("");
 
     // Add typing message (stable id)
-    setMessages((prev) => [...prev, { id: typingId, kind: "ai_text", text: "", isTyping: true }]);
+    setMessages((prev) => [
+      ...prev,
+      { id: typingId, kind: "ai_text", text: "", isTyping: true },
+    ]);
 
     const response = await askAI({
       prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
-      system:  `${system_prompt}`
+      system: `${system_prompt}`,
     });
 
     // Remove typing indicator by id
@@ -358,242 +540,47 @@ Rules:
 
     const recipe = tryParseRecipe(response);
     if (recipe) {
-      setMessages((prev) => [...prev, { id: uid(), kind: "ai_recipe", recipe }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), kind: "ai_recipe", recipe },
+      ]);
     } else {
-      setMessages((prev) => [...prev, { id: uid(), kind: "ai_text", text: response }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), kind: "ai_text", text: response },
+      ]);
     }
   };
-  // Replace the existing handleMatchGrocery function in ChatAIScreen with this:
 
-const handleMatchGrocery = (recipe: RecipeCard) => {
-  const groceryList: any[] = [];
-  
-  // Extract all ingredients from the recipe
-  recipe.ingredients.forEach(section => {
-    section.items.forEach(item => {
-      const parsed = parseIngredientToJson(item);
-      groceryList.push(parsed);
+  const handleMatchGrocery = (recipe: RecipeCard) => {
+    const groceryList: any[] = [];
+
+    // Extract all ingredients from the recipe
+    recipe.ingredients.forEach((section) => {
+      section.items.forEach((item) => {
+        const parsed = parseIngredientToJson(item);
+        groceryList.push(parsed);
+      });
     });
-  });
 
-  console.log("Grocery List to send:", groceryList);
-  console.log("Pantry Items to send:", pantryItems);
+    console.log("Grocery List to send:", groceryList);
+    console.log("Pantry Items to send:", pantryItems);
 
-  // Validate we have data
-  if (groceryList.length === 0) {
-    Alert.alert("Error", "No ingredients found in recipe");
-    return;
-  }
-
-  // Navigate to Match My Grocery screen with actual recipe data and pantry items
-  router.push({
-    pathname:"/(home)/matchMyGrocery", // Make sure this matches your route file name
-    params: { 
-      groceryData: JSON.stringify(groceryList),
-      pantryData: JSON.stringify(pantryItems)
+    // Validate we have data
+    if (groceryList.length === 0) {
+      Alert.alert("Error", "No ingredients found in recipe");
+      return;
     }
-  });
-};
 
-  // Recipe Card Component
-  function RecipeCardViewBase({ data }: { data: RecipeCard }) {
-    const cardFadeAnim = useRef(new Animated.Value(0)).current;
-    const cardSlideAnim = useRef(new Animated.Value(30)).current;
-
-    useEffect(() => {
-      Animated.parallel([
-        Animated.timing(cardFadeAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.spring(cardSlideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 8,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }, []);
-
-    return (
-      <Animated.View
-        style={[
-          styles.messageBubble,
-          styles.aiMessage,
-          styles.cardRoot,
-          {
-            opacity: cardFadeAnim,
-            transform: [{ translateY: cardSlideAnim }],
-          },
-        ]}
-      >
-        <Text style={styles.headerSummaryText}>{data.headerSummary}</Text>
-
-        <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>Ingredients</Text>
-          {data.ingredients.map((sec, i) => (
-            <View key={i} style={{ marginTop: 8 }}>
-              {!!sec.title && <Text style={styles.subTitle}>{sec.title}</Text>}
-              {sec.items.map((line, j) => (
-                <Text key={j} style={styles.bulletText}>
-                  • {line}
-                </Text>
-              ))}
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>Instructions</Text>
-          {data.instructions.map((stepLines, idx) => (
-            <View key={idx} style={{ marginTop: 10 }}>
-              <Text style={styles.stepNumber}>{idx + 1}.</Text>
-              {stepLines.map((ln, k) => (
-                <Text key={k} style={styles.bulletText}>
-                  {ln}
-                </Text>
-              ))}
-            </View>
-          ))}
-        </View>
-
-        {data.optionalAdditions?.length ? (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionTitle}>Optional Additions</Text>
-            {data.optionalAdditions.map((ln, i) => (
-              <Text key={i} style={styles.bulletText}>
-                • {ln}
-              </Text>
-            ))}
-          </View>
-        ) : null}
-
-        <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>Pantry Check</Text>
-          <Text style={styles.bulletText}>
-            Used from pantry:{" "}
-            {data.pantryCheck?.usedFromPantry?.join(", ") || "None"}
-          </Text>
-        </View>
-
-        <View style={styles.cardSection}>
-          <Text style={styles.sectionTitle}>Shopping List (Minimal)</Text>
-          {data.shoppingListMinimal?.length ? (
-            data.shoppingListMinimal.map((ln, i) => (
-              <Text key={i} style={styles.bulletText}>
-                • {ln}
-              </Text>
-            ))
-          ) : (
-            <Text style={styles.bulletText}>Nothing needed</Text>
-          )}
-        </View>
-
-        {data.finalNote ? (
-          <View style={styles.cardSection}>
-            <Text style={styles.sectionTitle}>Final Note</Text>
-            <Text style={styles.bulletText}>{data.finalNote}</Text>
-          </View>
-        ) : null}
-
-        <TouchableOpacity
-          style={styles.matchGroceryButton}
-          onPress={() => handleMatchGrocery(data)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="cart-outline" size={20} color="#FFF" />
-          <Text style={styles.matchGroceryText}>Match My Grocery</Text>
-        </TouchableOpacity>
-      </Animated.View>
-    );
-  }
-
-  const RecipeCardView = React.memo(RecipeCardViewBase);
-
-  // Typing indicator component
-  function TypingIndicator() {
-    const dot1 = useRef(new Animated.Value(0)).current;
-    const dot2 = useRef(new Animated.Value(0)).current;
-    const dot3 = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      const animate = (dot: Animated.Value, delay: number) => {
-        Animated.loop(
-          Animated.sequence([
-            Animated.delay(delay),
-            Animated.timing(dot, {
-              toValue: 1,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-            Animated.timing(dot, {
-              toValue: 0,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
-      };
-
-      animate(dot1, 0);
-      animate(dot2, 150);
-      animate(dot3, 300);
-    }, []);
-
-    return (
-      <View style={styles.typingIndicator}>
-        <Animated.View
-          style={[
-            styles.typingDot,
-            {
-              opacity: dot1,
-              transform: [
-                {
-                  translateY: dot1.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.typingDot,
-            {
-              opacity: dot2,
-              transform: [
-                {
-                  translateY: dot2.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.typingDot,
-            {
-              opacity: dot3,
-              transform: [
-                {
-                  translateY: dot3.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -8],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-      </View>
-    );
-  }
+    // Navigate to Match My Grocery screen with actual recipe data and pantry items
+    router.push({
+      pathname: "/(home)/matchMyGrocery",
+      params: {
+        groceryData: JSON.stringify(groceryList),
+        pantryData: JSON.stringify(pantryItems),
+      },
+    });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -608,9 +595,6 @@ const handleMatchGrocery = (recipe: RecipeCard) => {
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Freshly AI</Text>
-        <TouchableOpacity style={styles.addButton}>
-          <Ionicons name="add-circle-outline" size={28} color="#000" />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -630,19 +614,34 @@ const handleMatchGrocery = (recipe: RecipeCard) => {
                 key={msg.id}
                 style={[styles.messageBubble, styles.userMessage]}
               >
-                <Text style={[styles.messageText, { color: "#FFF" }]}>{msg.text}</Text>
+                <Text style={[styles.messageText, { color: "#FFF" }]}>
+                  {msg.text}
+                </Text>
               </View>
             );
           }
           if (msg.kind === "ai_text") {
             return (
-              <View key={msg.id} style={[styles.messageBubble, styles.aiMessage]}>
-                {msg.isTyping ? <TypingIndicator /> : <AnimatedTypingText text={msg.text} />}
+              <View
+                key={msg.id}
+                style={[styles.messageBubble, styles.aiMessage]}
+              >
+                {msg.isTyping ? (
+                  <TypingIndicator />
+                ) : (
+                  <AnimatedTypingText text={msg.text} />
+                )}
               </View>
             );
           }
           if (msg.kind === "ai_recipe") {
-            return <RecipeCardView key={msg.id} data={msg.recipe} />;
+            return (
+              <RecipeCardView
+                key={msg.id}
+                data={msg.recipe}
+                onMatchGrocery={handleMatchGrocery}
+              />
+            );
           }
           return null;
         })}
@@ -666,11 +665,6 @@ const handleMatchGrocery = (recipe: RecipeCard) => {
             >
               <Ionicons name="camera-outline" size={20} color="#B4B8BF" />
             </TouchableOpacity>
-
-            <View style={styles.searchPill}>
-              <Ionicons name="globe-outline" size={16} color="#B4B8BF" />
-              <Text style={styles.searchPillText}>Search</Text>
-            </View>
           </View>
         </View>
 
@@ -797,7 +791,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-evenly",
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 16,

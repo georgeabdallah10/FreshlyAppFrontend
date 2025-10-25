@@ -18,7 +18,6 @@ import { useRouter, Redirect } from "expo-router";
 import { registerUser, loginUser, sendVerificationCode } from "@/api/Auth/auth";
 import ToastBanner from "@/components/generalMessage";
 
-
 type ToastType = "success" | "error";
 interface ToastState {
   visible: boolean;
@@ -232,6 +231,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 resizeMode="contain"
               />
               <Text style={styles.brandName}>Freshly</Text>
+              <Text style={{ color: "#00A86B", fontSize: 20 }}>
+                Smarter Shopping.
+              </Text>
+              <Text style={{ color: "#FD8100", fontSize: 20 }}>
+                Healthier Living.
+              </Text>
             </View>
           </Animated.View>
 
@@ -344,6 +349,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 />
               </View>
               <TextInput
+                style={styles.input}
                 placeholder="Enter password"
                 placeholderTextColor="#B0B0B0"
                 value={password}
@@ -484,7 +490,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 90,
+    paddingTop: 55,
   },
   keyboardView: {
     flex: 1,
@@ -498,7 +504,7 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: "center",
     marginBottom: verticalScale(5),
-    marginTop: -40 ,
+    marginTop: -40,
   },
   logoPlaceholder: {
     width: moderateScale(60),

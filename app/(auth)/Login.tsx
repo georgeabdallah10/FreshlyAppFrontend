@@ -162,6 +162,11 @@ export default function LoginScreen(): React.JSX.Element {
                 resizeMode="contain"
               />
               <Text style={styles.brandName}>Freshly</Text>
+              <Text style={styles.welcomeText}>
+                <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text>
+                {"\n"}
+                <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+              </Text>
             </View>
           </Animated.View>
 
@@ -176,9 +181,9 @@ export default function LoginScreen(): React.JSX.Element {
             ]}
           >
             {/* Header */}
-            <Text style={styles.title}>Getting Started</Text>
+            <Text style={styles.title}>Welcome Back👋</Text>
             <Text style={styles.subtitle}>
-              Sign in to continue your{"\n"}exploration.
+              Login to plan smarter, shop better, {"\n"} and eat healthier.
             </Text>
             {/* Email Input */}
             <Animated.View
@@ -214,7 +219,8 @@ export default function LoginScreen(): React.JSX.Element {
                 passwordFocused && styles.inputContainerFocused,
               ]}
             >
-              <View style={styles.iconContainer}>xf
+              <View style={styles.iconContainer}>
+                
                 <Image
                   source={require("../../assets/icons/lock.png")}
                   style={styles.menuCardIcon}
@@ -290,10 +296,6 @@ export default function LoginScreen(): React.JSX.Element {
               <Text style={styles.signUpLink}>Sign Up</Text>
             </TouchableOpacity>
           </Animated.View>
-          <Text style={styles.welcomeText}>
-            <Text style={{ color: "#00A86B" }}>Smarter shopping.</Text> {"\n"}
-            <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
-          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
       <ToastBanner
@@ -312,7 +314,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop:50,
+    paddingTop: 50,
   },
   keyboardView: {
     flex: 1,
@@ -323,7 +325,7 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   logoContainer: {
-    marginTop: -20,
+    marginTop: 0,
     alignItems: "center",
     marginBottom: 20,
   },
@@ -449,15 +451,7 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
     lineHeight: 32,
-    marginTop: 30,
-  },
-  topHeader: {
-    width: "auto",
-    height: "auto",
-    borderWidth: 2,
-  },
-  topHeaderTtile: {
-    color: "",
+    marginTop: 5,
   },
   brandName: {
     fontSize: 56,

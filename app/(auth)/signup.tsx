@@ -149,7 +149,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
       //pathname: "/(auth)/emailVerficationCode",
       //params: { fromSignUp: "true", email },
       //});
-      router.replace("/(home)/main");
+      router.replace("/(user)/setPfp");
       return;
     } else {
       showToast("error", result.message || "Sign up failed. Please try again.");

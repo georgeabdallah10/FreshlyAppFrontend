@@ -30,7 +30,7 @@ const toErrorText = (err: any): string => {
   if (typeof err === "string") return err;
   if (Array.isArray(err)) {
     // Likely FastAPI/Pydantic errors array
-    return err.map((e) => (e?.msg ?? e?.message ?? String(e))).join("\n");
+    return err.map((e) => e?.msg ?? e?.message ?? String(e)).join("\n");
   }
   if (typeof err === "object") {
     if (err.msg) return String(err.msg);
@@ -134,8 +134,6 @@ export default function LoginScreen(): React.JSX.Element {
     router.replace("/(auth)/signup");
   };
 
-  
-
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -157,16 +155,13 @@ export default function LoginScreen(): React.JSX.Element {
               },
             ]}
           >
-            <Text style={styles.welcomeText}>
-              <Text style={{ color: "#00A86B" }}>Smarter</Text> shopping{"\n"}
-              <Text style={{ color: "#FD8100" }}>Healthier</Text> Living
-            </Text>
-            <View>
+            <View style={styles.logoContainer}>
               <Image
-                source={require("../../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")} // Update with your image path
                 style={styles.logoImage}
                 resizeMode="contain"
               />
+              <Text style={styles.brandName}>Freshly</Text>
             </View>
           </Animated.View>
 
@@ -295,6 +290,10 @@ export default function LoginScreen(): React.JSX.Element {
               <Text style={styles.signUpLink}>Sign Up</Text>
             </TouchableOpacity>
           </Animated.View>
+          <Text style={styles.welcomeText}>
+            <Text style={{ color: "#00A86B" }}>Smarter shopping.</Text> {"\n"}
+            <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
       <ToastBanner
@@ -322,10 +321,11 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingBottom: 30,
-    
   },
   logoContainer: {
+    marginTop: -20,
     alignItems: "center",
+    marginBottom: 20,
   },
   logoImage: {
     width: 150,
@@ -445,12 +445,26 @@ const styles = StyleSheet.create({
     height: 26,
   },
   welcomeText: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#111111",
+    fontSize: 22,
+    fontWeight: "500",
     textAlign: "center",
     lineHeight: 32,
-    marginTop: 10,
-    marginBottom: -25,
+    marginTop: 30,
+  },
+  topHeader: {
+    width: "auto",
+    height: "auto",
+    borderWidth: 2,
+  },
+  topHeaderTtile: {
+    color: "",
+  },
+  brandName: {
+    fontSize: 56,
+    fontWeight: "700",
+    color: "#00C853",
+    fontFamily: "System",
+    letterSpacing: -1,
+    marginTop: -30,
   },
 });

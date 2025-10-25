@@ -146,10 +146,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
       // Navigate to the verification screen
       //router.replace({
-        //pathname: "/(auth)/emailVerficationCode",
-        //params: { fromSignUp: "true", email },
+      //pathname: "/(auth)/emailVerficationCode",
+      //params: { fromSignUp: "true", email },
       //});
-      router.replace("/(home)/main")
+      router.replace("/(home)/main");
       return;
     } else {
       showToast("error", result.message || "Sign up failed. Please try again.");
@@ -223,12 +223,13 @@ export default function CreateAccountScreen(): React.JSX.Element {
               },
             ]}
           >
-            <View style={styles.logoPlaceholder}>
+            <View style={styles.logoContainer}>
               <Image
-                source={require("../../assets/images/logo.png")}
+                source={require("../../assets/images/logo.png")} // Update with your image path
                 style={styles.logoImage}
                 resizeMode="contain"
               />
+              <Text style={styles.brandName}>Freshly</Text>
             </View>
           </Animated.View>
 
@@ -341,8 +342,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 />
               </View>
               <TextInput
-
-placeholder="Enter password"
+                placeholder="Enter password"
                 placeholderTextColor="#B0B0B0"
                 value={password}
                 onChangeText={setPassword}
@@ -495,7 +495,8 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: "center",
-    marginBottom: verticalScale(20),
+    marginBottom: verticalScale(5),
+    marginTop: -40 ,
   },
   logoPlaceholder: {
     width: moderateScale(60),
@@ -646,5 +647,13 @@ const styles = StyleSheet.create({
   menuCardIcon: {
     width: 23,
     height: 23,
+  },
+  brandName: {
+    fontSize: 56,
+    fontWeight: "700",
+    color: "#00C853",
+    fontFamily: "System",
+    letterSpacing: -1,
+    marginTop: -30,
   },
 });

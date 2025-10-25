@@ -214,7 +214,7 @@ export default function LoginScreen(): React.JSX.Element {
                 passwordFocused && styles.inputContainerFocused,
               ]}
             >
-              <View style={styles.iconContainer}>
+              <View style={styles.iconContainer}>xf
                 <Image
                   source={require("../../assets/icons/lock.png")}
                   style={styles.menuCardIcon}
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 90,
+    paddingTop:50,
   },
   keyboardView: {
     flex: 1,

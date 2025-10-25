@@ -14,9 +14,10 @@ import {
   Platform,
   Dimensions,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, Redirect } from "expo-router";
 import { registerUser, loginUser, sendVerificationCode } from "@/api/Auth/auth";
 import ToastBanner from "@/components/generalMessage";
+
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -134,6 +135,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
       }
       await Storage.setItem("access_token", login.data.access_token);
       showToast("success", "Account createed successfully");
+      router.replace("/(user)/setPfp");
+
       // Send verification code before navigating
       try {
         const sent = await sendVerificationCode(email);
@@ -149,7 +152,6 @@ export default function CreateAccountScreen(): React.JSX.Element {
       //pathname: "/(auth)/emailVerficationCode",
       //params: { fromSignUp: "true", email },
       //});
-      router.replace("/(user)/setPfp");
       return;
     } else {
       showToast("error", result.message || "Sign up failed. Please try again.");

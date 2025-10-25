@@ -221,7 +221,7 @@ export const SetPfp = () => {
         </TouchableOpacity>
       ) : null}
 
-      <Text style={styles.title}>Face ID Verification</Text>
+      <Text style={styles.title}>Set a profile picture for yourself</Text>
       <Text style={styles.subtitle}>
         Please put your phone in front{"\n"}of your face.
       </Text>

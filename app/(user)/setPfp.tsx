@@ -183,6 +183,7 @@ export const SetPfp = () => {
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from camera.");
+      setSelectedImage(assetUri); // <-- Add this line
 
       let finalUri: string | File = assetUri;
       if (Platform.OS === "web") {
@@ -257,6 +258,7 @@ export const SetPfp = () => {
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from gallery.");
+      setSelectedImage(assetUri); // <-- Add this line
 
       let finalUri: string | File = assetUri;
       if (Platform.OS === "web") {

@@ -1,22 +1,22 @@
 // ==================== FaceVerificationFlow.tsx ====================
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Animated,
-  Image,
-  Alert,
-} from "react-native";
-import { Platform } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 import { getCurrentUser } from "@/api/Auth/auth";
 import { uploadAvatarViaProxy } from "@/api/user/uploadViaBackend";
-import { useUser } from "@/context/usercontext";
-import Icon from "@/components/profileSection/components/icon";
 import ToastBanner from "@/components/generalMessage";
+import Icon from "@/components/profileSection/components/icon";
+import { useUser } from "@/context/usercontext";
+import * as ImagePicker from "expo-image-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 
 type Step = "initial" | "scanning" | "captured" | "success";
@@ -186,11 +186,28 @@ export const SetPfp = () => {
 
       let finalUri: string | File = assetUri;
       if (Platform.OS === "web") {
-        // Fetch blob and convert to File for web upload
-        const response = await fetch(assetUri);
-        const blob = await response.blob();
-        const file = new File([blob], "avatar.jpg", { type: blob.type });
-        finalUri = file;
+        // Try to use File object if available (newer Expo SDKs)
+        const fileObj = result.assets?.[0]?.file;
+        if (fileObj) {
+          finalUri = fileObj;
+        } else if (assetUri.startsWith("data:")) {
+          // Convert data URI to Blob
+          const res = await fetch(assetUri);
+          const blob = await res.blob();
+          finalUri = new File([blob], "avatar.jpg", { type: blob.type });
+        } else if (assetUri.startsWith("blob:")) {
+          // Try to fetch blob URI (may fail on iOS Safari)
+          try {
+            const res = await fetch(assetUri);
+            const blob = await res.blob();
+            finalUri = new File([blob], "avatar.jpg", { type: blob.type });
+          } catch (e) {
+            showToast("error", "Failed to load image from camera. Try a different image.");
+            setUploading(false);
+            setCurrentStep("initial");
+            return;
+          }
+        }
       }
 
       // Upload via backend proxy (uses x-user-id and SERVICE_ROLE on server)
@@ -243,11 +260,28 @@ export const SetPfp = () => {
 
       let finalUri: string | File = assetUri;
       if (Platform.OS === "web") {
-        // Fetch blob and convert to File for web upload
-        const response = await fetch(assetUri);
-        const blob = await response.blob();
-        const file = new File([blob], "avatar.jpg", { type: blob.type });
-        finalUri = file;
+        // Try to use File object if available (newer Expo SDKs)
+        const fileObj = result.assets?.[0]?.file;
+        if (fileObj) {
+          finalUri = fileObj;
+        } else if (assetUri.startsWith("data:")) {
+          // Convert data URI to Blob
+          const res = await fetch(assetUri);
+          const blob = await res.blob();
+          finalUri = new File([blob], "avatar.jpg", { type: blob.type });
+        } else if (assetUri.startsWith("blob:")) {
+          // Try to fetch blob URI (may fail on iOS Safari)
+          try {
+            const res = await fetch(assetUri);
+            const blob = await res.blob();
+            finalUri = new File([blob], "avatar.jpg", { type: blob.type });
+          } catch (e) {
+            showToast("error", "Failed to load image from gallery. Try a different image.");
+            setUploading(false);
+            setCurrentStep("initial");
+            return;
+          }
+        }
       }
 
       const { publicUrl } = await uploadAvatarViaProxy({
@@ -468,7 +502,7 @@ export const SetPfp = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       {currentStep === "initial" && renderInitialScreen()}
       {currentStep === "scanning" && renderScanningScreen()}
       {currentStep === "captured" && renderCapturedScreen()}
@@ -481,7 +515,7 @@ export const SetPfp = () => {
         topOffset={toast.topOffset ?? 40}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-    </View>
+    </ScrollView>
   );
 };
 

@@ -45,6 +45,15 @@ async function getAuthToken(): Promise<string | null> {
   }
 }
 
+// Get appropriate base URL based on platform
+function getBaseUrl(): string {
+  if (Platform.OS === 'web') {
+    // Use proxy route for web to avoid CORS
+    return '/api/proxy';
+  }
+  return BASE_URL;
+}
+
 // Updated askAI to use authenticated chat only
 export async function askAI({
   prompt,   
@@ -73,7 +82,8 @@ export async function sendMessage({
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -93,7 +103,8 @@ export async function getConversations(): Promise<Conversation[]> {
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat/conversations`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat/conversations`, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   
@@ -111,7 +122,8 @@ export async function getConversation(id: number): Promise<{
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat/conversations/${id}`, {
     headers: { "Authorization": `Bearer ${token}` },
   });
   
@@ -126,7 +138,8 @@ export async function createConversation(title?: string): Promise<Conversation> 
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat/conversations`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat/conversations`, {
     method: "POST",
     headers: { 
       "Content-Type": "application/json",
@@ -146,7 +159,8 @@ export async function updateConversationTitle(id: number, title: string): Promis
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat/conversations/${id}/title`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat/conversations/${id}/title`, {
     method: "PUT",
     headers: { 
       "Content-Type": "application/json",
@@ -165,7 +179,8 @@ export async function deleteConversation(id: number): Promise<void> {
     throw new Error('Authentication required - please log in');
   }
 
-  const resp = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
+  const baseUrl = getBaseUrl();
+  const resp = await fetch(`${baseUrl}/chat/conversations/${id}`, {
     method: "DELETE",
     headers: { "Authorization": `Bearer ${token}` },
   });

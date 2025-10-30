@@ -1,5 +1,6 @@
 // api/home/chat.ts  (React Native frontend)
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { BASE_URL } from "../env/baseUrl";
 
 // Types for chat API
@@ -24,16 +25,27 @@ export type ChatResponse = {
   message_id: number;
 };
 
-// Get auth token
+// Get auth token from appropriate storage
 async function getAuthToken(): Promise<string | null> {
   try {
-    return await AsyncStorage.getItem('authToken');
-  } catch {
+    if (Platform.OS === 'web') {
+      // Web: Check sessionStorage first, then localStorage as fallback
+      const sessionToken = sessionStorage.getItem('access_token');
+      if (sessionToken) return sessionToken;
+      
+      const localToken = localStorage.getItem('access_token');
+      return localToken;
+    } else {
+      // Mobile: Use AsyncStorage
+      return await AsyncStorage.getItem('access_token');
+    }
+  } catch (error) {
+    console.error('Error retrieving auth token:', error);
     return null;
   }
 }
 
-// Legacy chat (no auth required)
+// Updated askAI to use authenticated chat only
 export async function askAI({
   prompt,   
   system,      
@@ -41,14 +53,9 @@ export async function askAI({
   prompt: string;
   system: string;
 }): Promise<string> {
-  const resp = await fetch(`${BASE_URL}/chat/legacy`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system, prompt}),
-  });
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
-  const data = await resp.json();
-  return data.reply ?? "";
+  // Always use authenticated chat now
+  const result = await sendMessage({ prompt, system });
+  return result.reply;
 }
 
 // Authenticated chat with history
@@ -63,7 +70,7 @@ export async function sendMessage({
 }): Promise<ChatResponse> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required');
+    throw new Error('Authentication required - please log in');
   }
 
   const resp = await fetch(`${BASE_URL}/chat`, {
@@ -82,7 +89,9 @@ export async function sendMessage({
 // Get all conversations
 export async function getConversations(): Promise<Conversation[]> {
   const token = await getAuthToken();
-  if (!token) return [];
+  if (!token) {
+    throw new Error('Authentication required - please log in');
+  }
 
   const resp = await fetch(`${BASE_URL}/chat/conversations`, {
     headers: { "Authorization": `Bearer ${token}` },
@@ -99,7 +108,7 @@ export async function getConversation(id: number): Promise<{
 }> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required');
+    throw new Error('Authentication required - please log in');
   }
 
   const resp = await fetch(`${BASE_URL}/chat/conversations/${id}`, {
@@ -114,7 +123,7 @@ export async function getConversation(id: number): Promise<{
 export async function createConversation(title?: string): Promise<Conversation> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required');
+    throw new Error('Authentication required - please log in');
   }
 
   const resp = await fetch(`${BASE_URL}/chat/conversations`, {
@@ -134,7 +143,7 @@ export async function createConversation(title?: string): Promise<Conversation> 
 export async function updateConversationTitle(id: number, title: string): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required');
+    throw new Error('Authentication required - please log in');
   }
 
   const resp = await fetch(`${BASE_URL}/chat/conversations/${id}/title`, {
@@ -153,7 +162,7 @@ export async function updateConversationTitle(id: number, title: string): Promis
 export async function deleteConversation(id: number): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required');
+    throw new Error('Authentication required - please log in');
   }
 
   const resp = await fetch(`${BASE_URL}/chat/conversations/${id}`, {

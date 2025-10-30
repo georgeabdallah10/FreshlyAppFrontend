@@ -1,34 +1,22 @@
+import React, { useState, useRef, useEffect } from "react";
 import {
-  askAI,
-  createConversation,
-  deleteConversation,
-  getConversation,
-  getConversations,
-  sendMessage,
-  updateConversationTitle,
-  type ChatMessage as APIChatMessage,
-  type Conversation
-} from "@/api/home/chat";
-import { useUser } from "@/context/usercontext";
-import { Ionicons } from "@expo/vector-icons";
-import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
-import {
-  Alert,
-  Animated,
-  FlatList,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
+  View,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Animated,
+  Modal,
+  Alert,
+  ScrollView,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
+import { askAI } from "@/api/home/chat";
+import { useUser } from "@/context/usercontext";
 
 // Stable id for chat messages
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -335,339 +323,17 @@ function RecipeCardViewBase({ data, onMatchGrocery }: RecipeCardViewProps) {
 }
 const RecipeCardView = React.memo(RecipeCardViewBase);
 
-/** --- HOISTED: ConversationItem (memoized) --- */
-type ConversationItemProps = {
-  conversation: Conversation;
-  isActive: boolean;
-  onSelect: (id: number) => void;
-  onDelete: (id: number) => void;
-  onRename: (id: number, title: string) => void;
-};
-
-const ConversationItem = React.memo(function ConversationItem({
-  conversation,
-  isActive,
-  onSelect,
-  onDelete,
-  onRename,
-}: ConversationItemProps) {
-  const [showOptions, setShowOptions] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(conversation.title);
-
-  const handleRename = () => {
-    if (editTitle.trim() && editTitle !== conversation.title) {
-      onRename(conversation.id, editTitle.trim());
-    }
-    setIsEditing(false);
-    setShowOptions(false);
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
-  };
-
-  return (
-    <TouchableOpacity
-      style={[styles.conversationItem, isActive && styles.conversationItemActive]}
-      onPress={() => onSelect(conversation.id)}
-      onLongPress={() => setShowOptions(true)}
-    >
-      <View style={styles.conversationHeader}>
-        {isEditing ? (
-          <TextInput
-            style={styles.conversationTitleEdit}
-            value={editTitle}
-            onChangeText={setEditTitle}
-            onBlur={handleRename}
-            onSubmitEditing={handleRename}
-            autoFocus
-            selectTextOnFocus
-          />
-        ) : (
-          <Text style={[styles.conversationTitle, isActive && styles.conversationTitleActive]} numberOfLines={1}>
-            {conversation.title}
-          </Text>
-        )}
-        
-        <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
-          <Ionicons name="ellipsis-horizontal" size={16} color={isActive ? "#FFF" : "#666"} />
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.conversationMeta}>
-        <Text style={[styles.conversationDate, isActive && styles.conversationDateActive]}>
-          {formatDate(conversation.updated_at)}
-        </Text>
-        <Text style={[styles.conversationCount, isActive && styles.conversationCountActive]}>
-          {conversation.message_count} messages
-        </Text>
-      </View>
-
-      {showOptions && (
-        <View style={styles.conversationOptions}>
-          <TouchableOpacity
-            style={styles.conversationOption}
-            onPress={() => {
-              setIsEditing(true);
-              setShowOptions(false);
-            }}
-          >
-            <Ionicons name="pencil" size={14} color="#666" />
-            <Text style={styles.conversationOptionText}>Rename</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.conversationOption}
-            onPress={() => {
-              Alert.alert(
-                'Delete Conversation',
-                'Are you sure you want to delete this conversation?',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: () => onDelete(conversation.id) }
-                ]
-              );
-              setShowOptions(false);
-            }}
-          >
-            <Ionicons name="trash" size={14} color="#FF3B30" />
-            <Text style={[styles.conversationOptionText, { color: '#FF3B30' }]}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-});
-
-/** --- HOISTED: Sidebar Component --- */
-const ConversationSidebar = React.memo(function ConversationSidebar({
-  conversations,
-  currentConversationId,
-  isLoading,
-  onSelect,
-  onNew,
-  onDelete,
-  onRename,
-  onClose,
-}: {
-  conversations: Conversation[];
-  currentConversationId: number | null;
-  isLoading: boolean;
-  onSelect: (id: number) => void;
-  onNew: () => void;
-  onDelete: (id: number) => void;
-  onRename: (id: number, title: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <View style={styles.sidebar}>
-      <View style={styles.sidebarHeader}>
-        <Text style={styles.sidebarTitle}>Conversations</Text>
-        <TouchableOpacity onPress={onClose}>
-          <Ionicons name="close" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
-      
-      <TouchableOpacity style={styles.newConversationButton} onPress={onNew}>
-        <Ionicons name="add" size={20} color="#FFF" />
-        <Text style={styles.newConversationText}>New Conversation</Text>
-      </TouchableOpacity>
-
-      <FlatList
-        data={conversations}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <ConversationItem
-            conversation={item}
-            isActive={item.id === currentConversationId}
-            onSelect={onSelect}
-            onDelete={onDelete}
-            onRename={onRename}
-          />
-        )}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={() => {}} />
-        }
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.conversationList}
-      />
-    </View>
-  );
-});
-
 export default function ChatAIScreen() {
   const { prefrences } = useUser();
-  const router = useRouter();
-  
-  // State for conversations and chat
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
-  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
-  const [apiMessages, setApiMessages] = useState<APIChatMessage[]>([]);
-  
-  // State for UI
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [message, setMessage] = useState("");
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"camera" | "gallery" | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [showSidebar, setShowSidebar] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
-  // Animation refs
+  const router = useRouter();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const sidebarSlideAnim = useRef(new Animated.Value(-300)).current;
   const scrollViewRef = useRef<ScrollView>(null);
-
-  // Check authentication status on mount
-  useEffect(() => {
-    checkAuthStatus();
-    loadConversations();
-  }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const conversations = await getConversations();
-      setIsAuthenticated(true);
-      setConversations(conversations);
-    } catch (error) {
-      setIsAuthenticated(false);
-      setConversations([]);
-    }
-  };
-
-  const loadConversations = async () => {
-    setIsLoadingConversations(true);
-    try {
-      const convs = await getConversations();
-      setConversations(convs);
-      
-      // If no current conversation and conversations exist, select the most recent
-      if (!currentConversationId && convs.length > 0) {
-        await loadConversation(convs[0].id);
-      }
-    } catch (error) {
-      console.error('Failed to load conversations:', error);
-    } finally {
-      setIsLoadingConversations(false);
-    }
-  };
-
-  const loadConversation = async (conversationId: number) => {
-    try {
-      const data = await getConversation(conversationId);
-      setCurrentConversation(data.conversation);
-      setCurrentConversationId(conversationId);
-      setApiMessages(data.messages);
-      
-      // Convert API messages to UI messages
-      const uiMessages: ChatMessage[] = data.messages.map(msg => {
-        if (msg.role === 'user') {
-          return {
-            id: msg.id.toString(),
-            kind: 'user' as const,
-            text: msg.content
-          };
-        } else {
-          // Check if message contains a recipe
-          const recipe = tryParseRecipe(msg.content);
-          if (recipe) {
-            return {
-              id: msg.id.toString(),
-              kind: 'ai_recipe' as const,
-              recipe: recipe
-            };
-          } else {
-            return {
-              id: msg.id.toString(),
-              kind: 'ai_text' as const,
-              text: msg.content
-            };
-          }
-        }
-      });
-      
-      setMessages(uiMessages);
-    } catch (error) {
-      console.error('Failed to load conversation:', error);
-      Alert.alert('Error', 'Failed to load conversation');
-    }
-  };
-
-  const createNewConversation = async () => {
-    try {
-      const newConv = await createConversation();
-      setConversations(prev => [newConv, ...prev]);
-      setCurrentConversation(newConv);
-      setCurrentConversationId(newConv.id);
-      setApiMessages([]);
-      setMessages([]);
-      setShowSidebar(false);
-    } catch (error) {
-      console.error('Failed to create conversation:', error);
-      Alert.alert('Error', 'Failed to create new conversation');
-    }
-  };
-
-  const handleDeleteConversation = async (conversationId: number) => {
-    try {
-      await deleteConversation(conversationId);
-      setConversations(prev => prev.filter(c => c.id !== conversationId));
-      
-      if (currentConversationId === conversationId) {
-        // Switch to another conversation or clear current
-        const remaining = conversations.filter(c => c.id !== conversationId);
-        if (remaining.length > 0) {
-          await loadConversation(remaining[0].id);
-        } else {
-          setCurrentConversation(null);
-          setCurrentConversationId(null);
-          setMessages([]);
-          setApiMessages([]);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to delete conversation:', error);
-      Alert.alert('Error', 'Failed to delete conversation');
-    }
-  };
-
-  const handleRenameConversation = async (conversationId: number, newTitle: string) => {
-    try {
-      await updateConversationTitle(conversationId, newTitle);
-      setConversations(prev => 
-        prev.map(c => c.id === conversationId ? { ...c, title: newTitle } : c)
-      );
-      if (currentConversation?.id === conversationId) {
-        setCurrentConversation(prev => prev ? { ...prev, title: newTitle } : null);
-      }
-    } catch (error) {
-      console.error('Failed to rename conversation:', error);
-      Alert.alert('Error', 'Failed to rename conversation');
-    }
-  };
-
-  const toggleSidebar = () => {
-    const toValue = showSidebar ? -300 : 0;
-    setShowSidebar(!showSidebar);
-    
-    Animated.timing(sidebarSlideAnim, {
-      toValue,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
 
   const system_prompt = `
 You are Freshly, an advanced meal-planning and cooking assistant. You generate complete, structured, easy-to-read outputs with precise formatting and clear section breaks. Use a calm, friendly, and helpful tone.
@@ -850,7 +516,7 @@ Rules:
     if (!userText) return;
 
     const userId = uid();
-    const typingId = "__typing__";
+    const typingId = "__typing__"; // stable id for typing indicator
 
     setMessages((prev) => [
       ...prev,
@@ -858,64 +524,31 @@ Rules:
     ]);
     setMessage("");
 
-    // Add typing indicator
+    // Add typing message (stable id)
     setMessages((prev) => [
       ...prev,
       { id: typingId, kind: "ai_text", text: "", isTyping: true },
     ]);
 
-    setIsLoading(true);
+    const response = await askAI({
+      prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
+      system: `${system_prompt}`,
+    });
 
-    try {
-      let response: string;
-      let newConversationId = currentConversationId;
+    // Remove typing indicator by id
+    setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
 
-      if (isAuthenticated) {
-        // Use authenticated chat with conversation history
-        const chatResponse = await sendMessage({
-          prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
-          system: system_prompt,
-          conversationId: currentConversationId || undefined,
-        });
-        
-        response = chatResponse.reply;
-        newConversationId = chatResponse.conversation_id;
-        
-        // Update conversation state if needed
-        if (!currentConversationId) {
-          setCurrentConversationId(newConversationId);
-          // Reload conversations to get the new one
-          await loadConversations();
-        }
-      } else {
-        // Fallback to legacy chat
-        response = await askAI({
-          prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
-          system: system_prompt,
-        });
-      }
-
-      // Remove typing indicator
-      setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
-
-      const recipe = tryParseRecipe(response);
-      if (recipe) {
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_recipe", recipe },
-        ]);
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_text", text: response },
-        ]);
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
-      Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
-      setIsLoading(false);
+    const recipe = tryParseRecipe(response);
+    if (recipe) {
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), kind: "ai_recipe", recipe },
+      ]);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), kind: "ai_text", text: response },
+      ]);
     }
   };
 
@@ -961,15 +594,7 @@ Rules:
         >
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {currentConversation?.title || "Freshly AI"}
-        </Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={toggleSidebar}
-        >
-          <Ionicons name="menu" size={24} color="#000" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Freshly AI</Text>
       </View>
 
       <ScrollView
@@ -1153,45 +778,6 @@ Rules:
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-
-      {/* Conversation Sidebar */}
-      {showSidebar && (
-        <Modal
-          visible={showSidebar}
-          transparent
-          animationType="none"
-          onRequestClose={toggleSidebar}
-        >
-          <TouchableOpacity
-            style={styles.sidebarOverlay}
-            activeOpacity={1}
-            onPress={toggleSidebar}
-          >
-            <Animated.View
-              style={[
-                styles.sidebarContainer,
-                {
-                  transform: [{ translateX: sidebarSlideAnim }],
-                },
-              ]}
-            >
-              <ConversationSidebar
-                conversations={conversations}
-                currentConversationId={currentConversationId}
-                isLoading={isLoadingConversations}
-                onSelect={(id) => {
-                  loadConversation(id);
-                  toggleSidebar();
-                }}
-                onNew={createNewConversation}
-                onDelete={handleDeleteConversation}
-                onRename={handleRenameConversation}
-                onClose={toggleSidebar}
-              />
-            </Animated.View>
-          </TouchableOpacity>
-        </Modal>
-      )}
     </KeyboardAvoidingView>
   );
 }
@@ -1495,142 +1081,6 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "600",
-    marginLeft: 8,
-  },
-  // Conversation Sidebar Styles
-  sidebarOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-start",
-  },
-  sidebarContainer: {
-    width: 300,
-    height: "100%",
-    backgroundColor: "#FFF",
-  },
-  sidebar: {
-    flex: 1,
-    backgroundColor: "#FFF",
-    paddingTop: 50,
-  },
-  sidebarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  sidebarTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: "#000",
-  },
-  newConversationButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#00A86B",
-    marginHorizontal: 16,
-    marginVertical: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  newConversationText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  conversationList: {
-    paddingHorizontal: 16,
-  },
-  conversationItem: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
-  },
-  conversationItemActive: {
-    backgroundColor: "#00A86B",
-    borderColor: "#00A86B",
-  },
-  conversationHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-  },
-  conversationTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-    flex: 1,
-    marginRight: 8,
-  },
-  conversationTitleActive: {
-    color: "#FFF",
-  },
-  conversationTitleEdit: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
-    flex: 1,
-    marginRight: 8,
-    backgroundColor: "#FFF",
-    borderWidth: 1,
-    borderColor: "#DEE2E6",
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  conversationMeta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  conversationDate: {
-    fontSize: 12,
-    color: "#6C757D",
-  },
-  conversationDateActive: {
-    color: "#E8F5E8",
-  },
-  conversationCount: {
-    fontSize: 12,
-    color: "#6C757D",
-  },
-  conversationCountActive: {
-    color: "#E8F5E8",
-  },
-  conversationOptions: {
-    position: "absolute",
-    top: 40,
-    right: 16,
-    backgroundColor: "#FFF",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#DEE2E6",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 1000,
-  },
-  conversationOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minWidth: 120,
-  },
-  conversationOptionText: {
-    fontSize: 14,
-    color: "#666",
     marginLeft: 8,
   },
 });

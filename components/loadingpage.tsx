@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  Animated,
-  Dimensions,
-  Image,
+    Animated,
+    Dimensions,
+    Image,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -23,12 +22,12 @@ const LoadingDots: React.FC = () => {
           Animated.delay(delay),
           Animated.timing(dot, {
             toValue: 1,
-            duration: 400,
+            duration: 500,
             useNativeDriver: true,
           }),
           Animated.timing(dot, {
             toValue: 0,
-            duration: 400,
+            duration: 500,
             useNativeDriver: true,
           }),
         ])
@@ -104,16 +103,16 @@ const styles = StyleSheet.create({
     marginBottom: 80,
   },
   logoImage: {
-    width: 200,
-    height: 200,
+    width: 280,
+    height: 280,
   },
   brandName: {
-    fontSize: 56,
+    fontSize: 64,
     fontWeight: '700',
-    color: '#00C853',
-    marginTop: 16,
+    color: '#00A86B',
+    marginTop: 24,
     fontFamily: 'System',
-    letterSpacing: -1,
+    letterSpacing: -1.5,
   },
   loadingContainer: {
     position: 'absolute',

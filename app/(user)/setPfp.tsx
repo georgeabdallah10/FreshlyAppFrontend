@@ -8,14 +8,14 @@ import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Animated,
-  Image,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View
+    Animated,
+    Image,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 
@@ -334,15 +334,15 @@ export const SetPfp = () => {
         </TouchableOpacity>
       ) : null}
 
-      <Text style={styles.title}>Set a profile picture for yourself</Text>
+      <Text style={styles.title}>Set a profile picture</Text>
       <Text style={styles.subtitle}>
-        Please put your phone in front{"\n"}of your face.
+        Choose a photo that represents you
       </Text>
 
       <View style={styles.faceIconContainer}>
         <View style={styles.faceCircleOuter}>
           <View style={styles.faceCircleInner}>
-            <Text style={styles.faceIcon}>🙂</Text>
+            <Icon name="user" size={80} color="#00A86B" />
           </View>
         </View>
       </View>
@@ -354,7 +354,8 @@ export const SetPfp = () => {
           activeOpacity={0.9}
           disabled={!userID}
         >
-          <Text style={styles.scanButtonText}>📷 Take Photo</Text>
+          <Icon name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+          <Text style={styles.scanButtonText}>Take Photo</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -363,7 +364,8 @@ export const SetPfp = () => {
           activeOpacity={0.9}
           disabled={!userID}
         >
-          <Text style={styles.galleryButtonText}>🖼️ Choose from Gallery</Text>
+          <Icon name="image" size={20} color="#00A86B" style={{ marginRight: 8 }} />
+          <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
         </TouchableOpacity>
       </View>
     </View>

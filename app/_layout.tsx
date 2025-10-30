@@ -1,16 +1,16 @@
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
-import { StatusBar } from "expo-status-bar";
-import { useState, useEffect } from "react";
-import "react-native-reanimated";
-import { Slot } from "expo-router";
 import SplashScreen from "@/components/loadingpage";
-import * as Splash from "expo-splash-screen";
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { UserProvider } from "@/context/usercontext";
+import { useColorScheme } from "@/hooks/use-color-scheme";
+import {
+    DarkTheme,
+    DefaultTheme,
+    ThemeProvider,
+} from "@react-navigation/native";
+import { Slot } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useState } from "react";
+import "react-native-reanimated";
+import "../global.css";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",

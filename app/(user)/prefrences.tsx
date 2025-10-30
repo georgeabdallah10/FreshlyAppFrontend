@@ -1,16 +1,16 @@
-import React, { useState, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  Animated,
-  TextInput,
-} from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
 import { setPrefrences } from "@/api/user/setPrefrences";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useRef, useState } from "react";
+import {
+    Animated,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
 
 type PreferenceOption = {
   id: string;
@@ -23,6 +23,9 @@ const OnboardingPreferences = () => {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [medicalRestrictions, setMedicalRestrictions] = useState<string[]>([]);
+  const [allergies, setAllergies] = useState<string[]>([]);
+  const [allergyInput, setAllergyInput] = useState("");
+  const [editingAllergyIndex, setEditingAllergyIndex] = useState<number | null>(null);
   const [culturalPreferences, setCulturalPreferences] = useState<string[]>([]);
   const [lifestylePreferences, setLifestylePreferences] = useState<string[]>(
     []
@@ -35,6 +38,12 @@ const OnboardingPreferences = () => {
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Common allergy suggestions
+  const commonAllergies = [
+    "Peanuts", "Tree Nuts", "Milk", "Eggs", "Soy", "Wheat", 
+    "Fish", "Shellfish", "Sesame", "Mustard", "Celery", "Sulfites"
+  ];
 
   const screens = [
     {
@@ -56,7 +65,6 @@ const OnboardingPreferences = () => {
       options: [
         { id: "halal", label: "Halal" },
         { id: "kosher", label: "Kosher" },
-        { id: "jain", label: "Jain Vegetarian" },
       ],
       state: culturalPreferences,
       setState: setCulturalPreferences,
@@ -67,7 +75,6 @@ const OnboardingPreferences = () => {
         { id: "vegetarian", label: "Vegetarian" },
         { id: "vegan", label: "Vegan" },
         { id: "pescatarian", label: "Pescatarian" },
-        { id: "flexitarian", label: "Flexitarian" },
       ],
       state: lifestylePreferences,
       setState: setLifestylePreferences,
@@ -96,7 +103,7 @@ const OnboardingPreferences = () => {
     {
       title: "What is your goal?",
       options: [
-        { id: "weight-loss", label: "Weight Loss" },
+        { id: "lose-weight", label: "Lose Weight" },
         { id: "weight-gain", label: "Gain Weight" },
         { id: "muscle-gain", label: "Muscle Gain" },
         { id: "balanced", label: "Balanced" },
@@ -106,21 +113,24 @@ const OnboardingPreferences = () => {
     },
   ];
 
-  const currentScreen = screens[currentStep];
-  const isLastStep = currentStep === screens.length - 1;
-  const isCalorieStep = currentStep === screens.length;
+  // Adjust for allergies screen at step 1
+  const currentScreen = currentStep >= 2 ? screens[currentStep - 2] : null;
+  const isLastStep = currentStep === screens.length + 1; // +1 for allergies screen
+  const isCalorieStep = currentStep === screens.length + 2; // +2 for allergies screen
 
   const toggleOption = (id: string) => {
+    if (!currentScreen) return;
+    
     const { state, setState } = currentScreen;
 
-    // For goal selection, only allow one option
-    if (currentStep === 5) {
+    // For goal selection, only allow one option (adjusted for allergies screen)
+    if (currentStep === 7) { // Goal is now at step 7 (was 5)
       setGoal(id);
       return;
     }
 
     if (state.includes(id)) {
-      setState(state.filter((item) => item !== id));
+      setState(state.filter((item: string) => item !== id));
     } else {
       setState([...state, id]);
     }
@@ -135,18 +145,24 @@ const OnboardingPreferences = () => {
           ...lifestylePreferences,
           ...culturalPreferences,
           ...otherRestrictions,
+          ...medicalRestrictions,
         ];
 
+        // Convert allergies to a format the backend can use
+        // For now, we'll store them as part of diet_codes with a prefix
+        const allergyDietCodes = allergies.map(allergy => `allergy-${allergy.toLowerCase().replace(/\s+/g, '-')}`);
+
         console.log("Submitting preferences:", {
-          diet_codes: allDietCodes,
+          diet_codes: [...allDietCodes, ...allergyDietCodes],
           allergen_ingredient_ids: [],
           disliked_ingredient_ids: [],
           goal: goal,
           calorie_target: parseInt(calorieTarget) || 2200,
+          allergies: allergies, // Store raw allergies list
         });
 
         const result = await setPrefrences({
-          diet_codes: allDietCodes,
+          diet_codes: [...allDietCodes, ...allergyDietCodes],
           allergen_ingredient_ids: [],
           disliked_ingredient_ids: [],
           goal: goal,
@@ -260,6 +276,45 @@ const OnboardingPreferences = () => {
     }
   };
 
+  // Allergy Management Functions
+  const addAllergy = () => {
+    const trimmed = allergyInput.trim();
+    if (!trimmed) return;
+    
+    if (editingAllergyIndex !== null) {
+      // Update existing allergy
+      const updated = [...allergies];
+      updated[editingAllergyIndex] = trimmed;
+      setAllergies(updated);
+      setEditingAllergyIndex(null);
+    } else {
+      // Add new allergy
+      if (!allergies.includes(trimmed)) {
+        setAllergies([...allergies, trimmed]);
+      }
+    }
+    setAllergyInput("");
+  };
+
+  const editAllergy = (index: number) => {
+    setAllergyInput(allergies[index]);
+    setEditingAllergyIndex(index);
+  };
+
+  const deleteAllergy = (index: number) => {
+    setAllergies(allergies.filter((_, i) => i !== index));
+    if (editingAllergyIndex === index) {
+      setAllergyInput("");
+      setEditingAllergyIndex(null);
+    }
+  };
+
+  const selectCommonAllergy = (allergy: string) => {
+    if (!allergies.includes(allergy)) {
+      setAllergies([...allergies, allergy]);
+    }
+  };
+
   // Welcome Screen
   if (currentStep === 0) {
     return (
@@ -275,7 +330,7 @@ const OnboardingPreferences = () => {
             </TouchableOpacity>
           ) : null}
           <Text style={styles.welcomeTitle}>
-            Now let's{"\n"}Lock-In{"\n"}Your{"\n"}Preferences
+            Now let's{"\n"}set up{"\n"}your{"\n"}preferences
           </Text>
 
           <View style={styles.logoContainer}>
@@ -294,6 +349,138 @@ const OnboardingPreferences = () => {
             <Text style={styles.nextButtonText}>Next</Text>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  // Allergies Screen (Step 1)
+  if (currentStep === 1) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateX: slideAnim }],
+            }}
+          >
+            <Text style={styles.title}>Food Allergies</Text>
+            <Text style={styles.subtitle}>
+              Let us know about any food allergies you have
+            </Text>
+
+            {/* Custom Input */}
+            <View style={styles.allergyInputSection}>
+              <Text style={styles.sectionLabel}>Add Custom Allergy</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.allergyInput}
+                  placeholder="Enter allergy (e.g., Peanuts)"
+                  placeholderTextColor="#B0B0B0"
+                  value={allergyInput}
+                  onChangeText={setAllergyInput}
+                  onSubmitEditing={addAllergy}
+                  returnKeyType="done"
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.addButton,
+                    !allergyInput.trim() && styles.addButtonDisabled,
+                  ]}
+                  onPress={addAllergy}
+                  disabled={!allergyInput.trim()}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.addButtonText}>
+                    {editingAllergyIndex !== null ? "Update" : "Add"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* User's Allergies List */}
+            {allergies.length > 0 && (
+              <View style={styles.allergiesListSection}>
+                <Text style={styles.sectionLabel}>Your Allergies</Text>
+                <View style={styles.allergiesList}>
+                  {allergies.map((allergy, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.allergyTag,
+                        editingAllergyIndex === index && styles.allergyTagEditing,
+                      ]}
+                    >
+                      <Text style={styles.allergyTagText}>{allergy}</Text>
+                      <View style={styles.allergyActions}>
+                        <TouchableOpacity
+                          onPress={() => editAllergy(index)}
+                          style={styles.allergyActionButton}
+                          activeOpacity={0.6}
+                        >
+                          <Text style={styles.allergyEditIcon}>✎</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => deleteAllergy(index)}
+                          style={styles.allergyActionButton}
+                          activeOpacity={0.6}
+                        >
+                          <Text style={styles.allergyDeleteIcon}>×</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Common Allergies Quick Select */}
+            <View style={styles.commonAllergiesSection}>
+              <Text style={styles.sectionLabel}>Common Allergies (Tap to Add)</Text>
+              <View style={styles.commonAllergiesGrid}>
+                {commonAllergies.map((allergy) => (
+                  <TouchableOpacity
+                    key={allergy}
+                    style={[
+                      styles.commonAllergyChip,
+                      allergies.includes(allergy) && styles.commonAllergyChipSelected,
+                    ]}
+                    onPress={() => selectCommonAllergy(allergy)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.commonAllergyText,
+                        allergies.includes(allergy) && styles.commonAllergyTextSelected,
+                      ]}
+                    >
+                      {allergy}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </Animated.View>
+
+          <TouchableOpacity
+            style={styles.nextButton}
+            onPress={handleNext}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.nextButtonText}>Next</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
@@ -369,6 +556,10 @@ const OnboardingPreferences = () => {
   }
 
   // Regular Preference Screens
+  if (!currentScreen) {
+    return null; // Safety check
+  }
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -394,12 +585,12 @@ const OnboardingPreferences = () => {
           <Text style={styles.title}>{currentScreen.title}</Text>
 
           <View style={styles.progressContainer}>
-            {screens.slice(1).map((_, index) => (
+            {screens.map((_, index) => (
               <View
                 key={index}
                 style={[
                   styles.progressDot,
-                  currentStep - 1 === index && styles.progressDotActive,
+                  currentStep - 2 === index && styles.progressDotActive,
                 ]}
               />
             ))}
@@ -415,7 +606,7 @@ const OnboardingPreferences = () => {
               >
                 <Text style={styles.optionLabel}>{option.label}</Text>
                 <View style={styles.radioOuter}>
-                  {(currentStep === 5
+                  {(currentStep === 7
                     ? goal === option.id
                     : currentScreen.state.includes(option.id)) && (
                     <View style={styles.radioInner} />
@@ -612,6 +803,132 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#888888",
     textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 15,
+    color: "#666666",
+    textAlign: "center",
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  // Allergy Management Styles
+  allergyInputSection: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111111",
+    marginBottom: 12,
+  },
+  inputRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  allergyInput: {
+    flex: 1,
+    backgroundColor: "#F7F8FA",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: "#111111",
+    borderWidth: 1,
+    borderColor: "#EEEFF3",
+  },
+  addButton: {
+    backgroundColor: "#00A86B",
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    minWidth: 80,
+  },
+  addButtonDisabled: {
+    backgroundColor: "#D1D5DB",
+    opacity: 0.6,
+  },
+  addButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  allergiesListSection: {
+    marginBottom: 24,
+  },
+  allergiesList: {
+    gap: 10,
+  },
+  allergyTag: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#FFF5F0",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: "#FD8100",
+  },
+  allergyTagEditing: {
+    backgroundColor: "#E8F8F2",
+    borderColor: "#00A86B",
+  },
+  allergyTagText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111111",
+    flex: 1,
+  },
+  allergyActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  allergyActionButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  allergyEditIcon: {
+    fontSize: 16,
+    color: "#00A86B",
+  },
+  allergyDeleteIcon: {
+    fontSize: 22,
+    color: "#FF4444",
+    fontWeight: "600",
+  },
+  commonAllergiesSection: {
+    marginBottom: 24,
+  },
+  commonAllergiesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  commonAllergyChip: {
+    backgroundColor: "#F7F8FA",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#EEEFF3",
+  },
+  commonAllergyChipSelected: {
+    backgroundColor: "#E8F8F2",
+    borderColor: "#00A86B",
+  },
+  commonAllergyText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666666",
+  },
+  commonAllergyTextSelected: {
+    color: "#00A86B",
+    fontWeight: "600",
   },
 });
 

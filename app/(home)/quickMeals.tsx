@@ -1,29 +1,28 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  Pressable,
-  Platform,
-  Animated,
-  Easing,
-} from "react-native";
-import { useRouter } from "expo-router";
+import { askAI } from "@/api/home/chat";
+import { createMealForSignleUser } from "@/api/user/meals";
+import RecipeItem from "@/components/meal/mealPreview";
+import { useUser } from "@/context/usercontext";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { askAI } from "@/api/home/chat";
-import { useUser } from "@/context/usercontext";
-import RecipeItem from "@/components/meal/mealPreview";
-import { createMealForSignleUser } from "@/api/user/meals";
+import { useRouter } from "expo-router";
+import React, {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from "react";
+import {
+    Animated,
+    Easing,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
+} from "react-native";
 
 type FormState = {
   ingredientSource: "pantry" | "outside";
@@ -482,30 +481,37 @@ ${JSON_DIRECTIVE}`;
   const Phase1: React.FC<{ animateKey: number }> = useCallback(
     ({ animateKey }) => (
       <>
-        <Question animateKey={animateKey} title="What's your budget comfort?">
-          {[1, 2, 3].map((tier) => (
-            <OptionRow
-              key={tier}
-              label={"$".repeat(tier)}
-              selected={form.budget === tier}
-              onPress={() => setSingle("budget", tier as 1 | 2 | 3)}
-            />
-          ))}
+        <Question animateKey={animateKey} title="What's your ideal meal budget?">
+          <OptionRow
+            label="Cheap and simple"
+            selected={form.budget === 1}
+            onPress={() => setSingle("budget", 1 as 1 | 2 | 3)}
+          />
+          <OptionRow
+            label="Balanced cost"
+            selected={form.budget === 2}
+            onPress={() => setSingle("budget", 2 as 1 | 2 | 3)}
+          />
+          <OptionRow
+            label="Premium or specialty"
+            selected={form.budget === 3}
+            onPress={() => setSingle("budget", 3 as 1 | 2 | 3)}
+          />
         </Question>
 
-        <Question animateKey={animateKey} title="How fast do you want it?">
+        <Question animateKey={animateKey} title="How much time do you have?">
           <OptionRow
-            label="Fast (≤ 15m)"
+            label="Quick (≤ 15m)"
             selected={form.speed === "fast"}
             onPress={() => setSingle("speed", "fast")}
           />
           <OptionRow
-            label="Medium (≤ 25m)"
+            label="Normal (≤ 25m)"
             selected={form.speed === "medium"}
             onPress={() => setSingle("speed", "medium")}
           />
           <OptionRow
-            label="Leisure (≤ 40m)"
+            label="Takes time (≤ 40m)"
             selected={form.speed === "leisure"}
             onPress={() => setSingle("speed", "leisure")}
           />
@@ -533,27 +539,14 @@ ${JSON_DIRECTIVE}`;
             onPress={() => setSingle("goal", "gain")}
           />
           <OptionRow
-            label="Use my saved prefs"
+            label="Use my saved preferences"
             selected={form.goal === "prefs"}
             onPress={() => setSingle("goal", "prefs")}
           />
         </Question>
-
-        <Question animateKey={animateKey} title="How hard should it be?">
-          <OptionRow
-            label="Easy"
-            selected={form.difficulty === "easy"}
-            onPress={() => setSingle("difficulty", "easy")}
-          />
-          <OptionRow
-            label="Medium"
-            selected={form.difficulty === "medium"}
-            onPress={() => setSingle("difficulty", "medium")}
-          />
-        </Question>
       </>
     ),
-    [form.goal, form.difficulty, setSingle]
+    [form.goal, setSingle]
   );
 
   const Phase3: React.FC<{ animateKey: number }> = useCallback(
@@ -561,7 +554,7 @@ ${JSON_DIRECTIVE}`;
       <>
         <Question
           animateKey={animateKey}
-          title="Which cooking methods are okay?"
+          title="Which cooking methods do you have access to?"
         >
           {["stovetop", "oven", "microwave", "airfryer", "nocook"].map((m) => (
             <OptionRow
@@ -569,7 +562,7 @@ ${JSON_DIRECTIVE}`;
               mode="check"
               label={
                 m === "nocook"
-                  ? "No cook"
+                  ? "No appliances available"
                   : m === "airfryer"
                   ? "Air fryer"
                   : m[0].toUpperCase() + m.slice(1)

@@ -1,18 +1,17 @@
-import React, { useState, useRef, useEffect } from "react";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AddProductModal } from "@/components/quickAddModal";
+import { useRouter, useSegments } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
+  Animated,
   Image,
   ImageSourcePropType,
-  Animated,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter, useSegments } from "expo-router";
-import { AddProductModal } from "@/components/quickAddModal";
-import { Storage } from "@/api/utils/storage";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type MenuItem = {
   id: string;
@@ -248,7 +247,11 @@ const HomeDashboard = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} activeOpacity={0.6}>
+        <TouchableOpacity 
+          style={styles.menuButton} 
+          activeOpacity={0.6}
+          onPress={() => router.push("./(home)/faq" as any)}
+        >
           <View style={styles.menuIcon}>
           <Image
             source={require("../../assets/icons/q&a.png")}
@@ -258,7 +261,11 @@ const HomeDashboard = () => {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.notificationButton} activeOpacity={0.6}>
+        <TouchableOpacity 
+          style={styles.notificationButton} 
+          activeOpacity={0.6}
+          onPress={() => router.push("./(home)/notifications" as any)}
+        >
           <Image
             source={require("../../assets/icons/noti.png")}
             style={styles.menuCardIcon}

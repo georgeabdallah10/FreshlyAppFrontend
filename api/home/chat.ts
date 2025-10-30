@@ -47,10 +47,7 @@ async function getAuthToken(): Promise<string | null> {
 
 // Get appropriate base URL based on platform
 function getBaseUrl(): string {
-  if (Platform.OS === 'web') {
-    // Use proxy route for web to avoid CORS
-    return '/api/proxy';
-  }
+  // Always use direct backend URL - CORS should be handled on backend
   return BASE_URL;
 }
 
@@ -83,17 +80,32 @@ export async function sendMessage({
   }
 
   const baseUrl = getBaseUrl();
-  const resp = await fetch(`${baseUrl}/chat`, {
-    method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${token}`
-    },
-    body: JSON.stringify({ prompt, system, conversation_id: conversationId }),
-  });
+  console.log('Sending message to:', `${baseUrl}/chat`);
+  console.log('Token exists:', !!token);
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
-  return await resp.json();
+  try {
+    const resp = await fetch(`${baseUrl}/chat`, {
+      method: "POST",
+      headers: { 
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ prompt, system, conversation_id: conversationId }),
+    });
+    
+    console.log('Response status:', resp.status);
+    console.log('Response headers:', resp.headers);
+    
+    if (!resp.ok) {
+      const errorText = await resp.text();
+      console.error('Error response:', errorText);
+      throw new Error(`HTTP ${resp.status}: ${errorText}`);
+    }
+    return await resp.json();
+  } catch (error) {
+    console.error('Fetch error:', error);
+    throw error;
+  }
 }
 
 // Get all conversations

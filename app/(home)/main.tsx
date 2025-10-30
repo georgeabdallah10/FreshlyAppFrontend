@@ -215,7 +215,7 @@ const HomeDashboard = () => {
       subtitle: "Upload All Grocery",
       iconSource: require("../../assets/icons/grocery.png"),
       bgColor: "#F0F0F0",
-      onPress: () => router.push("./(home)/allGrocery"),
+      onPress: () => router.push("/(home)/allGrocery"),
     },
     {
       id: "Mealplanner",

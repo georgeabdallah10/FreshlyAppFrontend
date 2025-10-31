@@ -22,6 +22,7 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
+import { scanGroceryImage, imageUriToBase64, getConfidenceColor } from "@/src/utils/aiApi";
 
 type ScanType = "groceries" | "receipt" | "barcode";
 
@@ -101,16 +102,16 @@ const AllGroceryScanner = () => {
 
   // Mock AI processing functions (replace with actual API calls)
   const processGroceryImage = async (imageUri: string): Promise<ScannedItem[]> => {
-    // Simulate API call to process grocery image
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Mock response - replace with actual API integration
-    return [
-      { id: generateId(), name: "Bananas", quantity: "6", unit: "ea", category: "Fruits", confidence: 0.95 },
-      { id: generateId(), name: "Milk", quantity: "1", unit: "L", category: "Dairy", confidence: 0.90 },
-      { id: generateId(), name: "Bread", quantity: "1", unit: "ea", category: "Bakery", confidence: 0.88 },
-      { id: generateId(), name: "Apples", quantity: "4", unit: "ea", category: "Fruits", confidence: 0.92 },
-    ];
+    const base64Image = await imageUriToBase64(imageUri);
+    const response = await scanGroceryImage(base64Image);
+    return response.items.map((item: any) => ({
+      id: generateId(),
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      category: item.category,
+      confidence: item.confidence,
+    }));
   };
 
   const processReceiptImage = async (imageUri: string): Promise<ScannedItem[]> => {
@@ -184,23 +185,38 @@ const AllGroceryScanner = () => {
     setScanned(false);
   };
 
-  // Process captured image
+  // Process captured image with AI
   const processImage = async (imageUri: string) => {
     try {
-      let items: ScannedItem[];
+      console.log('[Grocery Scanner] Processing image:', selectedScanType);
       
-      if (selectedScanType === "groceries") {
-        items = await processGroceryImage(imageUri);
-      } else if (selectedScanType === "receipt") {
-        items = await processReceiptImage(imageUri);
-      } else {
-        return;
-      }
+      // Convert image URI to base64
+      const base64Image = await imageUriToBase64(imageUri);
       
+      // Call AI API
+      const response = await scanGroceryImage(base64Image);
+      
+      // Convert API response to ScannedItem format
+      const items: ScannedItem[] = response.items.map(item => ({
+        id: generateId(),
+        name: item.name,
+        quantity: item.quantity.split(' ')[0], // Extract number from "3 pieces"
+        unit: item.quantity.split(' ')[1] || 'ea', // Extract unit or default to 'ea'
+        category: item.category.charAt(0).toUpperCase() + item.category.slice(1), // Capitalize
+        confidence: item.confidence,
+      }));
+      
+      console.log('[Grocery Scanner] Found', items.length, 'items');
       setScannedItems(items);
       setCurrentStep("confirmation");
     } catch (error) {
-      showToast("error", "Failed to process image. Please try again.");
+      console.error('[Grocery Scanner] Error:', error);
+      
+      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+        showToast("error", "Session expired. Please log in again.");
+      } else {
+        showToast("error", error instanceof Error ? error.message : "Failed to process image. Please try again.");
+      }
       setCurrentStep("selection");
     }
   };
@@ -432,7 +448,12 @@ const AllGroceryScanner = () => {
                   {item.quantity} {item.unit} • {item.category}
                 </Text>
                 {item.confidence && (
-                  <Text style={styles.itemConfidence}>
+                  <Text 
+                    style={[
+                      styles.itemConfidence,
+                      { color: getConfidenceColor(item.confidence) }
+                    ]}
+                  >
                     {Math.round(item.confidence * 100)}% confidence
                   </Text>
                 )}

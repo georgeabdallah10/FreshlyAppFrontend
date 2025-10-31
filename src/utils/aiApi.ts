@@ -1,6 +1,6 @@
 // AI API utilities for meal planning features
-import { Storage } from "./storage";
 import { BASE_URL } from "../env/baseUrl";
+import { Storage } from "./storage";
 
 async function getAuthHeaders() {
   const token = await Storage.getItem("access_token");

@@ -2,6 +2,7 @@ import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { createMyPantryItem } from "@/src/user/pantry";
+import { getConfidenceColor, imageUriToBase64, scanGroceryImage } from "@/src/utils/aiApi";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -22,7 +23,6 @@ import {
     TouchableOpacity,
     View
 } from "react-native";
-import { scanGroceryImage, imageUriToBase64, getConfidenceColor } from "@/src/utils/aiApi";
 
 type ScanType = "groceries" | "receipt" | "barcode";
 

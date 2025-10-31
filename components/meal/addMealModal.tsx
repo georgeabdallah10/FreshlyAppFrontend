@@ -229,35 +229,6 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
           >
-            {/* Emoji Selector */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Meal Icon</Text>
-              <TouchableOpacity
-                style={styles.emojiButton}
-                onPress={() => setShowEmojiPicker(!showEmojiPicker)}
-              >
-                <Text style={styles.selectedEmoji}>{selectedEmoji}</Text>
-                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-
-              {showEmojiPicker && (
-                <Animated.View style={styles.emojiPicker}>
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <TouchableOpacity
-                      key={emoji}
-                      style={styles.emojiOption}
-                      onPress={() => {
-                        setSelectedEmoji(emoji);
-                        setShowEmojiPicker(false);
-                      }}
-                    >
-                      <Text style={styles.emojiText}>{emoji}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </Animated.View>
-              )}
-            </View>
-
             {/* Basic Info */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Meal Name *</Text>

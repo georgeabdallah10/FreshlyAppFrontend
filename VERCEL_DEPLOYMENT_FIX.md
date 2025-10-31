@@ -17,7 +17,7 @@ Changed the configuration to explicitly tell Vercel this is a **static site expo
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "web-build",
   "framework": null,           // ✅ Tells Vercel: not a Next.js app
-  "functions": {},             // ✅ Explicitly: zero serverless functions
+  // Note: No "functions" property - omit entirely for static sites
   "routes": [                  // ✅ Static routing rules
     {
       "src": "/_expo/(.*)",
@@ -42,7 +42,7 @@ Changed the configuration to explicitly tell Vercel this is a **static site expo
 **Key Changes:**
 - `"version": 2` - Uses Vercel's latest platform version
 - `"framework": null` - Explicitly tells Vercel this is not a framework-specific app
-- `"functions": {}` - Explicitly declares zero serverless functions
+- **No `"functions"` property** - Omit entirely; empty object causes validation errors
 - Changed `rewrites` to `routes` - Uses static routing instead of dynamic rewrites
 
 ### 2. Created `.vercelignore`

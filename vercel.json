@@ -3,7 +3,6 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "web-build",
   "framework": null,
-  "functions": {},
   "routes": [
     {
       "src": "/_expo/(.*)",

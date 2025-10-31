@@ -6,19 +6,19 @@ module.exports = function (api) {
       [
         'module-resolver',
         {
-          root: ['./'],
+          root: ['.'],
           alias: {
-            '@': './',
+            '@': '.',
           },
           extensions: [
-            '.ios.ts',
-            '.android.ts',
+            '.web.ts',
+            '.web.tsx',
+            '.web.js',
+            '.web.jsx',
             '.ts',
-            '.ios.tsx',
-            '.android.tsx',
             '.tsx',
-            '.jsx',
             '.js',
+            '.jsx',
             '.json',
           ],
         },

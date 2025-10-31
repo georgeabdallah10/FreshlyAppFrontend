@@ -19,6 +19,8 @@
     "@react-navigation/native": "^7.1.17",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.75.1",
+    "@tanstack/react-query": "^5.90.5",
+    "axios": "^1.13.1",
     "browser-image-compression": "^2.0.2",
     "expo": "~54.0.12",
     "expo-barcode-scanner": "^13.0.1",

@@ -1,3 +1,4 @@
+import { queryClient } from '@/api/config/queryClient';
 import SplashScreen from "@/components/loadingpage";
 import { UserProvider } from "@/context/usercontext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
@@ -6,6 +7,7 @@ import {
     DefaultTheme,
     ThemeProvider,
 } from "@react-navigation/native";
+import { QueryClientProvider } from '@tanstack/react-query';
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
@@ -35,11 +37,13 @@ if (showSplash) {
   return (
     <>
       <StatusBar hidden={true} />
-      <UserProvider>
-        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-          <Slot /> 
-        </ThemeProvider>
-      </UserProvider>
+      <QueryClientProvider client={queryClient}>
+        <UserProvider>
+          <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+            <Slot /> 
+          </ThemeProvider>
+        </UserProvider>
+      </QueryClientProvider>
     </>
   );
 }

@@ -1,6 +1,6 @@
 // ==================== FaceVerificationFlow.tsx ====================
 import { getCurrentUser } from "@/src/auth/auth";
-import { uploadAvatarViaProxy } from "@/src/user/uploadViaBackend";
+import { pickAndUploadAvatar, uploadAvatarFromUri } from "@/src/user/uploadPfp";
 import ToastBanner from "@/components/generalMessage";
 import Icon from "@/components/profileSection/components/icon";
 import { useUser } from "@/context/usercontext";
@@ -163,7 +163,7 @@ export const SetPfp = () => {
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,
@@ -211,13 +211,20 @@ export const SetPfp = () => {
         }
       }
 
-      // Upload via backend proxy (uses x-user-id and SERVICE_ROLE on server)
-      const { publicUrl } = await uploadAvatarViaProxy({
-        uri: finalUri,
-        appUserId: userID,
-      });
+      // Upload directly to Supabase (avoids backend CORS issues)
+      console.log('[UPLOAD] Uploading to Supabase, userId:', userID);
+      
+      const uploadResult = await uploadAvatarFromUri(userID, 
+        typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
+        {
+          bucket: 'users',
+          fileName: 'profile.jpg',
+          quality: 0.9,
+        }
+      );
 
-      console.log(`public url ${publicUrl}`);
+      const publicUrl = uploadResult.publicUrl || uploadResult.path;
+      console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
       await persistAvatar(publicUrl);
 
       setUploading(false);
@@ -238,7 +245,7 @@ export const SetPfp = () => {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: [ImagePicker.MediaType.Images],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,
@@ -286,12 +293,20 @@ export const SetPfp = () => {
         }
       }
 
-      const { publicUrl } = await uploadAvatarViaProxy({
-        uri: finalUri,
-        appUserId: userID,
-      });
+      // Upload directly to Supabase (avoids backend CORS issues)
+      console.log('[UPLOAD] Uploading to Supabase from gallery, userId:', userID);
+      
+      const uploadResult = await uploadAvatarFromUri(userID, 
+        typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
+        {
+          bucket: 'users',
+          fileName: 'profile.jpg',
+          quality: 0.9,
+        }
+      );
 
-      console.log(`public url ${publicUrl}`);
+      const publicUrl = uploadResult.publicUrl || uploadResult.path;
+      console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
       await persistAvatar(publicUrl);
 
       setUploading(false);
@@ -842,7 +857,7 @@ export default SetPfp;
 //     return;
 //   }
 //   const result = await ImagePicker.launchCameraAsync({
-//     mediaTypes: ImagePicker.MediaTypeOptions.Images,
+//     mediaTypes: [ImagePicker.MediaType.Images],
 //     allowsEditing: true,
 //     aspect: [1, 1],
 //     quality: 1,
@@ -860,7 +875,7 @@ export default SetPfp;
 //     return;
 //   }
 //   const result = await ImagePicker.launchImageLibraryAsync({
-//     mediaTypes: ImagePicker.MediaTypeOptions.Images,
+//     mediaTypes: [ImagePicker.MediaType.Images],
 //     allowsEditing: true,
 //     aspect: [1, 1],
 //     quality: 1,

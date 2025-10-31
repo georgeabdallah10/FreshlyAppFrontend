@@ -5,8 +5,8 @@
 // - Re-encodes to JPEG when picking an image (fixes HEIC).
 // - Adds robust logging and public URL helpers for public buckets (like "users").
 
-import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import { createSupabaseClient } from "../supabase/client";
 
 type UploadImageUriParams = {

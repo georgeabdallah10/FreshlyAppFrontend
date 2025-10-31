@@ -1,22 +1,22 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  Animated,
-  Modal,
-  Alert,
-  ScrollView,
-} from "react-native";
+import { useUser } from "@/context/usercontext";
+import { askAI } from "@/src/home/chat";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { askAI } from "@/src/home/chat";
-import { useUser } from "@/context/usercontext";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 // Stable id for chat messages
 const uid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);

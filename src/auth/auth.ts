@@ -1,4 +1,3 @@
-import { Platform } from "react-native";
 import { BASE_URL } from "../env/baseUrl";
 import { Storage } from "../utils/storage";
 
@@ -138,6 +137,9 @@ export async function getCurrentUser() {
   const token = await Storage.getItem("access_token");
 
   try {
+    console.log('[GET_USER] Fetching current user from:', `${BASE_URL}/auth/me`);
+    console.log('[GET_USER] Has token:', !!token);
+    
     const res = await fetch(`${BASE_URL}/auth/me`, {
       method: "GET",
       headers: {
@@ -146,15 +148,23 @@ export async function getCurrentUser() {
       },
     });
 
+    console.log('[GET_USER] Response status:', res.status);
+    
     const json = await res.json().catch(() => ({}));
+    console.log('[GET_USER] Response body:', json);
+    
     if (!res.ok) {
       const message =
         (json && (json.detail || json.message)) ||
         `Request failed with status ${res.status}`;
+      console.error('[GET_USER] Failed:', message);
       return { ok: false, status: res.status, message };
     }
+    
+    console.log('[GET_USER] Success');
     return { ok: true, data: json };
   } catch (err: any) {
+    console.error('[GET_USER] Network error:', err);
     return { ok: false, status: -1, message: err?.message || "Network Error" };
   }
 }

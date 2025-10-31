@@ -15,7 +15,11 @@ import {
   Dimensions,
 } from "react-native";
 import { useRouter, Redirect } from "expo-router";
-import { registerUser, loginUser, sendVerificationCode } from "@/api/auth/auth";
+import {
+  registerUser,
+  loginUser,
+  sendVerificationCode,
+} from "../../api/auth/auth";
 import ToastBanner from "@/components/generalMessage";
 
 type ToastType = "success" | "error";

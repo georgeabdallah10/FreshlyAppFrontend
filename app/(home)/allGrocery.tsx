@@ -147,7 +147,7 @@ const AllGroceryScanner = () => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         quality: 0.8,
       });

@@ -1,21 +1,21 @@
 // ==================== FaceVerificationFlow.tsx ====================
-import { getCurrentUser } from "@/src/auth/auth";
-import { pickAndUploadAvatar, uploadAvatarFromUri } from "@/src/user/uploadPfp";
 import ToastBanner from "@/components/generalMessage";
 import Icon from "@/components/profileSection/components/icon";
 import { useUser } from "@/context/usercontext";
+import { getCurrentUser } from "@/src/auth/auth";
+import { uploadAvatarFromUri } from "@/src/user/uploadPfp";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Image,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Animated,
+  Image,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 
@@ -163,7 +163,7 @@ export const SetPfp = () => {
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,
@@ -245,7 +245,7 @@ export const SetPfp = () => {
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: [ImagePicker.MediaType.Images],
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,

@@ -128,7 +128,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: [ImagePicker.MediaType.Images],
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });

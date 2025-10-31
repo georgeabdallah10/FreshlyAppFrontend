@@ -116,7 +116,7 @@ export async function pickAndUploadAvatar(options: PickAndUploadAvatarOptions = 
 
   // 1) Pick
   const res = await ImagePicker.launchImageLibraryAsync({
-    mediaTypes: [ImagePicker.MediaType.Images],
+    mediaTypes: ['images'],
     allowsEditing: true,
     quality, // hint for picker only
   });

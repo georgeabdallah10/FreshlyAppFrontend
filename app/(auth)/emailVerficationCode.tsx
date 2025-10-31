@@ -1,27 +1,27 @@
 // ==================== app/(auth)/emailVerficationCode.tsx ====================
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
 // Adjust this path if your context lives elsewhere
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { useUser } from "@/context/usercontext";
 import {
-  sendVerificationCode,
-  verifyCode,
-  resendCode,
-} from "../../api/Auth/auth";
-import { getCurrentUser } from "../../api/Auth/auth";
+    getCurrentUser,
+    resendCode,
+    sendVerificationCode,
+    verifyCode,
+} from "../../api/auth/auth";
 
 const CODE_LENGTH = 6;
 

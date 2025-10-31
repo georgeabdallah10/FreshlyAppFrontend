@@ -1,5 +1,5 @@
 // ==================== FaceVerificationFlow.tsx ====================
-import { getCurrentUser } from "@/api/Auth/auth";
+import { getCurrentUser } from "@/api/auth/auth";
 import { uploadAvatarViaProxy } from "@/api/user/uploadViaBackend";
 import ToastBanner from "@/components/generalMessage";
 import Icon from "@/components/profileSection/components/icon";

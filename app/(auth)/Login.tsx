@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { loginUser } from "@/api/Auth/auth";
+import { loginUser } from "@/api/auth/auth";
 import { useRouter } from "expo-router";
 import ToastBanner from "@/components/generalMessage";
 import { Storage } from "@/api/utils/storage";

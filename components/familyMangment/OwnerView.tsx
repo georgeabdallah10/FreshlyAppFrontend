@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@/context/usercontext";
-import { getCurrentUser } from "@/api/Auth/auth";
+import { getCurrentUser } from "@/api/auth/auth";
 import type { FamilyMember, FamilyData } from "../../app/(home)/MyFamily";
 import {
   listMyFamilies,

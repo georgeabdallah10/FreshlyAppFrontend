@@ -17,7 +17,7 @@ import {
   requestPasswordReset,
   verifyPasswordResetCode,
   resetPassword,
-} from "@/api/Auth/auth";
+} from "@/api/auth/auth";
 
 type Step = "email" | "code" | "newpwd";
 const CODE_LENGTH = 6;

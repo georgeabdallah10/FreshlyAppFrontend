@@ -1,6 +1,5 @@
-# Ignore API directories (these are frontend API services, not serverless functions)
-api/
-.expo/
+# NOTE: Do NOT ignore api/ - it contains frontend API client code needed for the build
+# .expo/
 node_modules/
 
 # Ignore build artifacts

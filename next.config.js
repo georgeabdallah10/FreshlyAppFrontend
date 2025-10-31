@@ -5,6 +5,7 @@ const nextConfig = {
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
       'react-native$': 'react-native-web',
+      '@': __dirname,
     };
     config.resolve.extensions = [
       '.web.js',

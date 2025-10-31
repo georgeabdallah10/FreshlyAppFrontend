@@ -4,15 +4,15 @@
  * ============================================
  */
 
-import { ApiError } from '@/api/client/apiClient';
-import { invalidateQueries, queryKeys } from '@/api/config/queryClient';
+import { ApiError } from '@/src/client/apiClient';
+import { invalidateQueries, queryKeys } from '@/src/config/queryClient';
 import {
     chatApi,
     ChatMessage,
     ChatResponse,
     Conversation,
     SendMessageInput,
-} from '@/api/services/chat.service';
+} from '@/src/services/chat.service';
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 
 // ============================================

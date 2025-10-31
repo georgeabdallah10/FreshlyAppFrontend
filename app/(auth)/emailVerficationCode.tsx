@@ -21,7 +21,7 @@ import {
     resendCode,
     sendVerificationCode,
     verifyCode,
-} from "../../api/auth/auth";
+} from "../../src/auth/auth";
 
 const CODE_LENGTH = 6;
 

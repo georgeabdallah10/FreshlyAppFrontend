@@ -1,4 +1,4 @@
-import { setPrefrences } from "@/api/user/setPrefrences";
+import { setPrefrences } from "@/src/user/setPrefrences";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {

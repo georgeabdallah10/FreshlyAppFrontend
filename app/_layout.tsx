@@ -1,4 +1,4 @@
-import { queryClient } from '@/api/config/queryClient';
+import { queryClient } from '@/src/config/queryClient';
 import SplashScreen from "@/components/loadingpage";
 import { UserProvider } from "@/context/usercontext";
 import { useColorScheme } from "@/hooks/use-color-scheme";

@@ -14,9 +14,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { createMealForSignleUser } from "@/api/user/meals";
+import { createMealForSignleUser } from "@/src/user/meals";
 import { AddMealModal } from "./addMealModal";
-import { getAllmealsforSignelUser } from "@/api/user/meals";
+import { getAllmealsforSignelUser } from "@/src/user/meals";
 
 interface MealListScreenProps {
   onMealSelect: (meal: any) => void;

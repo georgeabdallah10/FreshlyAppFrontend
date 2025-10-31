@@ -1,5 +1,5 @@
-import { askAI } from "@/api/home/chat";
-import { createMealForSignleUser } from "@/api/user/meals";
+import { askAI } from "@/src/home/chat";
+import { createMealForSignleUser } from "@/src/user/meals";
 import RecipeItem from "@/components/meal/mealPreview";
 import { useUser } from "@/context/usercontext";
 import { Ionicons } from "@expo/vector-icons";

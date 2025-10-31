@@ -25,7 +25,7 @@ import {
   createMyPantryItem,
   updatePantryItem,
   deletePantryItem,
-} from "@/api/user/pantry";
+} from "@/src/user/pantry";
 
 const DEFAULT_CATEGORIES = [
   "Produce",
@@ -82,7 +82,7 @@ const UNIT_OPTIONS = [
   "pinch",
   "dash",
 ];
-import { GetItemByBarcode } from "@/api/scanners/barcodeeScanner";
+import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import ScanConfirmModal from "@/components/scanConfirmModal";
 import { useUser } from "@/context/usercontext";
 

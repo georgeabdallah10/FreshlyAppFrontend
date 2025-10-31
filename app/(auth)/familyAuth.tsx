@@ -23,7 +23,7 @@ import {
   regenerateInviteCode,
   joinFamilyByCode,
   listMyFamilies,
-} from "@/api/user/family";
+} from "@/src/user/family";
 import * as Clipboard from "expo-clipboard";
 
 

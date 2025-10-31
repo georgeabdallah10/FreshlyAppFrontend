@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Storage } from "@/api/utils/storage";
+import { Storage } from "@/src/utils/storage";
 
 import {
   View,
@@ -19,7 +19,7 @@ import {
   registerUser,
   loginUser,
   sendVerificationCode,
-} from "../../api/auth/auth";
+} from "../../src/auth/auth";
 import ToastBanner from "@/components/generalMessage";
 
 type ToastType = "success" | "error";

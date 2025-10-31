@@ -14,7 +14,7 @@
  * - Prefetching for better UX
  */
 
-import { CreateMealInput } from '@/api/services/meals.service';
+import { CreateMealInput } from '@/src/services/meals.service';
 import ToastBanner from '@/components/generalMessage';
 import MealDetailScreen from '@/components/meal/mealDetailScreen';
 import MealListScreen from '@/components/meal/mealListScreen';

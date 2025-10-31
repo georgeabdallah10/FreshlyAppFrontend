@@ -11,7 +11,7 @@ import {
   leaveFamily,
   removeFamilyMember,
   regenerateInviteCode,
-} from "@/api/user/family";
+} from "@/src/user/family";
 import FamilyMemberFlow from "../(auth)/familyAuth";
 
 type UserRole = "owner" | "member" | "user";

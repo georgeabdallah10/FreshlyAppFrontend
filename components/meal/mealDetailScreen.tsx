@@ -15,7 +15,7 @@ import { type Meal } from "./mealsData";
 import {
   deleteMealForSignleUser,
   updateMealForSignleUser,
-} from "@/api/user/meals";
+} from "@/src/user/meals";
 type Props = {
   meal: Meal;
   onBack: () => void;

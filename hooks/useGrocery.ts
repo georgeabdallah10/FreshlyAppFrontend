@@ -5,14 +5,14 @@
  * @description Provides hooks for managing grocery lists with React Query
  */
 
-import { queryKeys } from '@/api/config/queryClient';
+import { queryKeys } from '@/src/config/queryClient';
 import type {
     AddGroceryItemInput,
     CreateGroceryListInput,
     GroceryItem,
     GroceryList,
-} from '@/api/services/grocery.service';
-import { groceryService } from '@/api/services/grocery.service';
+} from '@/src/services/grocery.service';
+import { groceryService } from '@/src/services/grocery.service';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**

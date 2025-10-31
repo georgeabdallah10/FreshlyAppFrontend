@@ -11,10 +11,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { loginUser } from "../../api/auth/auth";
+import { loginUser } from "../../src/auth/auth";
 import { useRouter } from "expo-router";
 import ToastBanner from "@/components/generalMessage";
-import { Storage } from "@/api/utils/storage";
+import { Storage } from "@/src/utils/storage";
 
 type ToastType = "success" | "error";
 interface ToastState {

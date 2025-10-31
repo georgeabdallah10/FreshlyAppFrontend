@@ -12,15 +12,15 @@
  */
 
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
-import { ApiError } from '../api/client/apiClient';
-import { invalidateQueries, optimisticUpdate, prefetchQueries, queryKeys } from '../api/config/queryClient';
+import { ApiError } from '../src/client/apiClient';
+import { invalidateQueries, optimisticUpdate, prefetchQueries, queryKeys } from '../src/config/queryClient';
 import {
     CreateMealInput,
     Meal,
     MealFilters,
     mealsApi,
     UpdateMealInput,
-} from '../api/services/meals.service';
+} from '../src/services/meals.service';
 
 // ============================================
 // QUERY HOOKS

@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useUser } from "@/context/usercontext";
-import { getCurrentUser } from "@/api/auth/auth";
+import { getCurrentUser } from "@/src/auth/auth";
 import type { FamilyMember, FamilyData } from "../../app/(home)/MyFamily";
 import {
   listMyFamilies,
@@ -22,7 +22,7 @@ import {
   leaveFamily,
   removeFamilyMember,
   regenerateInviteCode,
-} from "@/api/user/family";
+} from "@/src/user/family";
 
 
 interface OwnerViewProps {

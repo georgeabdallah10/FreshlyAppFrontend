@@ -15,7 +15,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import { askAI } from "@/api/home/chat";
+import { askAI } from "@/src/home/chat";
 import { useUser } from "@/context/usercontext";
 
 // Stable id for chat messages

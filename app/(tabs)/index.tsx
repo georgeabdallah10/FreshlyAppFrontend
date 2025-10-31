@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Redirect, useRouter } from "expo-router";
 import { View, Text } from "react-native";
-import { getCurrentUser } from "@/api/auth/auth";
+import { getCurrentUser } from "@/src/auth/auth";
 
 export default function IndexPage() {
   const [loggedIn, setLoggedIn] = useState<boolean | null>(null);

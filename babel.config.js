@@ -9,6 +9,7 @@ module.exports = function (api) {
           root: ['.'],
           alias: {
             '@': '.',
+            '@/api': './src',
           },
           extensions: [
             '.web.ts',

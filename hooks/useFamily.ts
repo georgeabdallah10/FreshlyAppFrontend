@@ -5,15 +5,15 @@
  * @description Provides hooks for managing family groups with React Query
  */
 
-import { queryKeys } from '@/api/config/queryClient';
+import { queryKeys } from '@/src/config/queryClient';
 import type {
     CreateFamilyInput,
     Family,
     FamilyInvitation,
     FamilyMember,
     InviteMemberInput,
-} from '@/api/services/family.service';
-import { familyService } from '@/api/services/family.service';
+} from '@/src/services/family.service';
+import { familyService } from '@/src/services/family.service';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**

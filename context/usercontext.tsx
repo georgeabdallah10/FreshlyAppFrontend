@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { getCurrentUser } from "@/api/auth/auth";
-import { updateUserInfo as updateUserInfoApi } from "@/api/auth/auth";
-import { getMyprefrences } from "@/api/user/setPrefrences";
-import { listMyPantryItems } from "@/api/user/pantry";
-import { Storage } from "@/api/utils/storage";
+import { getCurrentUser } from "@/src/auth/auth";
+import { updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
+import { getMyprefrences } from "@/src/user/setPrefrences";
+import { listMyPantryItems } from "@/src/user/pantry";
+import { Storage } from "@/src/utils/storage";
 
 type PantryItem = {
   id: number;

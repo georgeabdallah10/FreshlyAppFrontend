@@ -4,15 +4,15 @@
  * ============================================
  */
 
-import { ApiError } from '@/api/client/apiClient';
-import { invalidateQueries, optimisticUpdate, queryKeys } from '@/api/config/queryClient';
+import { ApiError } from '@/src/client/apiClient';
+import { invalidateQueries, optimisticUpdate, queryKeys } from '@/src/config/queryClient';
 import {
     CreatePantryItemInput,
     pantryApi,
     PantryFilters,
     PantryItem,
     UpdatePantryItemInput,
-} from '@/api/services/pantry.service';
+} from '@/src/services/pantry.service';
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 
 // ============================================

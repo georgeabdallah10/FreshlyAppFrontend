@@ -5,7 +5,7 @@ import MealDetailScreen from '@/components/meal/mealDetailScreen';
 import { type Meal } from '@/components/meal/mealsData';
 import MealListScreen from '@/components/meal/mealListScreen';
 type Screen = 'list' | 'detail';
-import { getAllmealsforSignelUser } from '@/api/user/meals';
+import { getAllmealsforSignelUser } from '@/src/user/meals';
 import { AddMealModal } from '@/components/meal/addMealModal';
 import ToastBanner from "@/components/generalMessage";
 

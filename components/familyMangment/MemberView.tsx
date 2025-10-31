@@ -17,7 +17,7 @@ import {
   listMyFamilies,
   listFamilyMembers,
   leaveFamily,
-} from "@/api/user/family";
+} from "@/src/user/family";
 import { useUser } from "@/context/usercontext";
 
 interface MemberViewProps {

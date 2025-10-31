@@ -96,21 +96,40 @@ export async function loginUser(
   input: LoginInput
 ): Promise<ApiResult<LoginResponse>> {
   try {
+    console.log('[LOGIN] Attempting login to:', `${BASE_URL}/auth/login`);
+    console.log('[LOGIN] Request payload:', { email: input.email, password: '***' });
+    
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+      },
       body: JSON.stringify(input),
     });
 
-    const json = await res.json().catch(() => ({}));
+    console.log('[LOGIN] Response status:', res.status);
+    console.log('[LOGIN] Response headers:', Object.fromEntries(res.headers.entries()));
+
+    const json = await res.json().catch((e) => {
+      console.error('[LOGIN] Failed to parse JSON response:', e);
+      return {};
+    });
+    
+    console.log('[LOGIN] Response body:', json);
+
     if (!res.ok) {
       const message =
         (json && (json.detail || json.message)) ||
         `Request failed with status ${res.status}`;
+      console.error('[LOGIN] Login failed:', message);
       return { ok: false, status: res.status, message };
     }
+    
+    console.log('[LOGIN] Login successful');
     return { ok: true, data: json as LoginResponse };
   } catch (err: any) {
+    console.error('[LOGIN] Network error:', err);
     return { ok: false, status: -1, message: err?.message || "Network Error" };
   }
 }

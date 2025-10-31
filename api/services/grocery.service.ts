@@ -137,7 +137,7 @@ export async function getGrocerySuggestions(): Promise<GroceryItem[]> {
 // EXPORT ALL
 // ============================================
 
-export const groceryApi = {
+export const groceryService = {
   getGroceryLists,
   getActiveGroceryList,
   getGroceryList,
@@ -152,4 +152,6 @@ export const groceryApi = {
   getGrocerySuggestions,
 };
 
-export default groceryApi;
+// Legacy export
+export const groceryApi = groceryService;
+export default groceryService;

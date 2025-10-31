@@ -1,0 +1,12 @@
+# Ignore API directories (these are frontend API services, not serverless functions)
+api/
+.expo/
+node_modules/
+
+# Ignore build artifacts
+.expo-shared/
+web-build/
+
+# Ignore development files
+*.log
+.DS_Store

@@ -1,23 +1,25 @@
 {
+  "version": 2,
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "web-build",
-  "cleanUrls": true,
-  "rewrites": [
+  "framework": null,
+  "functions": {},
+  "routes": [
     {
-      "source": "/_expo/:splat*",
-      "destination": "/_expo/:splat"
+      "src": "/_expo/(.*)",
+      "dest": "/_expo/$1"
     },
     {
-      "source": "/assets/:splat*",
-      "destination": "/assets/:splat"
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1"
     },
     {
-      "source": "/favicon.ico",
-      "destination": "/favicon.ico"
+      "src": "/favicon.ico",
+      "dest": "/favicon.ico"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

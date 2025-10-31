@@ -104,8 +104,12 @@ export const queryKeys = {
   family: {
     all: ['family'] as const,
     current: () => [...queryKeys.family.all, 'current'] as const,
+    detail: () => [...queryKeys.family.all, 'detail'] as const,
     members: () => [...queryKeys.family.all, 'members'] as const,
+    member: (id: string) => [...queryKeys.family.all, 'member', id] as const,
     invitations: () => [...queryKeys.family.all, 'invitations'] as const,
+    invites: () => [...queryKeys.family.all, 'invites'] as const,
+    activity: () => [...queryKeys.family.all, 'activity'] as const,
   },
 
   // ========== GROCERY QUERIES ==========
@@ -113,6 +117,9 @@ export const queryKeys = {
     all: ['grocery'] as const,
     lists: () => [...queryKeys.grocery.all, 'list'] as const,
     list: (id?: number) => [...queryKeys.grocery.lists(), id] as const,
+    detail: (id: string | number) => [...queryKeys.grocery.all, 'detail', id] as const,
+    active: () => [...queryKeys.grocery.all, 'active'] as const,
+    items: (listId: string | number) => [...queryKeys.grocery.all, 'items', listId] as const,
     suggestions: () => [...queryKeys.grocery.all, 'suggestions'] as const,
   },
 

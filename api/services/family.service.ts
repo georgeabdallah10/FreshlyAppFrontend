@@ -153,7 +153,7 @@ export async function regenerateFamilyCode(familyId: number): Promise<{ code: st
 // EXPORT ALL
 // ============================================
 
-export const familyApi = {
+export const familyService = {
   getCurrentFamily,
   createFamily,
   updateFamily,
@@ -170,4 +170,6 @@ export const familyApi = {
   regenerateFamilyCode,
 };
 
-export default familyApi;
+// Legacy export
+export const familyApi = familyService;
+export default familyService;

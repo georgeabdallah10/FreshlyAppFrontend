@@ -3,7 +3,7 @@ import ToastBanner from "@/components/generalMessage";
 import Icon from "@/components/profileSection/components/icon";
 import { useUser } from "@/context/usercontext";
 import { getCurrentUser } from "@/src/auth/auth";
-import { uploadAvatarFromUri } from "@/src/user/uploadPfp";
+import { uploadAvatarViaProxy } from "@/src/user/uploadViaBackend";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -211,31 +211,21 @@ export const SetPfp = () => {
         }
       }
 
-      // Upload directly to Supabase Storage
-      console.log('[UPLOAD] Uploading to Supabase, userId:', userID);
+      // Upload via backend proxy
+      console.log('[UPLOAD] Uploading via backend proxy, userId:', userID);
       
       try {
-        const uploadResult = await uploadAvatarFromUri(userID, 
-          typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
-          {
-            bucket: 'users', // Changed from 'users' - needs RLS policy
-            fileName: 'profile.jpg',
-            quality: 0.9,
-          }
-        );
+        const uploadResult = await uploadAvatarViaProxy({
+          uri: finalUri,
+          appUserId: userID,
+        });
 
         const publicUrl = uploadResult.publicUrl || uploadResult.path;
         console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
-        console.error('[UPLOAD] Supabase upload failed:', uploadError);
-        
-        // If RLS error, show helpful message
-        if (uploadError?.message?.includes('row-level security') || uploadError?.message?.includes('RLS')) {
-          showToast("error", "Storage permissions not configured. Please contact support or check SUPABASE_RLS_FIX.md");
-        } else {
-          showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
-        }
+        console.error('[UPLOAD] Backend upload failed:', uploadError);
+        showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
         setUploading(false);
         setCurrentStep("initial");
         return;
@@ -307,31 +297,21 @@ export const SetPfp = () => {
         }
       }
 
-      // Upload directly to Supabase Storage
-      console.log('[UPLOAD] Uploading to Supabase from gallery, userId:', userID);
+      // Upload via backend proxy
+      console.log('[UPLOAD] Uploading via backend proxy from gallery, userId:', userID);
       
       try {
-        const uploadResult = await uploadAvatarFromUri(userID, 
-          typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
-          {
-            bucket: 'users', // Changed from 'users' - needs RLS policy
-            fileName: 'profile.jpg',
-            quality: 0.9,
-          }
-        );
+        const uploadResult = await uploadAvatarViaProxy({
+          uri: finalUri,
+          appUserId: userID,
+        });
 
         const publicUrl = uploadResult.publicUrl || uploadResult.path;
         console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
-        console.error('[UPLOAD] Supabase upload failed:', uploadError);
-        
-        // If RLS error, show helpful message
-        if (uploadError?.message?.includes('row-level security') || uploadError?.message?.includes('RLS')) {
-          showToast("error", "Storage permissions not configured. Please contact support or check SUPABASE_RLS_FIX.md");
-        } else {
-          showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
-        }
+        console.error('[UPLOAD] Backend upload failed:', uploadError);
+        showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
         setUploading(false);
         setCurrentStep("initial");
         return;

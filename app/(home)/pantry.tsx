@@ -1,31 +1,34 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Modal,
-  FlatList,
-  Animated,
-  Easing,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-  ActivityIndicator,
-  Image,
-  Button,
-} from "react-native";
-import { useRouter } from "expo-router";
 import ToastBanner from "@/components/generalMessage";
+import ScanConfirmModal from "@/components/scanConfirmModal";
+import { useUser } from "@/context/usercontext";
+import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import {
-  listMyPantryItems,
   createMyPantryItem,
-  updatePantryItem,
   deletePantryItem,
+  listMyPantryItems,
+  updatePantryItem,
 } from "@/src/user/pantry";
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  Animated,
+  Button,
+  Easing,
+  FlatList,
+  Image,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
+} from "react-native";
 
 const DEFAULT_CATEGORIES = [
   "Produce",
@@ -82,9 +85,6 @@ const UNIT_OPTIONS = [
   "pinch",
   "dash",
 ];
-import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
-import ScanConfirmModal from "@/components/scanConfirmModal";
-import { useUser } from "@/context/usercontext";
 
 const categoryIdFromName = (n: string) =>
   n.toLowerCase().replace(/\s+|&/g, "-");
@@ -256,12 +256,12 @@ const PantryDashboard = () => {
   // Toast banner
   const [toast, setToast] = useState<{
     visible: boolean;
-    type: "success" | "error";
+    type: "success" | "error" | "info";
     message: string;
     duration?: number;
     topOffset?: number;
   }>({ visible: false, type: "success", message: "", topOffset: 40});
-  const showToast = (type: "success" | "error", message: string, duration?: number, topOffset?: number) => {
+  const showToast = (type: "success" | "error" | "info", message: string, duration?: number, topOffset?: number) => {
     setToast({ visible: true, type, message, duration , topOffset});
   };
 
@@ -284,6 +284,12 @@ const PantryDashboard = () => {
   };
 
   const openScanner = async () => {
+    // On web, use file input fallback instead of CameraView
+    if (Platform.OS === 'web') {
+      showToast('info', 'Web barcode scanning coming soon. Please use the mobile app for scanning.', 3000);
+      return;
+    }
+    
     // Request permission if needed, then open the scanner modal
     if (!perm) {
       const req = await requestPermission();

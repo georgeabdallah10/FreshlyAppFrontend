@@ -1,5 +1,5 @@
 import { Html5Qrcode } from 'html5-qrcode';
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface WebBarcodeScannerProps {
   onScan: (result: { data: string; type: string }) => void;
@@ -9,17 +9,43 @@ interface WebBarcodeScannerProps {
 export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerIdRef = useRef('web-barcode-scanner');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
+    console.log('[WebBarcodeScanner] Component mounted, starting scanner...');
 
     const startScanner = async () => {
       try {
+        // Wait a bit for the DOM to be ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        console.log('[WebBarcodeScanner] Checking for element:', scannerIdRef.current);
+        const element = document.getElementById(scannerIdRef.current);
+        console.log('[WebBarcodeScanner] Element found:', element);
+        
+        if (!element) {
+          throw new Error('Scanner container element not found');
+        }
+
         // Create scanner instance
+        console.log('[WebBarcodeScanner] Creating Html5Qrcode instance...');
         const scanner = new Html5Qrcode(scannerIdRef.current);
         scannerRef.current = scanner;
 
+        // Get available cameras
+        console.log('[WebBarcodeScanner] Getting camera devices...');
+        const devices = await Html5Qrcode.getCameras();
+        console.log('[WebBarcodeScanner] Available cameras:', devices);
+
+        if (!devices || devices.length === 0) {
+          throw new Error('No cameras found on this device');
+        }
+
         // Start scanning with back camera
+        console.log('[WebBarcodeScanner] Starting camera...');
         await scanner.start(
           { facingMode: 'environment' }, // Use back camera
           {
@@ -29,7 +55,7 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
           },
           (decodedText, decodedResult) => {
             if (mounted) {
-              console.log('Barcode scanned:', decodedText);
+              console.log('[WebBarcodeScanner] Barcode scanned:', decodedText);
               onScan({
                 data: decodedText,
                 type: decodedResult.result.format?.formatName || 'UNKNOWN',
@@ -37,19 +63,25 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
             }
           },
           (errorMessage) => {
-            // Ignore errors during scanning (they're frequent)
-            // Only log actual issues
+            // Ignore NotFoundException errors (they're frequent when no barcode is visible)
             if (errorMessage && !errorMessage.includes('NotFoundException')) {
-              console.debug('Scan error:', errorMessage);
+              console.debug('[WebBarcodeScanner] Scan error:', errorMessage);
             }
           }
         );
 
-        console.log('Web barcode scanner started successfully');
+        console.log('[WebBarcodeScanner] Scanner started successfully');
+        if (mounted) {
+          setLoading(false);
+        }
       } catch (err: any) {
-        console.error('Failed to start web scanner:', err);
-        if (mounted && onError) {
-          onError(err?.message || 'Failed to start camera');
+        console.error('[WebBarcodeScanner] Failed to start scanner:', err);
+        if (mounted) {
+          setError(err?.message || 'Failed to start camera');
+          setLoading(false);
+          if (onError) {
+            onError(err?.message || 'Failed to start camera');
+          }
         }
       }
     };
@@ -58,16 +90,17 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
 
     // Cleanup
     return () => {
+      console.log('[WebBarcodeScanner] Cleaning up...');
       mounted = false;
       if (scannerRef.current) {
         scannerRef.current
           .stop()
           .then(() => {
-            console.log('Web scanner stopped');
+            console.log('[WebBarcodeScanner] Scanner stopped');
             scannerRef.current?.clear();
           })
           .catch((err) => {
-            console.error('Error stopping scanner:', err);
+            console.error('[WebBarcodeScanner] Error stopping scanner:', err);
           });
       }
     };
@@ -75,14 +108,57 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
 
   return (
     <div
-      id={scannerIdRef.current}
       style={{
         width: '340px',
         height: '340px',
         margin: '0 auto',
-        borderRadius: '12px',
-        overflow: 'hidden',
+        position: 'relative',
       }}
-    />
+    >
+      {loading && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#FFF',
+            fontSize: '16px',
+            textAlign: 'center',
+            zIndex: 10,
+          }}
+        >
+          Loading camera...
+        </div>
+      )}
+      {error && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            color: '#FF3B30',
+            fontSize: '14px',
+            textAlign: 'center',
+            padding: '20px',
+            zIndex: 10,
+          }}
+        >
+          {error}
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        id={scannerIdRef.current}
+        style={{
+          width: '340px',
+          height: '340px',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          backgroundColor: '#000',
+        }}
+      />
+    </div>
   );
 }

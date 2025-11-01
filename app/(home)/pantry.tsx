@@ -1168,15 +1168,26 @@ const PantryDashboard = () => {
 
           <View style={styles.scannerBox}>
             {Platform.OS === 'web' ? (
-              // @ts-ignore - Web-only component
-              <WebBarcodeScanner
-                onScan={handleBarcodeScan}
-                onError={(error) => {
-                  console.error('Web scanner error:', error);
-                  showToast('error', `Camera error: ${error}`);
-                }}
-              />
+              // Web: Use a div wrapper for proper DOM rendering
+              // @ts-ignore - Web-only JSX
+              <div style={{ 
+                width: '340px', 
+                height: '340px', 
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+              }}>
+                {/* @ts-ignore - Web-only component */}
+                <WebBarcodeScanner
+                  onScan={handleBarcodeScan}
+                  onError={(error) => {
+                    console.error('[Pantry] Web scanner error:', error);
+                    showToast('error', `Camera error: ${error}`);
+                  }}
+                />
+              </div>
             ) : (
+              // Native: Use CameraView
               <CameraView
                 key={showQRScanner ? "scanner-on" : "scanner-off"}
                 style={{

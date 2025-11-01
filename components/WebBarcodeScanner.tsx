@@ -8,31 +8,33 @@ interface WebBarcodeScannerProps {
 
 export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const scannerIdRef = useRef('web-barcode-scanner');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [scannerId] = useState(`web-barcode-scanner-${Date.now()}`);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const isRunningRef = useRef(false);
 
   useEffect(() => {
     let mounted = true;
-    console.log('[WebBarcodeScanner] Component mounted, starting scanner...');
+    console.log('[WebBarcodeScanner] Component mounted, ID:', scannerId);
 
     const startScanner = async () => {
       try {
-        // Wait a bit for the DOM to be ready
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait for DOM to be ready
+        await new Promise(resolve => setTimeout(resolve, 250));
         
-        console.log('[WebBarcodeScanner] Checking for element:', scannerIdRef.current);
-        const element = document.getElementById(scannerIdRef.current);
+        if (!mounted) return;
+
+        console.log('[WebBarcodeScanner] Checking for element:', scannerId);
+        const element = document.getElementById(scannerId);
         console.log('[WebBarcodeScanner] Element found:', element);
         
         if (!element) {
-          throw new Error('Scanner container element not found');
+          throw new Error('Scanner container element not found in DOM');
         }
 
         // Create scanner instance
         console.log('[WebBarcodeScanner] Creating Html5Qrcode instance...');
-        const scanner = new Html5Qrcode(scannerIdRef.current);
+        const scanner = new Html5Qrcode(scannerId);
         scannerRef.current = scanner;
 
         // Get available cameras
@@ -43,6 +45,8 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
         if (!devices || devices.length === 0) {
           throw new Error('No cameras found on this device');
         }
+
+        if (!mounted) return;
 
         // Start scanning with back camera
         console.log('[WebBarcodeScanner] Starting camera...');
@@ -70,7 +74,9 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
           }
         );
 
+        isRunningRef.current = true;
         console.log('[WebBarcodeScanner] Scanner started successfully');
+        
         if (mounted) {
           setLoading(false);
         }
@@ -92,19 +98,23 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
     return () => {
       console.log('[WebBarcodeScanner] Cleaning up...');
       mounted = false;
-      if (scannerRef.current) {
+      
+      if (scannerRef.current && isRunningRef.current) {
         scannerRef.current
           .stop()
           .then(() => {
             console.log('[WebBarcodeScanner] Scanner stopped');
-            scannerRef.current?.clear();
+            isRunningRef.current = false;
+            if (scannerRef.current) {
+              scannerRef.current.clear();
+            }
           })
           .catch((err) => {
             console.error('[WebBarcodeScanner] Error stopping scanner:', err);
           });
       }
     };
-  }, [onScan, onError]);
+  }, [scannerId, onScan, onError]);
 
   return (
     <div
@@ -149,8 +159,7 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
         </div>
       )}
       <div
-        ref={containerRef}
-        id={scannerIdRef.current}
+        id={scannerId}
         style={{
           width: '340px',
           height: '340px',

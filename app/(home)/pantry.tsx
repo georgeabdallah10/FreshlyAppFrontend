@@ -1484,8 +1484,8 @@ const styles = StyleSheet.create({
   },
   scannerBox: {
     alignSelf: "center",
-    width: 280,
-    height: 280,
+    width: 340,
+    height: 340,
     justifyContent: "center",
     alignItems: "center",
   },

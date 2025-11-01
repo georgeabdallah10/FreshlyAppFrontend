@@ -77,9 +77,11 @@ export default function WebBarcodeScanner({ onScan, onError }: WebBarcodeScanner
     <div
       id={scannerIdRef.current}
       style={{
-        width: '100%',
-        maxWidth: '500px',
+        width: '340px',
+        height: '340px',
         margin: '0 auto',
+        borderRadius: '12px',
+        overflow: 'hidden',
       }}
     />
   );

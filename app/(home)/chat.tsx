@@ -1,5 +1,13 @@
 import { useUser } from "@/context/usercontext";
-import { askAI } from "@/src/home/chat";
+import {
+  createConversation,
+  deleteConversation,
+  getConversation,
+  getConversations,
+  sendMessage,
+  updateConversationTitle,
+  type Conversation
+} from "@/src/home/chat";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
@@ -334,6 +342,13 @@ export default function ChatAIScreen() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Conversation management state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [currentConversationId, setCurrentConversationId] = useState<number | undefined>();
+  const [showConversationList, setShowConversationList] = useState(false);
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const conversationSlideAnim = useRef(new Animated.Value(-300)).current;
 
   const system_prompt = `
 You are Freshly, an advanced meal-planning and cooking assistant. You generate complete, structured, easy-to-read outputs with precise formatting and clear section breaks. Use a calm, friendly, and helpful tone.
@@ -461,12 +476,142 @@ Rules:
     }
   }, [showActionSheet]);
 
+  // Load conversations on mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  // Animate conversation sidebar
+  useEffect(() => {
+    Animated.timing(conversationSlideAnim, {
+      toValue: showConversationList ? 0 : -300,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [showConversationList]);
+
   // Auto scroll to bottom when new message
   useEffect(() => {
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 100);
   }, [messages]);
+
+  // Load all conversations
+  const loadConversations = async () => {
+    try {
+      setIsLoadingConversations(true);
+      const convos = await getConversations();
+      setConversations(convos);
+    } catch (error: any) {
+      console.error('Failed to load conversations:', error);
+      Alert.alert('Error', 'Failed to load conversation history');
+    } finally {
+      setIsLoadingConversations(false);
+    }
+  };
+
+  // Load a specific conversation
+  const loadConversation = async (conversationId: number) => {
+    try {
+      const { conversation, messages: apiMessages } = await getConversation(conversationId);
+      
+      // Convert API messages to UI messages
+      const uiMessages: ChatMessage[] = apiMessages.map(msg => {
+        const recipe = tryParseRecipe(msg.content);
+        if (recipe && msg.role === 'assistant') {
+          return { id: uid(), kind: "ai_recipe", recipe };
+        }
+        return {
+          id: uid(),
+          kind: msg.role === 'user' ? 'user' : 'ai_text',
+          text: msg.content,
+        } as ChatMessage;
+      });
+      
+      setMessages(uiMessages);
+      setCurrentConversationId(conversationId);
+      setShowConversationList(false);
+    } catch (error: any) {
+      console.error('Failed to load conversation:', error);
+      Alert.alert('Error', 'Failed to load conversation');
+    }
+  };
+
+  // Create a new conversation
+  const handleNewConversation = async () => {
+    try {
+      const newConvo = await createConversation('New Chat');
+      setConversations([newConvo, ...conversations]);
+      setCurrentConversationId(newConvo.id);
+      setMessages([]);
+      setShowConversationList(false);
+    } catch (error: any) {
+      console.error('Failed to create conversation:', error);
+      Alert.alert('Error', 'Failed to create new conversation');
+    }
+  };
+
+  // Delete a conversation
+  const handleDeleteConversation = async (conversationId: number) => {
+    Alert.alert(
+      'Delete Conversation',
+      'Are you sure you want to delete this conversation?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteConversation(conversationId);
+              setConversations(conversations.filter(c => c.id !== conversationId));
+              if (currentConversationId === conversationId) {
+                setMessages([]);
+                setCurrentConversationId(undefined);
+              }
+            } catch (error: any) {
+              console.error('Failed to delete conversation:', error);
+              Alert.alert('Error', 'Failed to delete conversation');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Rename conversation
+  const handleRenameConversation = (conversationId: number, currentTitle: string) => {
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        'Rename Conversation',
+        'Enter new title:',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Save',
+            onPress: async (newTitle?: string) => {
+              if (!newTitle?.trim()) return;
+              try {
+                await updateConversationTitle(conversationId, newTitle.trim());
+                setConversations(conversations.map(c => 
+                  c.id === conversationId ? { ...c, title: newTitle.trim() } : c
+                ));
+              } catch (error: any) {
+                console.error('Failed to rename conversation:', error);
+                Alert.alert('Error', 'Failed to rename conversation');
+              }
+            },
+          },
+        ],
+        'plain-text',
+        currentTitle
+      );
+    } else {
+      // For Android/Web, we'll show a simple alert (you can later add a modal)
+      Alert.alert('Rename', 'Rename feature requires a custom modal on Android/Web');
+    }
+  };
 
   const handleCameraPress = () => {
     setShowActionSheet(true);
@@ -530,25 +675,40 @@ Rules:
       { id: typingId, kind: "ai_text", text: "", isTyping: true },
     ]);
 
-    const response = await askAI({
-      prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
-      system: `${system_prompt}`,
-    });
+    try {
+      // Send message with conversation context
+      const response = await sendMessage({
+        prompt: `\n\nUSER:\n${userText}\n\n${JSON_DIRECTIVE}`,
+        system: `${system_prompt}`,
+        conversationId: currentConversationId,
+      });
 
-    // Remove typing indicator by id
-    setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
+      // If no conversation was active, set the new one
+      if (!currentConversationId && response.conversation_id) {
+        setCurrentConversationId(response.conversation_id);
+        // Reload conversations to show the new one
+        loadConversations();
+      }
 
-    const recipe = tryParseRecipe(response);
-    if (recipe) {
-      setMessages((prev) => [
-        ...prev,
-        { id: uid(), kind: "ai_recipe", recipe },
-      ]);
-    } else {
-      setMessages((prev) => [
-        ...prev,
-        { id: uid(), kind: "ai_text", text: response },
-      ]);
+      // Remove typing indicator by id
+      setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
+
+      const recipe = tryParseRecipe(response.reply);
+      if (recipe) {
+        setMessages((prev) => [
+          ...prev,
+          { id: uid(), kind: "ai_recipe", recipe },
+        ]);
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          { id: uid(), kind: "ai_text", text: response.reply },
+        ]);
+      }
+    } catch (error: any) {
+      console.error('Failed to send message:', error);
+      setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
+      Alert.alert('Error', error.message || 'Failed to send message');
     }
   };
 
@@ -595,7 +755,93 @@ Rules:
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Freshly AI</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={handleNewConversation}
+          >
+            <Ionicons name="add" size={24} color="#00A86B" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => setShowConversationList(!showConversationList)}
+          >
+            <Ionicons name="menu" size={24} color="#00A86B" />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Conversation Sidebar */}
+      {showConversationList && (
+        <TouchableOpacity
+          style={styles.conversationOverlay}
+          activeOpacity={1}
+          onPress={() => setShowConversationList(false)}
+        >
+          <Animated.View
+            style={[
+              styles.conversationSidebar,
+              { transform: [{ translateX: conversationSlideAnim }] },
+            ]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.conversationHeader}>
+              <Text style={styles.conversationHeaderTitle}>Conversations</Text>
+              <TouchableOpacity onPress={() => setShowConversationList(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.conversationList}>
+              {isLoadingConversations ? (
+                <Text style={styles.loadingText}>Loading...</Text>
+              ) : conversations.length === 0 ? (
+                <Text style={styles.emptyConversationsText}>
+                  No conversations yet. Start chatting!
+                </Text>
+              ) : (
+                conversations.map((convo) => (
+                  <View key={convo.id} style={styles.conversationItem}>
+                    <TouchableOpacity
+                      style={[
+                        styles.conversationItemButton,
+                        currentConversationId === convo.id && styles.conversationItemActive,
+                      ]}
+                      onPress={() => loadConversation(convo.id)}
+                    >
+                      <View style={styles.conversationItemContent}>
+                        <Text
+                          style={styles.conversationItemTitle}
+                          numberOfLines={1}
+                        >
+                          {convo.title}
+                        </Text>
+                        <Text style={styles.conversationItemMeta}>
+                          {convo.message_count} messages
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                    <View style={styles.conversationItemActions}>
+                      <TouchableOpacity
+                        onPress={() => handleRenameConversation(convo.id, convo.title)}
+                        style={styles.conversationActionButton}
+                      >
+                        <Ionicons name="pencil" size={18} color="#666" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteConversation(convo.id)}
+                        style={styles.conversationActionButton}
+                      >
+                        <Ionicons name="trash" size={18} color="#FF3B30" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </Animated.View>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         ref={scrollViewRef}
@@ -791,7 +1037,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-evenly",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 16,
@@ -806,9 +1052,99 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#000",
+    flex: 1,
+    textAlign: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerButton: {
+    padding: 4,
   },
   addButton: {
     padding: 4,
+  },
+  conversationOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    zIndex: 1000,
+  },
+  conversationSidebar: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 280,
+    backgroundColor: "#FFF",
+    shadowColor: "#000",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 2, height: 0 },
+    elevation: 5,
+  },
+  conversationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+    marginTop: 50,
+  },
+  conversationHeaderTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#000",
+  },
+  conversationList: {
+    flex: 1,
+  },
+  loadingText: {
+    padding: 20,
+    textAlign: "center",
+    color: "#999",
+  },
+  emptyConversationsText: {
+    padding: 20,
+    textAlign: "center",
+    color: "#999",
+    fontSize: 14,
+  },
+  conversationItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0F0F0",
+  },
+  conversationItemButton: {
+    flex: 1,
+    padding: 16,
+  },
+  conversationItemActive: {
+    backgroundColor: "#F0F9F5",
+  },
+  conversationItemContent: {
+    flex: 1,
+  },
+  conversationItemTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 4,
+  },
+  conversationItemMeta: {
+    fontSize: 12,
+    color: "#999",
+  },
+  conversationItemActions: {
+    flexDirection: "row",
+    paddingRight: 8,
+  },
+  conversationActionButton: {
+    padding: 8,
   },
   messagesContainer: {
     flex: 1,

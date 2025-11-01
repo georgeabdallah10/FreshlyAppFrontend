@@ -19,6 +19,9 @@ export async function uploadAvatarViaProxy({
   }
 
   const formData = new FormData();
+  
+  // Add user_id to FormData (backend expects this)
+  formData.append('user_id', appUserId);
 
   if (typeof uri === "string") {
     if (Platform.OS === "web") {

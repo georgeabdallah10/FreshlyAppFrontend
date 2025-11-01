@@ -1,29 +1,29 @@
 import { useUser } from "@/context/usercontext";
 import {
-  createConversation,
-  deleteConversation,
-  getConversation,
-  getConversations,
-  sendMessage,
-  updateConversationTitle,
-  type Conversation
+    createConversation,
+    deleteConversation,
+    getConversation,
+    getConversations,
+    sendMessage,
+    updateConversationTitle,
+    type Conversation
 } from "@/src/home/chat";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
-  Animated,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Alert,
+    Animated,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 // Stable id for chat messages
@@ -556,7 +556,7 @@ Rules:
   const handleDeleteConversation = async (conversationId: number) => {
     Alert.alert(
       'Delete Conversation',
-      'Are you sure you want to delete this conversation?',
+      'Are you sure you want to delete this conversation? This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -570,6 +570,7 @@ Rules:
                 setMessages([]);
                 setCurrentConversationId(undefined);
               }
+              Alert.alert('Success', 'Conversation deleted');
             } catch (error: any) {
               console.error('Failed to delete conversation:', error);
               Alert.alert('Error', 'Failed to delete conversation');
@@ -581,7 +582,7 @@ Rules:
   };
 
   // Rename conversation
-  const handleRenameConversation = (conversationId: number, currentTitle: string) => {
+  const handleRenameConversation = async (conversationId: number, currentTitle: string) => {
     if (Platform.OS === 'ios') {
       Alert.prompt(
         'Rename Conversation',
@@ -597,6 +598,7 @@ Rules:
                 setConversations(conversations.map(c => 
                   c.id === conversationId ? { ...c, title: newTitle.trim() } : c
                 ));
+                Alert.alert('Success', 'Conversation renamed');
               } catch (error: any) {
                 console.error('Failed to rename conversation:', error);
                 Alert.alert('Error', 'Failed to rename conversation');
@@ -608,8 +610,23 @@ Rules:
         currentTitle
       );
     } else {
-      // For Android/Web, we'll show a simple alert (you can later add a modal)
-      Alert.alert('Rename', 'Rename feature requires a custom modal on Android/Web');
+      // For Web/Android, use browser prompt
+      const newTitle = typeof window !== 'undefined' 
+        ? window.prompt('Enter new title for this conversation:', currentTitle)
+        : null;
+      
+      if (newTitle && newTitle.trim()) {
+        try {
+          await updateConversationTitle(conversationId, newTitle.trim());
+          setConversations(conversations.map(c => 
+            c.id === conversationId ? { ...c, title: newTitle.trim() } : c
+          ));
+          Alert.alert('Success', 'Conversation renamed');
+        } catch (error: any) {
+          console.error('Failed to rename conversation:', error);
+          Alert.alert('Error', 'Failed to rename conversation');
+        }
+      }
     }
   };
 

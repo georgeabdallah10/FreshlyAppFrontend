@@ -50,10 +50,32 @@ export async function uploadImageUri({
   upsert = true,
 }: UploadImageUriParams): Promise<{ path: string; publicUrl?: string }> {
   const supabase = createSupabaseClient();
+  
+  console.log('[uploadImageUri] Starting upload', { bucket, path, contentType });
+
+  // Verify bucket exists first
+  const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
+  console.log('[uploadImageUri] Available buckets:', buckets?.map(b => b.name));
+  
+  if (bucketError) {
+    console.error('[uploadImageUri] Failed to list buckets:', bucketError);
+    throw new Error('Failed to connect to storage');
+  }
+
+  const bucketExists = buckets?.some(b => b.name === bucket);
+  if (!bucketExists) {
+    throw new Error(`Bucket "${bucket}" does not exist. Available: ${buckets?.map(b => b.name).join(', ')}`);
+  }
 
   // Read bytes from the local/remote URI
   const resp = await fetch(uri);
   const bytes = await resp.arrayBuffer();
+  
+  console.log('[uploadImageUri] File prepared', { 
+    size: bytes.byteLength,
+    bucket,
+    path 
+  });
 
   console.log("[uploadImageUri] uploading", { bucket, path, contentType, cacheSeconds, upsert });
 

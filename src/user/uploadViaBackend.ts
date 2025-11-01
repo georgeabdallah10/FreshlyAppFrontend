@@ -24,12 +24,59 @@ export async function uploadAvatarViaProxy({
     if (Platform.OS === "web") {
       const response = await fetch(uri);
       const blob = await response.blob();
-      const file = new File([blob], "avatar.jpg", { type: blob.type || "image/jpeg" });
-      formData.append("file", file);
+      
+      // Check file size and compress if needed
+      const maxSize = 2 * 1024 * 1024; // 2MB
+      console.log('[uploadAvatarViaProxy] Original blob size:', blob.size, 'bytes');
+      
+      if (blob.size > maxSize) {
+        console.log('[uploadAvatarViaProxy] File too large, compressing...');
+        // Create canvas to resize/compress image
+        const img = new Image();
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = URL.createObjectURL(blob);
+        });
+        
+        // Resize to max 1024x1024
+        let width = img.width;
+        let height = img.height;
+        const maxDim = 1024;
+        
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = (height / width) * maxDim;
+            width = maxDim;
+          } else {
+            width = (width / height) * maxDim;
+            height = maxDim;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        // Convert to compressed JPEG
+        const compressedBlob = await new Promise<Blob>((resolve) => {
+          canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.7);
+        });
+        
+        console.log('[uploadAvatarViaProxy] Compressed size:', compressedBlob.size, 'bytes');
+        formData.append("file", new File([compressedBlob], "avatar.jpg", { type: "image/jpeg" }));
+      } else {
+        formData.append("file", new File([blob], "avatar.jpg", { type: blob.type || "image/jpeg" }));
+      }
     } else {
-      // Mobile: Re-encode to JPEG and compress
+      // Mobile: Re-encode to JPEG and compress aggressively
       const manipulated = await ImageManipulator.manipulateAsync(
-        uri, [], { compress: 0.9, format: ImageManipulator.SaveFormat.JPEG }
+        uri, 
+        [{ resize: { width: 1024 } }], // Resize to max 1024px width
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG } // More compression
       );
       
       const filename = manipulated.uri.split('/').pop() || 'avatar.jpg';
@@ -44,8 +91,51 @@ export async function uploadAvatarViaProxy({
       });
     }
   } else {
-    // Web: File object already provided
-    formData.append("file", uri);
+    // Web: File object already provided - may need compression
+    const file = uri as File;
+    const maxSize = 2 * 1024 * 1024; // 2MB
+    console.log('[uploadAvatarViaProxy] File size:', file.size, 'bytes');
+    
+    if (file.size > maxSize) {
+      console.log('[uploadAvatarViaProxy] File too large, compressing...');
+      // Use canvas to compress
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+      
+      let width = img.width;
+      let height = img.height;
+      const maxDim = 1024;
+      
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = (height / width) * maxDim;
+          width = maxDim;
+        } else {
+          width = (width / height) * maxDim;
+          height = maxDim;
+        }
+      }
+      
+      canvas.width = width;
+      canvas.height = height;
+      ctx?.drawImage(img, 0, 0, width, height);
+      
+      const compressedBlob = await new Promise<Blob>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.7);
+      });
+      
+      console.log('[uploadAvatarViaProxy] Compressed size:', compressedBlob.size, 'bytes');
+      formData.append("file", new File([compressedBlob], "avatar.jpg", { type: "image/jpeg" }));
+    } else {
+      formData.append("file", file);
+    }
   }
 
   console.log('[uploadAvatarViaProxy] Uploading to /storage/avatar/proxy');

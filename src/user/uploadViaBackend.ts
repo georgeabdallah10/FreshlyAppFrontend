@@ -144,6 +144,7 @@ export async function uploadAvatarViaProxy({
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
+      'x-user-id': appUserId, // Backend requires this header
       // Don't set Content-Type - browser/fetch sets it automatically with boundary
     },
     body: formData,

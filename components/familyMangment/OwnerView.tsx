@@ -1,28 +1,25 @@
 // ==================== OwnerView.tsx ====================
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Animated,
-  Modal,
-  Share,
-  Clipboard, // If not available, consider: // import * as Clipboard from 'expo-clipboard';
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
-import { getCurrentUser } from "@/src/auth/auth";
-import type { FamilyMember, FamilyData } from "../../app/(home)/MyFamily";
 import {
-  listMyFamilies,
-  listFamilyMembers,
-  leaveFamily,
-  removeFamilyMember,
-  regenerateInviteCode,
+    listFamilyMembers,
+    regenerateInviteCode,
+    removeFamilyMember
 } from "@/src/user/family";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import {
+    Animated,
+    Clipboard,
+    Modal,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
 
 
 interface OwnerViewProps {
@@ -52,6 +49,36 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const [loadingMembers, setLoadingMembers] = useState(false);
   const {user} = useUser();
 
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "confirm" | "info";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({
+    visible: false,
+    type: "info",
+    message: "",
+  });
+
+  const showToast = (
+    type: "success" | "error" | "confirm" | "info",
+    message: string,
+    title?: string,
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>
+  ) => {
+    setToast({ visible: true, type, message, title, buttons });
+  };
+
   const loadMembers = useCallback(async () => {
     try {
       setLoadingMembers(true);
@@ -59,7 +86,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       setLocalMembers(fetched);
     } catch (e) {
       console.error("Failed to load members:", e);
-      Alert.alert("Error", "Couldn't load members");
+      showToast("error", "Couldn't load members");
     } finally {
       setLoadingMembers(false);
     }
@@ -126,10 +153,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       setIsRegenerating(true);
       const newCode = await runRegenerateCode();
       setLocalInviteCode(newCode);
-      Alert.alert("Success", "New invite code generated successfully!");
+      showToast("success", "New invite code generated successfully!");
     } catch (error) {
       console.error("Regenerate code error:", error);
-      Alert.alert("Error", "Failed to regenerate code. Please try again.");
+      showToast("error", "Failed to regenerate code. Please try again.");
     } finally {
       setIsRegenerating(false);
     }
@@ -150,35 +177,41 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       if (Clipboard && typeof Clipboard.setString === "function") {
         Clipboard.setString(localInviteCode);
       }
-      Alert.alert("Copied!", "Invite code copied to clipboard");
+      showToast("success", "Invite code copied to clipboard");
     } catch {
-      Alert.alert("Copied!", "Invite code copied");
+      showToast("success", "Invite code copied");
     }
   };
 
   const handleKickMember = (member: FamilyMember) => {
-    Alert.alert(
-      "Remove Member",
+    showToast(
+      "confirm",
       `Are you sure you want to remove ${member.name} from the family?`,
+      "Remove Member",
       [
-        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Cancel", 
+          style: "cancel",
+          onPress: () => setToast({ ...toast, visible: false })
+        },
         {
           text: "Remove",
           style: "destructive",
           onPress: async () => {
+            setToast({ ...toast, visible: false });
             try {
               await runKickMember(member.id);
               // Optimistically remove from UI, then refresh in background
               setLocalMembers((prev) => prev.filter((m) => m.id !== member.id));
               loadMembers();
-              Alert.alert(
-                "Success",
+              showToast(
+                "success",
                 `${member.name} has been removed from the family`
               );
             } catch (error) {
               console.error("Kick member error:", error);
-              Alert.alert(
-                "Error",
+              showToast(
+                "error",
                 "Failed to remove member. Please try again."
               );
             }
@@ -398,6 +431,16 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast({ ...toast, visible: false })}
+        topOffset={60}
+      />
     </>
   );
 };

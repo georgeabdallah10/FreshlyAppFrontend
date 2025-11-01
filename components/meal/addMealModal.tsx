@@ -1,16 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Animated,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import ToastBanner from '@/components/generalMessage';
 import { Ionicons } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+    Animated,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from 'react-native';
 
 interface AddMealModalProps {
   visible: boolean;
@@ -59,6 +59,36 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
   
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "confirm" | "info";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({
+    visible: false,
+    type: "info",
+    message: "",
+  });
+
+  const showToast = (
+    type: "success" | "error" | "confirm" | "info",
+    message: string,
+    title?: string,
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>
+  ) => {
+    setToast({ visible: true, type, message, title, buttons });
+  };
 
   useEffect(() => {
     if (visible) {
@@ -141,12 +171,12 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
 
   const handleSubmit = () => {
     if (!name.trim()) {
-      Alert.alert('Missing Information', 'Please enter a meal name');
+      showToast('error', 'Please enter a meal name', 'Missing Information');
       return;
     }
 
     if (!calories) {
-      Alert.alert('Missing Information', 'Please enter calories');
+      showToast('error', 'Please enter calories', 'Missing Information');
       return;
     }
 
@@ -184,8 +214,8 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
 
     onSubmit(meal);
     resetForm();
-    Alert.alert('Success', 'Meal added successfully!', [
-      { text: 'OK', onPress: onClose },
+    showToast('success', 'Meal added successfully!', 'Success', [
+      { text: 'OK', onPress: onClose, style: 'default' },
     ]);
   };
 
@@ -519,6 +549,16 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
           </View>
         </Animated.View>
       </View>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast({ ...toast, visible: false })}
+        topOffset={100}
+      />
     </Modal>
   );
 };

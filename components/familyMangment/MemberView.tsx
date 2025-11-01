@@ -1,24 +1,24 @@
 // ==================== MemberView.tsx ====================
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  Animated,
-  Modal,
-} from "react-native";
-import * as Clipboard from "expo-clipboard";
-import { Ionicons } from "@expo/vector-icons";
-import type { FamilyMember, FamilyData } from "../../app/(home)/MyFamily";
-import {
-  listMyFamilies,
-  listFamilyMembers,
-  leaveFamily,
-} from "@/src/user/family";
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
+import {
+    leaveFamily,
+    listFamilyMembers,
+    listMyFamilies,
+} from "@/src/user/family";
+import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import React, { useEffect, useRef, useState } from "react";
+import {
+    Animated,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
 
 interface MemberViewProps {
   familyData: FamilyData;
@@ -40,6 +40,36 @@ const MemberView: React.FC<MemberViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(familyData?.inviteCode ?? (familyData as any)?.invite_code ?? null);
   const {user} = useUser();
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "confirm" | "info";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({
+    visible: false,
+    type: "info",
+    message: "",
+  });
+
+  const showToast = (
+    type: "success" | "error" | "confirm" | "info",
+    message: string,
+    title?: string,
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>
+  ) => {
+    setToast({ visible: true, type, message, title, buttons });
+  };
 
   const leaveSlideAnim = useRef(new Animated.Value(0)).current;
   const leaveFadeAnim = useRef(new Animated.Value(0)).current;
@@ -113,11 +143,11 @@ const MemberView: React.FC<MemberViewProps> = ({
       } else {
         await leaveFamily(Number(familyData.id), Number(user?.id));
       }
-      Alert.alert("Left Family", "You have successfully left the family");
+      showToast("success", "You have successfully left the family");
       setShowLeaveModal(false);
       onBack();
     } catch (error) {
-      Alert.alert("Error", "Failed to leave family. Please try again.");
+      showToast("error", "Failed to leave family. Please try again.");
     }
   };
 
@@ -171,9 +201,9 @@ const MemberView: React.FC<MemberViewProps> = ({
               onPress={async () => {
                 try {
                   await Clipboard.setStringAsync(inviteCode);
-                  Alert.alert("Copied", "Invite code copied to clipboard");
+                  showToast("success", "Invite code copied to clipboard");
                 } catch {
-                  Alert.alert("Copied", "Invite code copied");
+                  showToast("success", "Invite code copied");
                 }
               }}
               activeOpacity={0.8}
@@ -314,6 +344,16 @@ const MemberView: React.FC<MemberViewProps> = ({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast({ ...toast, visible: false })}
+        topOffset={60}
+      />
     </>
   );
 };

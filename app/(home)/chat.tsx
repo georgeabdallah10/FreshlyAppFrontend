@@ -1,29 +1,29 @@
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import {
-    createConversation,
-    deleteConversation,
-    getConversation,
-    getConversations,
-    sendMessage,
-    updateConversationTitle,
-    type Conversation
+  createConversation,
+  deleteConversation,
+  getConversation,
+  getConversations,
+  sendMessage,
+  updateConversationTitle,
+  type Conversation
 } from "@/src/home/chat";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    Alert,
-    Animated,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 // Stable id for chat messages
@@ -350,6 +350,28 @@ export default function ChatAIScreen() {
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const conversationSlideAnim = useRef(new Animated.Value(-300)).current;
 
+  // Toast state for better UX
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'confirm' | 'info';
+    message: string;
+    title?: string;
+    buttons?: Array<{text: string; onPress: () => void; style?: 'default' | 'destructive' | 'cancel'}>;
+  }>({
+    visible: false,
+    type: 'success',
+    message: '',
+  });
+
+  const showToast = (
+    type: 'success' | 'error' | 'confirm' | 'info',
+    message: string,
+    title?: string,
+    buttons?: Array<{text: string; onPress: () => void; style?: 'default' | 'destructive' | 'cancel'}>
+  ) => {
+    setToast({ visible: true, type, message, title, buttons });
+  };
+
   const system_prompt = `
 You are Freshly, an advanced meal-planning and cooking assistant. You generate complete, structured, easy-to-read outputs with precise formatting and clear section breaks. Use a calm, friendly, and helpful tone.
 
@@ -370,7 +392,7 @@ INPUTS YOU WILL RECEIVE
   ]
 
 GLOBAL RULES (NEVER VIOLATE)
-- Strictly exclude any allergens and any items listed in disliked_ingredient_ids.
+- Strictly exclude any allergens and any items listed in disliked_ingredient_ids. u 
 - Obey diet_codes (e.g., gluten_free, vegan) and user goal (e.g., weight_loss, muscle_gain, balanced).
 - Prefer ingredients already in pantry_json and favor items close to expiry if expires_at is present.
 - If a requested meal needs items not in the pantry, you may suggest a short, easy shopping list (widely available basics only).
@@ -505,7 +527,7 @@ Rules:
       setConversations(convos);
     } catch (error: any) {
       console.error('Failed to load conversations:', error);
-      Alert.alert('Error', 'Failed to load conversation history');
+      showToast('error', 'Failed to load conversation history');
     } finally {
       setIsLoadingConversations(false);
     }
@@ -534,7 +556,7 @@ Rules:
       setShowConversationList(false);
     } catch (error: any) {
       console.error('Failed to load conversation:', error);
-      Alert.alert('Error', 'Failed to load conversation');
+      showToast('error', 'Failed to load conversation');
     }
   };
 
@@ -548,17 +570,18 @@ Rules:
       setShowConversationList(false);
     } catch (error: any) {
       console.error('Failed to create conversation:', error);
-      Alert.alert('Error', 'Failed to create new conversation');
+      showToast('error', 'Failed to create new conversation');
     }
   };
 
   // Delete a conversation
   const handleDeleteConversation = async (conversationId: number) => {
-    Alert.alert(
-      'Delete Conversation',
+    showToast(
+      'confirm',
       'Are you sure you want to delete this conversation? This cannot be undone.',
+      'Delete Conversation',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Delete',
           style: 'destructive',
@@ -570,10 +593,10 @@ Rules:
                 setMessages([]);
                 setCurrentConversationId(undefined);
               }
-              Alert.alert('Success', 'Conversation deleted');
+              showToast('success', 'Conversation deleted');
             } catch (error: any) {
               console.error('Failed to delete conversation:', error);
-              Alert.alert('Error', 'Failed to delete conversation');
+              showToast('error', 'Failed to delete conversation');
             }
           },
         },
@@ -583,49 +606,60 @@ Rules:
 
   // Rename conversation
   const handleRenameConversation = async (conversationId: number, currentTitle: string) => {
-    if (Platform.OS === 'ios') {
-      Alert.prompt(
-        'Rename Conversation',
-        'Enter new title:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Save',
-            onPress: async (newTitle?: string) => {
-              if (!newTitle?.trim()) return;
-              try {
-                await updateConversationTitle(conversationId, newTitle.trim());
-                setConversations(conversations.map(c => 
-                  c.id === conversationId ? { ...c, title: newTitle.trim() } : c
-                ));
-                Alert.alert('Success', 'Conversation renamed');
-              } catch (error: any) {
-                console.error('Failed to rename conversation:', error);
-                Alert.alert('Error', 'Failed to rename conversation');
-              }
-            },
-          },
-        ],
-        'plain-text',
-        currentTitle
-      );
-    } else {
-      // For Web/Android, use browser prompt
+    // Helper function to perform the actual rename
+    const performRename = async (newTitle: string) => {
+      if (!newTitle?.trim()) return;
+      try {
+        await updateConversationTitle(conversationId, newTitle.trim());
+        setConversations(conversations.map(c => 
+          c.id === conversationId ? { ...c, title: newTitle.trim() } : c
+        ));
+        showToast('success', 'Conversation renamed');
+      } catch (error: any) {
+        console.error('Failed to rename conversation:', error);
+        showToast('error', 'Failed to rename conversation');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      // For Web, use browser prompt
       const newTitle = typeof window !== 'undefined' 
         ? window.prompt('Enter new title for this conversation:', currentTitle)
         : null;
       
-      if (newTitle && newTitle.trim()) {
-        try {
-          await updateConversationTitle(conversationId, newTitle.trim());
-          setConversations(conversations.map(c => 
-            c.id === conversationId ? { ...c, title: newTitle.trim() } : c
-          ));
-          Alert.alert('Success', 'Conversation renamed');
-        } catch (error: any) {
-          console.error('Failed to rename conversation:', error);
-          Alert.alert('Error', 'Failed to rename conversation');
+      if (newTitle) {
+        await performRename(newTitle);
+      }
+    } else {
+      // For iOS/Android, use TextInput in an Alert-style modal
+      // For now, use a simple prompt approach
+      const newTitle = await new Promise<string | null>((resolve) => {
+        if (Platform.OS === 'ios') {
+          // iOS supports Alert.prompt
+          const Alert = require('react-native').Alert;
+          Alert.prompt(
+            'Rename Conversation',
+            'Enter new title:',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+              {
+                text: 'Save',
+                onPress: (text?: string) => resolve(text || null),
+              },
+            ],
+            'plain-text',
+            currentTitle
+          );
+        } else {
+          // Android doesn't support Alert.prompt, fallback to a basic approach
+          // In a production app, you'd create a custom modal with TextInput
+          showToast('info', 'Rename feature requires custom modal on Android');
+          resolve(null);
         }
+      });
+      
+      if (newTitle) {
+        await performRename(newTitle);
       }
     }
   };
@@ -642,7 +676,7 @@ Rules:
     if (selectedAction === "camera") {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Camera permission is required.");
+        showToast('error', "Camera permission is required.");
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -651,14 +685,14 @@ Rules:
         quality: 0.8,
       });
       if (!result.canceled) {
-        Alert.alert("Success", "Image captured successfully!");
+        showToast('success', "Image captured successfully!");
         setShowActionSheet(false);
       }
     } else if (selectedAction === "gallery") {
       const { status } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Gallery permission is required.");
+        showToast('error', "Gallery permission is required.");
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -667,7 +701,7 @@ Rules:
         quality: 0.8,
       });
       if (!result.canceled) {
-        Alert.alert("Success", "Image selected successfully!");
+        showToast('success', "Image selected successfully!");
         setShowActionSheet(false);
       }
     }
@@ -725,7 +759,7 @@ Rules:
     } catch (error: any) {
       console.error('Failed to send message:', error);
       setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
-      Alert.alert('Error', error.message || 'Failed to send message');
+      showToast('error', error.message || 'Failed to send message');
     }
   };
 
@@ -745,7 +779,7 @@ Rules:
 
     // Validate we have data
     if (groceryList.length === 0) {
-      Alert.alert("Error", "No ingredients found in recipe");
+      showToast('error', 'No ingredients found in recipe');
       return;
     }
 
@@ -1041,6 +1075,17 @@ Rules:
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      {/* Toast Banner for better UX */}
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast({ ...toast, visible: false })}
+        topOffset={60}
+      />
     </KeyboardAvoidingView>
   );
 }

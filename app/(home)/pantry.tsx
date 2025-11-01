@@ -1166,28 +1166,29 @@ const PantryDashboard = () => {
           </TouchableOpacity>
           <Text style={styles.scannerTitle}>Scan Barcode</Text>
 
-          <View style={styles.scannerBox}>
-            {Platform.OS === 'web' ? (
-              // Web: Use a div wrapper for proper DOM rendering
-              // @ts-ignore - Web-only JSX
-              <div style={{ 
-                width: '340px', 
-                height: '340px', 
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-              }}>
-                {/* @ts-ignore - Web-only component */}
-                <WebBarcodeScanner
-                  onScan={handleBarcodeScan}
-                  onError={(error) => {
-                    console.error('[Pantry] Web scanner error:', error);
-                    showToast('error', `Camera error: ${error}`);
-                  }}
-                />
-              </div>
-            ) : (
-              // Native: Use CameraView
+          {Platform.OS === 'web' ? (
+            // Web: Render outside React Native View to prevent re-renders
+            // @ts-ignore - Web-only JSX
+            <div style={{ 
+              width: '340px', 
+              height: '340px', 
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              margin: '0 auto',
+            }}>
+              {/* @ts-ignore - Web-only component */}
+              <WebBarcodeScanner
+                key="web-scanner"
+                onScan={handleBarcodeScan}
+                onError={(error) => {
+                  console.error('[Pantry] Web scanner error:', error);
+                  showToast('error', `Camera error: ${error}`);
+                }}
+              />
+            </div>
+          ) : (
+            <View style={styles.scannerBox}>
               <CameraView
                 key={showQRScanner ? "scanner-on" : "scanner-off"}
                 style={{
@@ -1204,23 +1205,24 @@ const PantryDashboard = () => {
                 }}
                 onBarcodeScanned={handleBarcodeScan}
               />
-            )}
-            
-            {scanned && Platform.OS !== 'web' && (
-              <View
-                style={{
-                  position: "absolute",
-                  bottom: 12,
-                  left: 0,
-                  right: 0,
-                  alignItems: "center",
-                }}
-              >
-                <Button title="Scan again" onPress={() => setScanned(false)} />
-              </View>
-            )}
-            
-            <ScanConfirmModal
+              
+              {scanned && (
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 12,
+                    left: 0,
+                    right: 0,
+                    alignItems: "center",
+                  }}
+                >
+                  <Button title="Scan again" onPress={() => setScanned(false)} />
+                </View>
+              )}
+            </View>
+          )}
+
+          <ScanConfirmModal
               visible={confirmVisible}
               product={pendingProduct}
               onApprove={async (payload) => {
@@ -1258,7 +1260,6 @@ const PantryDashboard = () => {
                 showToast("error", "Scan canceled.");
               }}
             />
-          </View>
 
           <Text style={styles.scannerText}>
             {scanned

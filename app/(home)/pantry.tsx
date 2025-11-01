@@ -11,6 +11,8 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+// @ts-ignore - Web-only component
+import WebBarcodeScanner from "@/components/WebBarcodeScanner";
 import {
   ActivityIndicator,
   Animated,
@@ -284,20 +286,36 @@ const PantryDashboard = () => {
   };
 
   const openScanner = async () => {
-    // On web, use file input fallback instead of CameraView
+    console.log('Platform.OS:', Platform.OS);
+    console.log('Camera permission:', perm);
+    
+    // On web, we use html5-qrcode which handles permissions automatically
     if (Platform.OS === 'web') {
-      showToast('info', 'Web barcode scanning coming soon. Please use the mobile app for scanning.', 3000);
+      console.log('Opening web scanner...');
+      setShowQRScanner(true);
       return;
     }
     
-    // Request permission if needed, then open the scanner modal
+    // Native: Request camera permission for expo-camera
     if (!perm) {
+      console.log('No permission object, requesting...');
       const req = await requestPermission();
-      if (!req?.granted) return;
+      console.log('Permission result:', req);
+      if (!req?.granted) {
+        showToast('error', 'Camera permission denied. Please enable it in settings.');
+        return;
+      }
     } else if (!perm.granted) {
+      console.log('Permission not granted, requesting...');
       const req = await requestPermission();
-      if (!req?.granted) return;
+      console.log('Permission result:', req);
+      if (!req?.granted) {
+        showToast('error', 'Camera permission denied. Please enable it in settings.');
+        return;
+      }
     }
+    
+    console.log('Opening native scanner...');
     if (scanCooldownRef.current) {
       clearTimeout(scanCooldownRef.current);
       scanCooldownRef.current = null;
@@ -1149,27 +1167,35 @@ const PantryDashboard = () => {
           <Text style={styles.scannerTitle}>Scan Barcode</Text>
 
           <View style={styles.scannerBox}>
-            <CameraView
-              key={showQRScanner ? "scanner-on" : "scanner-off"} // force remount when modal toggles
-              style={{
-                width: 340,
-                height: 340,
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-              facing="back"
-              onCameraReady={() => console.log("Camera ready")}
-              onMountError={(e) => {
-                console.log("Camera mount error", e);
-                showToast("error", "Camera error: could not start.");
-              }}
-              onBarcodeScanned={handleBarcodeScan}
-              // Try with NO filter first to verify it works:
-              // barcodeScannerSettings={{}}
-              // Or include a wider set if you want a filter:
-              // @ts-ignore
-            />
-            {scanned && (
+            {Platform.OS === 'web' ? (
+              // @ts-ignore - Web-only component
+              <WebBarcodeScanner
+                onScan={handleBarcodeScan}
+                onError={(error) => {
+                  console.error('Web scanner error:', error);
+                  showToast('error', `Camera error: ${error}`);
+                }}
+              />
+            ) : (
+              <CameraView
+                key={showQRScanner ? "scanner-on" : "scanner-off"}
+                style={{
+                  width: 340,
+                  height: 340,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                }}
+                facing="back"
+                onCameraReady={() => console.log("Camera ready")}
+                onMountError={(e) => {
+                  console.log("Camera mount error", e);
+                  showToast("error", "Camera error: could not start.");
+                }}
+                onBarcodeScanned={handleBarcodeScan}
+              />
+            )}
+            
+            {scanned && Platform.OS !== 'web' && (
               <View
                 style={{
                   position: "absolute",
@@ -1182,6 +1208,7 @@ const PantryDashboard = () => {
                 <Button title="Scan again" onPress={() => setScanned(false)} />
               </View>
             )}
+            
             <ScanConfirmModal
               visible={confirmVisible}
               product={pendingProduct}

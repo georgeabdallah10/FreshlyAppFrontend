@@ -18,7 +18,7 @@ type UploadImageUriParams = {
   upsert?: boolean;            // default true
 };
 
-const DEFAULT_BUCKET = "users"; // your project uses a public "users" bucket
+const DEFAULT_BUCKET = "avatars"; // Changed from "users" - needs proper RLS policies (see SUPABASE_RLS_FIX.md)
 const DEFAULT_FILE = "profile.jpg";
 
 /** Small helper: build the canonical avatar path */

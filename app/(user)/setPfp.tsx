@@ -218,7 +218,7 @@ export const SetPfp = () => {
         const uploadResult = await uploadAvatarFromUri(userID, 
           typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
           {
-            bucket: 'avatars', // Changed from 'users' - needs RLS policy
+            bucket: 'users', // Changed from 'users' - needs RLS policy
             fileName: 'profile.jpg',
             quality: 0.9,
           }
@@ -314,7 +314,7 @@ export const SetPfp = () => {
         const uploadResult = await uploadAvatarFromUri(userID, 
           typeof finalUri === 'string' ? finalUri : URL.createObjectURL(finalUri),
           {
-            bucket: 'avatars', // Changed from 'users' - needs RLS policy
+            bucket: 'users', // Changed from 'users' - needs RLS policy
             fileName: 'profile.jpg',
             quality: 0.9,
           }

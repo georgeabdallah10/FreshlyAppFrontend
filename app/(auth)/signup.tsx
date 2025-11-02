@@ -1,26 +1,26 @@
-import React, { useState, useRef, useEffect } from "react";
 import { Storage } from "@/src/utils/storage";
+import React, { useEffect, useRef, useState } from "react";
 
+import ToastBanner from "@/components/generalMessage";
+import { useRouter } from "expo-router";
 import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
   Animated,
+  Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  Dimensions,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useRouter, Redirect } from "expo-router";
 import {
-  registerUser,
   loginUser,
+  registerUser,
   sendVerificationCode,
 } from "../../src/auth/auth";
-import ToastBanner from "@/components/generalMessage";
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -69,6 +69,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     visible: false,
     type: "success",
@@ -89,6 +90,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
+  const loadingOpacity = useRef(new Animated.Value(0)).current;
+  const loadingScale = useRef(new Animated.Value(0.8)).current;
+  const spinValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -106,58 +110,115 @@ export default function CreateAccountScreen(): React.JSX.Element {
     ]).start();
   }, []);
 
-  async function onsubmit() {
-    console.log("Something happened");
-    const result = await registerUser({
-      email: email,
-      password: password,
-      name: username,
-      phone_number: mobile,
-      preference: {
-        diet_codes: [],
-        allergen_ingredient_ids: [],
-        disliked_ingredient_ids: [],
-        goal: "balanced",
-        calorie_target: 0,
-      },
-    });
-    if (result.ok) {
-      setUsername("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-      setMobile("");
-      console.log(result);
-      const login = await loginUser({ email, password });
-      if (!login.ok) {
-        showToast(
-          "error",
-          login.message ?? "Auto-login failed. Please try again."
-        );
-        return;
-      }
-      await Storage.setItem("access_token", login.data.access_token);
-      showToast("success", "Account createed successfully");
-      router.replace("/(user)/setPfp");
+  // Loading overlay animation
+  useEffect(() => {
+    if (isCreatingAccount) {
+      // Show overlay with fade in
+      Animated.parallel([
+        Animated.timing(loadingOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(loadingScale, {
+          toValue: 1,
+          tension: 50,
+          friction: 7,
+          useNativeDriver: true,
+        }),
+      ]).start();
 
-      // Send verification code before navigating
-      try {
-        const sent = await sendVerificationCode(email);
-        if (!sent.ok) {
-          console.warn("Failed to send verification code:", sent.message);
-        }
-      } catch (e) {
-        console.warn("Error sending verification code:", e);
-      }
-
-      // Navigate to the verification screen
-      //router.replace({
-      //pathname: "/(auth)/emailVerficationCode",
-      //params: { fromSignUp: "true", email },
-      //});
-      return;
+      // Start spinning animation
+      Animated.loop(
+        Animated.timing(spinValue, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      ).start();
     } else {
-      showToast("error", result.message || "Sign up failed. Please try again.");
+      // Hide overlay
+      Animated.parallel([
+        Animated.timing(loadingOpacity, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(loadingScale, {
+          toValue: 0.8,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      spinValue.setValue(0);
+    }
+  }, [isCreatingAccount]);
+
+  async function onsubmit() {
+    setIsCreatingAccount(true);
+    try {
+      console.log("Something happened");
+      const result = await registerUser({
+        email: email,
+        password: password,
+        name: username,
+        phone_number: mobile,
+        preference: {
+          diet_codes: [],
+          allergen_ingredient_ids: [],
+          disliked_ingredient_ids: [],
+          goal: "balanced",
+          calorie_target: 0,
+        },
+      });
+      if (result.ok) {
+        setUsername("");
+        setEmail("");
+        setPassword("");
+        setConfirmPassword("");
+        setMobile("");
+        console.log(result);
+        const login = await loginUser({ email, password });
+        if (!login.ok) {
+          setIsCreatingAccount(false);
+          showToast(
+            "error",
+            login.message ?? "Auto-login failed. Please try again."
+          );
+          return;
+        }
+        await Storage.setItem("access_token", login.data.access_token);
+        showToast("success", "Account created successfully");
+
+        // Send verification code before navigating
+        try {
+          const sent = await sendVerificationCode(email);
+          if (!sent.ok) {
+            console.warn("Failed to send verification code:", sent.message);
+          }
+        } catch (e) {
+          console.warn("Error sending verification code:", e);
+        }
+
+        // Small delay to show success state
+        setTimeout(() => {
+          setIsCreatingAccount(false);
+          router.replace("/(user)/setPfp");
+        }, 800);
+
+        // Navigate to the verification screen
+        //router.replace({
+        //pathname: "/(auth)/emailVerficationCode",
+        //params: { fromSignUp: "true", email },
+        //});
+        return;
+      } else {
+        setIsCreatingAccount(false);
+        showToast("error", result.message || "Sign up failed. Please try again.");
+      }
+    } catch (error) {
+      setIsCreatingAccount(false);
+      showToast("error", "An unexpected error occurred. Please try again.");
     }
   }
   const getMissingFields = (): string[] => {
@@ -478,6 +539,52 @@ export default function CreateAccountScreen(): React.JSX.Element {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Loading Overlay */}
+      {isCreatingAccount && (
+        <Animated.View
+          style={[
+            styles.loadingOverlay,
+            {
+              opacity: loadingOpacity,
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.loadingCard,
+              {
+                transform: [{ scale: loadingScale }],
+              },
+            ]}
+          >
+            {/* Spinning loader */}
+            <Animated.View
+              style={{
+                transform: [
+                  {
+                    rotate: spinValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", "360deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <View style={styles.spinner}>
+                <View style={styles.spinnerInner} />
+              </View>
+            </Animated.View>
+
+            {/* Text */}
+            <Text style={styles.loadingTitle}>Creating Your Account</Text>
+            <Text style={styles.loadingSubtitle}>
+              Just a moment while we set everything up for you...
+            </Text>
+          </Animated.View>
+        </Animated.View>
+      )}
+
       <ToastBanner
         visible={toast.visible}
         type={toast.type}
@@ -667,5 +774,61 @@ const styles = StyleSheet.create({
     fontFamily: "System",
     letterSpacing: -1,
     marginTop: -30,
+  },
+  // Loading Overlay Styles
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  loadingCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: moderateScale(24),
+    padding: moderateScale(32),
+    alignItems: "center",
+    minWidth: SCREEN_WIDTH * 0.75,
+    maxWidth: SCREEN_WIDTH * 0.85,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  spinner: {
+    width: moderateScale(64),
+    height: moderateScale(64),
+    borderRadius: moderateScale(32),
+    borderWidth: 4,
+    borderColor: "#E8F5E9",
+    borderTopColor: "#00C853",
+    marginBottom: verticalScale(20),
+  },
+  spinnerInner: {
+    width: "100%",
+    height: "100%",
+    borderRadius: moderateScale(28),
+  },
+  loadingTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: "700",
+    color: "#111111",
+    textAlign: "center",
+    marginBottom: verticalScale(8),
+  },
+  loadingSubtitle: {
+    fontSize: moderateScale(14),
+    color: "#757575",
+    textAlign: "center",
+    lineHeight: moderateScale(20),
+    paddingHorizontal: scale(8),
   },
 });

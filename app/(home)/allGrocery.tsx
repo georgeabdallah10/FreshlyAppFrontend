@@ -118,12 +118,12 @@ const AllGroceryScanner = () => {
     if (type === "barcode") {
       openBarcodeScanner();
     } else {
-      openImageCapture();
+      openImageCapture(type); // Pass type directly
     }
   };
 
   // Open camera for image capture
-  const openImageCapture = async () => {
+  const openImageCapture = async (scanType: ScanType) => {
     try {
       addDebugLog(`Platform: ${Platform.OS}`);
       
@@ -155,10 +155,10 @@ const AllGroceryScanner = () => {
             const fileObj = (asset as any).file;
             if (fileObj) {
               addDebugLog('Using File object from camera');
-              await processImage(fileObj);
+              await processImage(fileObj, scanType);
             } else {
               addDebugLog('Using URI from camera');
-              await processImage(asset.uri);
+              await processImage(asset.uri, scanType);
             }
           } else {
             addDebugLog('iOS Safari camera capture canceled');
@@ -189,10 +189,10 @@ const AllGroceryScanner = () => {
           const fileObj = (asset as any).file;
           if (fileObj) {
             addDebugLog(`Using File object (size: ${fileObj.size} bytes)`);
-            await processImage(fileObj);
+            await processImage(fileObj, scanType);
           } else {
             addDebugLog('Using URI (no File object available)');
-            await processImage(assetUri);
+            await processImage(assetUri, scanType);
           }
         } else {
           addDebugLog('Image selection canceled');
@@ -225,7 +225,7 @@ const AllGroceryScanner = () => {
           addDebugLog(`Image captured: ${imageUri.substring(0, 50)}...`);
           setCapturedImage(imageUri);
           setCurrentStep("processing");
-          await processImage(imageUri);
+          await processImage(imageUri, scanType);
         } else {
           addDebugLog('Image capture canceled by user');
           setCurrentStep("selection");
@@ -259,18 +259,14 @@ const AllGroceryScanner = () => {
   };
 
   // Process captured image with AI via backend proxy
-  const processImage = async (imageData: string | File) => {
+  const processImage = async (imageData: string | File, scanType: ScanType) => {
     try {
-      if (!selectedScanType) {
-        throw new Error('No scan type selected');
-      }
-
       // Barcode scanning doesn't use image processing
-      if (selectedScanType === 'barcode') {
+      if (scanType === 'barcode') {
         throw new Error('Barcode scanning should not call processImage');
       }
 
-      addDebugLog(`Processing ${selectedScanType} image via proxy`);
+      addDebugLog(`Processing ${scanType} image via proxy`);
       
       if (typeof imageData === 'string') {
         addDebugLog(`Data type: string, length: ${imageData.length}`);
@@ -282,7 +278,7 @@ const AllGroceryScanner = () => {
       addDebugLog('Calling backend proxy API...');
       const response = await scanImageViaProxy({
         uri: imageData,
-        scanType: selectedScanType,
+        scanType: scanType,
       });
       
       addDebugLog(`API returned ${response.items?.length || 0} items`);

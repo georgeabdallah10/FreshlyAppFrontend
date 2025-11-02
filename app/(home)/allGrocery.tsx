@@ -160,16 +160,23 @@ const AllGroceryScanner = () => {
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
+          base64: true, // Get base64 directly on web
         });
 
         addDebugLog(`Result: canceled=${result.canceled}, hasAssets=${!!result.assets?.[0]}`);
 
         if (!result.canceled && result.assets[0]) {
-          const imageUri = result.assets[0].uri;
-          addDebugLog(`Image URI: ${imageUri.substring(0, 50)}...`);
-          setCapturedImage(imageUri);
+          const asset = result.assets[0];
+          addDebugLog(`Image type: ${asset.type}, size: ${asset.fileSize || 'unknown'}`);
+          addDebugLog(`Has base64: ${!!asset.base64}`);
+          
+          // On web, prefer base64 if available, otherwise use URI
+          const imageData = asset.base64 || asset.uri;
+          addDebugLog(`Using ${asset.base64 ? 'base64' : 'URI'}: ${imageData.substring(0, 50)}...`);
+          
+          setCapturedImage(asset.uri);
           setCurrentStep("processing");
-          await processImage(imageUri);
+          await processImage(imageData);
         } else {
           addDebugLog('Image selection canceled');
           setCurrentStep("selection");
@@ -235,15 +242,25 @@ const AllGroceryScanner = () => {
   };
 
   // Process captured image with AI
-  const processImage = async (imageUri: string) => {
+  const processImage = async (imageData: string) => {
     try {
       addDebugLog(`Processing ${selectedScanType} image`);
-      addDebugLog(`URI length: ${imageUri.length}`);
+      addDebugLog(`Data length: ${imageData.length}`);
+      addDebugLog(`Data type: ${imageData.startsWith('data:') ? 'data URL' : imageData.startsWith('blob:') ? 'blob URL' : imageData.startsWith('file:') ? 'file URL' : 'base64'}`);
       
-      // Convert image URI to base64
-      addDebugLog('Converting to base64...');
-      const base64Image = await imageUriToBase64(imageUri);
-      addDebugLog(`Base64 length: ${base64Image.length}`);
+      // Convert image URI to base64 if needed
+      let base64Image: string;
+      if (imageData.length < 500 && (imageData.startsWith('blob:') || imageData.startsWith('file:') || imageData.startsWith('http'))) {
+        // It's a URI, needs conversion
+        addDebugLog('Converting URI to base64...');
+        base64Image = await imageUriToBase64(imageData);
+        addDebugLog(`Base64 length after conversion: ${base64Image.length}`);
+      } else {
+        // It's already base64 or will be handled by imageUriToBase64
+        addDebugLog('Using data as-is or converting...');
+        base64Image = await imageUriToBase64(imageData);
+        addDebugLog(`Base64 length: ${base64Image.length}`);
+      }
       
       // Call AI API
       addDebugLog('Calling AI API...');

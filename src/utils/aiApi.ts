@@ -46,11 +46,24 @@ export const fileToBase64 = (file: File | Blob): Promise<string> => {
 };
 
 /**
- * Convert image URI to base64 (for React Native)
+ * Convert image URI to base64 (for React Native and Web)
  */
 export const imageUriToBase64 = async (uri: string): Promise<string> => {
   try {
-    console.log('[imageUriToBase64] Fetching URI:', uri);
+    console.log('[imageUriToBase64] Converting URI:', uri.substring(0, 100));
+    
+    // For web, if it's already a data URL, extract the base64 part
+    if (uri.startsWith('data:')) {
+      console.log('[imageUriToBase64] Data URL detected, extracting base64...');
+      const base64 = uri.split(',')[1];
+      if (!base64) {
+        throw new Error('Invalid data URL format');
+      }
+      console.log('[imageUriToBase64] Base64 extracted, length:', base64.length);
+      return base64;
+    }
+    
+    console.log('[imageUriToBase64] Fetching URI...');
     const response = await fetch(uri);
     
     if (!response.ok) {
@@ -61,14 +74,19 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
     const blob = await response.blob();
     console.log('[imageUriToBase64] Blob size:', blob.size, 'type:', blob.type);
     
+    if (blob.size === 0) {
+      throw new Error('Blob is empty - image may not have loaded');
+    }
+    
     console.log('[imageUriToBase64] Converting to base64...');
     const base64 = await fileToBase64(blob);
-    console.log('[imageUriToBase64] Conversion complete');
+    console.log('[imageUriToBase64] Conversion complete, length:', base64.length);
     
     return base64;
   } catch (error) {
     console.error('[imageUriToBase64] Error:', error);
-    throw new Error(`Failed to convert image URI to base64: ${error instanceof Error ? error.message : error}`);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to convert image: ${errorMsg}`);
   }
 };
 

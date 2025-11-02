@@ -2,7 +2,8 @@ import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { createMyPantryItem } from "@/src/user/pantry";
-import { getConfidenceColor, imageUriToBase64, scanGroceryImage } from "@/src/utils/aiApi";
+import { getConfidenceColor } from "@/src/utils/aiApi";
+import { scanImageViaProxy } from "@/src/utils/groceryScanProxy";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -110,33 +111,6 @@ const AllGroceryScanner = () => {
   // Generate unique ID
   const generateId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-  // Mock AI processing functions (replace with actual API calls)
-  const processGroceryImage = async (imageUri: string): Promise<ScannedItem[]> => {
-    const base64Image = await imageUriToBase64(imageUri);
-    const response = await scanGroceryImage(base64Image);
-    return response.items.map((item: any) => ({
-      id: generateId(),
-      name: item.name,
-      quantity: item.quantity,
-      unit: item.unit,
-      category: item.category,
-      confidence: item.confidence,
-    }));
-  };
-
-  const processReceiptImage = async (imageUri: string): Promise<ScannedItem[]> => {
-    // Simulate API call to process receipt
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    
-    // Mock response - replace with actual API integration
-    return [
-      { id: generateId(), name: "Chicken Breast", quantity: "500", unit: "g", category: "Meat", confidence: 0.93 },
-      { id: generateId(), name: "Tomatoes", quantity: "1", unit: "kg", category: "Vegetables", confidence: 0.89 },
-      { id: generateId(), name: "Pasta", quantity: "500", unit: "g", category: "Grains & Pasta", confidence: 0.91 },
-      { id: generateId(), name: "Olive Oil", quantity: "500", unit: "mL", category: "Oils & Vinegars", confidence: 0.87 },
-    ];
-  };
-
   // Handle scan type selection
   const handleScanTypeSelect = (type: ScanType) => {
     setSelectedScanType(type);
@@ -156,6 +130,7 @@ const AllGroceryScanner = () => {
       // On web, use image picker library (supports both camera and gallery on mobile browsers)
       if (Platform.OS === 'web') {
         addDebugLog('Using web image picker...');
+        
         // iOS Safari camera workaround: prefer camera for image capture
         const isIOSSafari = () => {
           const ua = navigator.userAgent;
@@ -165,25 +140,36 @@ const AllGroceryScanner = () => {
         if (isIOSSafari()) {
           addDebugLog('iOS Safari detected – forcing camera input');
           const cameraResult = await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             quality: 0.8,
           });
 
           if (!cameraResult.canceled && cameraResult.assets[0]) {
-            const imageUri = cameraResult.assets[0].uri;
-            addDebugLog(`Camera captured URI: ${imageUri}`);
-            setCapturedImage(imageUri);
+            const asset = cameraResult.assets[0];
+            addDebugLog(`Camera captured URI: ${asset.uri}`);
+            setCapturedImage(asset.uri);
             setCurrentStep("processing");
-            await processImage(imageUri);
+            
+            // Use File object if available, otherwise use URI
+            const fileObj = (asset as any).file;
+            if (fileObj) {
+              addDebugLog('Using File object from camera');
+              await processImage(fileObj);
+            } else {
+              addDebugLog('Using URI from camera');
+              await processImage(asset.uri);
+            }
           } else {
             addDebugLog('iOS Safari camera capture canceled');
             setCurrentStep("selection");
           }
           return; // Skip rest of web logic
         }
+        
+        // For other browsers, use library or camera
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           quality: 0.8,
         });
@@ -193,99 +179,20 @@ const AllGroceryScanner = () => {
         if (!result.canceled && result.assets[0]) {
           const asset = result.assets[0];
           const assetUri = asset.uri;
-          addDebugLog(`Image type: ${asset.type}, size: ${asset.fileSize || 'unknown'}`);
-          addDebugLog(`URI scheme: ${assetUri.split(':')[0]}`);
+          addDebugLog(`Image selected, URI scheme: ${assetUri.split(':')[0]}`);
           addDebugLog(`Has .file property: ${!!(asset as any).file}`);
           
           setCapturedImage(assetUri);
           setCurrentStep("processing");
           
-          // Convert to base64 using robust fallback strategy for iOS Safari
-          try {
-            let base64: string;
-            
-            // STRATEGY 1: Check for File object (modern browsers, including some iOS Safari versions)
-            const fileObj = (asset as any).file;
-            if (fileObj instanceof File || fileObj instanceof Blob) {
-              addDebugLog(`Using File/Blob object from asset (size: ${fileObj.size} bytes)`);
-              base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const result = reader.result as string;
-                  const base64Data = result.split(',')[1];
-                  addDebugLog(`FileReader conversion complete: ${base64Data.length} chars`);
-                  resolve(base64Data);
-                };
-                reader.onerror = (error) => {
-                  addDebugLog(`FileReader error: ${error}`);
-                  reject(new Error('FileReader failed'));
-                };
-                reader.readAsDataURL(fileObj);
-              });
-            }
-            // STRATEGY 2: Handle data URLs directly (no fetch needed)
-            else if (assetUri.startsWith("data:")) {
-              addDebugLog('Data URL detected - extracting base64 directly');
-              const parts = assetUri.split(',');
-              if (parts.length === 2) {
-                base64 = parts[1];
-                addDebugLog(`Base64 extracted: ${base64.length} chars`);
-              } else {
-                throw new Error('Invalid data URL format');
-              }
-            }
-            // STRATEGY 3: Robust blob: URL handling (no fetch; use .file if available)
-            else if (assetUri.startsWith("blob:")) {
-              addDebugLog('Blob URL detected');
-              const fileObj = (asset as any).file;
-              if (fileObj instanceof File || fileObj instanceof Blob) {
-                addDebugLog('Using .file object instead of fetch');
-                base64 = await new Promise<string>((resolve, reject) => {
-                  const reader = new FileReader();
-                  reader.onloadend = () => {
-                    const result = reader.result as string;
-                    const base64Data = result.split(',')[1];
-                    addDebugLog(`FileReader conversion from .file complete: ${base64Data.length} chars`);
-                    resolve(base64Data);
-                  };
-                  reader.onerror = (error) => {
-                    addDebugLog(`FileReader error from .file: ${error}`);
-                    reject(new Error('FileReader failed on .file'));
-                  };
-                  reader.readAsDataURL(fileObj);
-                });
-              } else {
-                addDebugLog('No .file object available on blob URI - iOS Safari likely blocked fetch');
-                showToast("error", "iOS Safari blocked image access. Please use 'Take Photo' instead of 'Choose File'.");
-                throw new Error('Blocked blob fetch on iOS Safari');
-              }
-            }
-            // STRATEGY 4: Unsupported URI format
-            else {
-              addDebugLog(`Unsupported URI format: ${assetUri.substring(0, 100)}`);
-              throw new Error('Unsupported image format');
-            }
-            
-            // Validate we got valid base64
-            if (!base64 || base64.length < 100) {
-              throw new Error('Converted base64 is too short or empty');
-            }
-            
-            addDebugLog('Base64 conversion successful, processing image...');
-            await processImage(base64);
-            
-          } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            addDebugLog(`ERROR converting image: ${errorMsg}`);
-            
-            // Provide helpful error messages for iOS Safari users
-            if (errorMsg.includes('iOS Safari') || errorMsg.includes('Load failed') || errorMsg.includes('blocked')) {
-              showToast("error", "iOS Safari has blocked image access. Please use Safari's camera option or try the native app.");
-            } else {
-              showToast("error", `Failed to load image: ${errorMsg}`);
-            }
-            
-            setCurrentStep("selection");
+          // Prefer File object over URI for iOS Safari compatibility
+          const fileObj = (asset as any).file;
+          if (fileObj) {
+            addDebugLog(`Using File object (size: ${fileObj.size} bytes)`);
+            await processImage(fileObj);
+          } else {
+            addDebugLog('Using URI (no File object available)');
+            await processImage(assetUri);
           }
         } else {
           addDebugLog('Image selection canceled');
@@ -306,7 +213,7 @@ const AllGroceryScanner = () => {
 
         addDebugLog('Launching camera...');
         const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          mediaTypes: ['images'],
           allowsEditing: true,
           quality: 0.8,
         });
@@ -351,41 +258,37 @@ const AllGroceryScanner = () => {
     setScanned(false);
   };
 
-  // Process captured image with AI
-  const processImage = async (imageData: string) => {
+  // Process captured image with AI via backend proxy
+  const processImage = async (imageData: string | File) => {
     try {
-      addDebugLog(`Processing ${selectedScanType} image`);
-      addDebugLog(`Data length: ${imageData.length}`);
-      addDebugLog(`Data type: ${imageData.startsWith('data:') ? 'data URL' : imageData.startsWith('blob:') ? 'blob URL' : imageData.startsWith('file:') ? 'file URL' : 'base64'}`);
+      if (!selectedScanType) {
+        throw new Error('No scan type selected');
+      }
+
+      // Barcode scanning doesn't use image processing
+      if (selectedScanType === 'barcode') {
+        throw new Error('Barcode scanning should not call processImage');
+      }
+
+      addDebugLog(`Processing ${selectedScanType} image via proxy`);
       
-      // Convert image URI to base64 if needed
-      let base64Image: string;
-      
-      // Check if it's already pure base64 (no URI scheme, long string)
-      const isPureBase64 = imageData.length > 1000 && !imageData.includes(':');
-      
-      if (isPureBase64) {
-        addDebugLog('Already pure base64, using directly');
-        base64Image = imageData;
-      } else if (imageData.startsWith('data:')) {
-        // Extract base64 from data URL
-        addDebugLog('Extracting base64 from data URL...');
-        base64Image = imageData.split(',')[1];
-        addDebugLog(`Base64 extracted, length: ${base64Image.length}`);
+      if (typeof imageData === 'string') {
+        addDebugLog(`Data type: string, length: ${imageData.length}`);
       } else {
-        // It's a URI (blob:, file:, http:), needs conversion
-        addDebugLog('Converting URI to base64...');
-        base64Image = await imageUriToBase64(imageData);
-        addDebugLog(`Base64 length after conversion: ${base64Image.length}`);
+        addDebugLog(`Data type: File, size: ${imageData.size} bytes`);
       }
       
-      // Call AI API
-      addDebugLog('Calling AI API...');
-      const response = await scanGroceryImage(base64Image);
+      // Call backend proxy API (handles all platforms including iOS Safari)
+      addDebugLog('Calling backend proxy API...');
+      const response = await scanImageViaProxy({
+        uri: imageData,
+        scanType: selectedScanType,
+      });
+      
       addDebugLog(`API returned ${response.items?.length || 0} items`);
       
       // Convert API response to ScannedItem format
-      const items: ScannedItem[] = response.items.map(item => ({
+      const items: ScannedItem[] = response.items.map((item) => ({
         id: generateId(),
         name: item.name,
         quantity: item.quantity.split(' ')[0], // Extract number from "3 pieces"
@@ -403,8 +306,8 @@ const AllGroceryScanner = () => {
       
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {
         showToast("error", "Session expired. Please log in again.");
-      } else if (error instanceof Error && error.message.includes('Failed to convert')) {
-        showToast("error", "Failed to load image. Please try again.");
+      } else if (error instanceof Error && error.message.includes('Not authenticated')) {
+        showToast("error", "Session expired. Please log in again.");
       } else {
         showToast("error", `Processing failed: ${errorMsg}`);
       }

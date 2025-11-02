@@ -168,58 +168,107 @@ const AllGroceryScanner = () => {
           const asset = result.assets[0];
           const assetUri = asset.uri;
           addDebugLog(`Image type: ${asset.type}, size: ${asset.fileSize || 'unknown'}`);
-          addDebugLog(`URI: ${assetUri.substring(0, 50)}...`);
+          addDebugLog(`URI scheme: ${assetUri.split(':')[0]}`);
+          addDebugLog(`Has .file property: ${!!(asset as any).file}`);
           
           setCapturedImage(assetUri);
           setCurrentStep("processing");
           
-          // Convert to base64 using the same method as setPfp.tsx
+          // Convert to base64 using robust fallback strategy for iOS Safari
           try {
-            let fileToConvert: File | Blob;
+            let base64: string;
             
-            // Try to use File object if available (newer Expo SDKs)
-            const fileObj = asset.file;
-            if (fileObj) {
-              addDebugLog('Using File object from asset');
-              fileToConvert = fileObj;
-            } else if (assetUri.startsWith("data:")) {
-              addDebugLog('Converting data URI to Blob');
-              const res = await fetch(assetUri);
-              const blob = await res.blob();
-              fileToConvert = new File([blob], "grocery.jpg", { type: blob.type });
-            } else if (assetUri.startsWith("blob:")) {
-              addDebugLog('Fetching blob URI');
-              const res = await fetch(assetUri);
-              const blob = await res.blob();
-              addDebugLog(`Blob fetched: size=${blob.size}, type=${blob.type}`);
-              fileToConvert = new File([blob], "grocery.jpg", { type: blob.type });
-            } else {
-              throw new Error('Unsupported URI format');
+            // STRATEGY 1: Check for File object (modern browsers, including some iOS Safari versions)
+            const fileObj = (asset as any).file;
+            if (fileObj instanceof File || fileObj instanceof Blob) {
+              addDebugLog(`Using File/Blob object from asset (size: ${fileObj.size} bytes)`);
+              base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  const base64Data = result.split(',')[1];
+                  addDebugLog(`FileReader conversion complete: ${base64Data.length} chars`);
+                  resolve(base64Data);
+                };
+                reader.onerror = (error) => {
+                  addDebugLog(`FileReader error: ${error}`);
+                  reject(new Error('FileReader failed'));
+                };
+                reader.readAsDataURL(fileObj);
+              });
+            }
+            // STRATEGY 2: Handle data URLs directly (no fetch needed)
+            else if (assetUri.startsWith("data:")) {
+              addDebugLog('Data URL detected - extracting base64 directly');
+              const parts = assetUri.split(',');
+              if (parts.length === 2) {
+                base64 = parts[1];
+                addDebugLog(`Base64 extracted: ${base64.length} chars`);
+              } else {
+                throw new Error('Invalid data URL format');
+              }
+            }
+            // STRATEGY 3: Try to fetch blob URLs (may fail on iOS Safari)
+            else if (assetUri.startsWith("blob:")) {
+              addDebugLog('Blob URL detected - attempting fetch (may fail on iOS Safari)');
+              try {
+                const response = await fetch(assetUri);
+                if (!response.ok) {
+                  throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
+                }
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                  throw new Error('Fetched blob is empty');
+                }
+                
+                addDebugLog(`Blob fetched successfully: size=${blob.size}, type=${blob.type}`);
+                
+                base64 = await new Promise<string>((resolve, reject) => {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    const result = reader.result as string;
+                    const base64Data = result.split(',')[1];
+                    addDebugLog(`Blob->Base64 complete: ${base64Data.length} chars`);
+                    resolve(base64Data);
+                  };
+                  reader.onerror = (error) => {
+                    addDebugLog(`FileReader error on blob: ${error}`);
+                    reject(new Error('FileReader failed on blob'));
+                  };
+                  reader.readAsDataURL(blob);
+                });
+              } catch (fetchError) {
+                const fetchMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+                addDebugLog(`Fetch blob failed: ${fetchMsg} - iOS Safari likely blocked it`);
+                throw new Error('iOS Safari blocked blob access. Please try a different image or use the native app.');
+              }
+            }
+            // STRATEGY 4: Unsupported URI format
+            else {
+              addDebugLog(`Unsupported URI format: ${assetUri.substring(0, 100)}`);
+              throw new Error('Unsupported image format');
             }
             
-            // Convert File/Blob to base64 using FileReader
-            addDebugLog('Converting to base64 with FileReader...');
-            const base64 = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const result = reader.result as string;
-                // Extract base64 part (remove data:image/...;base64, prefix)
-                const base64Data = result.split(',')[1];
-                addDebugLog(`Base64 conversion complete: ${base64Data.length} chars`);
-                resolve(base64Data);
-              };
-              reader.onerror = (error) => {
-                addDebugLog(`FileReader error: ${error}`);
-                reject(error);
-              };
-              reader.readAsDataURL(fileToConvert);
-            });
+            // Validate we got valid base64
+            if (!base64 || base64.length < 100) {
+              throw new Error('Converted base64 is too short or empty');
+            }
             
+            addDebugLog('Base64 conversion successful, processing image...');
             await processImage(base64);
+            
           } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             addDebugLog(`ERROR converting image: ${errorMsg}`);
-            showToast("error", `Failed to process image: ${errorMsg}`);
+            
+            // Provide helpful error messages for iOS Safari users
+            if (errorMsg.includes('iOS Safari') || errorMsg.includes('Load failed') || errorMsg.includes('blocked')) {
+              showToast("error", "iOS Safari has blocked image access. Please use Safari's camera option or try the native app.");
+            } else {
+              showToast("error", `Failed to load image: ${errorMsg}`);
+            }
+            
             setCurrentStep("selection");
           }
         } else {

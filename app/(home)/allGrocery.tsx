@@ -69,9 +69,6 @@ const AllGroceryScanner = () => {
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   
-  // Debug state
-  const [debugInfo, setDebugInfo] = useState<string[]>([]);
-  
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -86,13 +83,6 @@ const AllGroceryScanner = () => {
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ visible: true, type, message });
-  };
-
-  // Add debug log function
-  const addDebugLog = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setDebugInfo(prev => [...prev.slice(-4), `${timestamp}: ${message}`]);
-    console.log('[Debug]', message);
   };
 
   // Animation effects
@@ -125,12 +115,7 @@ const AllGroceryScanner = () => {
   // Open camera for image capture
   const openImageCapture = async (scanType: ScanType) => {
     try {
-      addDebugLog(`Platform: ${Platform.OS}`);
-      
-      // On web, use image picker library (supports both camera and gallery on mobile browsers)
       if (Platform.OS === 'web') {
-        addDebugLog('Using web image picker...');
-        
         // iOS Safari camera workaround: prefer camera for image capture
         const isIOSSafari = () => {
           const ua = navigator.userAgent;
@@ -138,7 +123,6 @@ const AllGroceryScanner = () => {
         };
 
         if (isIOSSafari()) {
-          addDebugLog('iOS Safari detected – forcing camera input');
           const cameraResult = await ImagePicker.launchCameraAsync({
             mediaTypes: ['images'],
             allowsEditing: true,
@@ -147,21 +131,17 @@ const AllGroceryScanner = () => {
 
           if (!cameraResult.canceled && cameraResult.assets[0]) {
             const asset = cameraResult.assets[0];
-            addDebugLog(`Camera captured URI: ${asset.uri}`);
             setCapturedImage(asset.uri);
             setCurrentStep("processing");
             
             // Use File object if available, otherwise use URI
             const fileObj = (asset as any).file;
             if (fileObj) {
-              addDebugLog('Using File object from camera');
               await processImage(fileObj, scanType);
             } else {
-              addDebugLog('Using URI from camera');
               await processImage(asset.uri, scanType);
             }
           } else {
-            addDebugLog('iOS Safari camera capture canceled');
             setCurrentStep("selection");
           }
           return; // Skip rest of web logic
@@ -174,13 +154,9 @@ const AllGroceryScanner = () => {
           quality: 0.8,
         });
 
-        addDebugLog(`Result: canceled=${result.canceled}, hasAssets=${!!result.assets?.[0]}`);
-
         if (!result.canceled && result.assets[0]) {
           const asset = result.assets[0];
           const assetUri = asset.uri;
-          addDebugLog(`Image selected, URI scheme: ${assetUri.split(':')[0]}`);
-          addDebugLog(`Has .file property: ${!!(asset as any).file}`);
           
           setCapturedImage(assetUri);
           setCurrentStep("processing");
@@ -188,52 +164,40 @@ const AllGroceryScanner = () => {
           // Prefer File object over URI for iOS Safari compatibility
           const fileObj = (asset as any).file;
           if (fileObj) {
-            addDebugLog(`Using File object (size: ${fileObj.size} bytes)`);
             await processImage(fileObj, scanType);
           } else {
-            addDebugLog('Using URI (no File object available)');
             await processImage(assetUri, scanType);
           }
         } else {
-          addDebugLog('Image selection canceled');
           setCurrentStep("selection");
         }
       } else {
         // Native app - use camera
-        addDebugLog('Requesting camera permissions...');
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        addDebugLog(`Permission status: ${status}`);
         
         if (status !== "granted") {
-          addDebugLog('Camera permission DENIED');
           showToast("error", "Camera permission is required");
           setCurrentStep("selection");
           return;
         }
 
-        addDebugLog('Launching camera...');
         const result = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
           allowsEditing: true,
           quality: 0.8,
         });
 
-        addDebugLog(`Camera result: canceled=${result.canceled}, hasAssets=${!!result.assets?.[0]}`);
-
         if (!result.canceled && result.assets[0]) {
           const imageUri = result.assets[0].uri;
-          addDebugLog(`Image captured: ${imageUri.substring(0, 50)}...`);
           setCapturedImage(imageUri);
           setCurrentStep("processing");
           await processImage(imageUri, scanType);
         } else {
-          addDebugLog('Image capture canceled by user');
           setCurrentStep("selection");
         }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      addDebugLog(`ERROR in openImageCapture: ${errorMsg}`);
       showToast("error", `Failed: ${errorMsg}`);
       setCurrentStep("selection");
     }
@@ -265,23 +229,12 @@ const AllGroceryScanner = () => {
       if (scanType === 'barcode') {
         throw new Error('Barcode scanning should not call processImage');
       }
-
-      addDebugLog(`Processing ${scanType} image via proxy`);
-      
-      if (typeof imageData === 'string') {
-        addDebugLog(`Data type: string, length: ${imageData.length}`);
-      } else {
-        addDebugLog(`Data type: File, size: ${imageData.size} bytes`);
-      }
       
       // Call backend proxy API (handles all platforms including iOS Safari)
-      addDebugLog('Calling backend proxy API...');
       const response = await scanImageViaProxy({
         uri: imageData,
         scanType: scanType,
       });
-      
-      addDebugLog(`API returned ${response.items?.length || 0} items`);
       
       // Convert API response to ScannedItem format
       const items: ScannedItem[] = response.items.map((item) => ({
@@ -293,12 +246,10 @@ const AllGroceryScanner = () => {
         confidence: item.confidence,
       }));
       
-      addDebugLog(`Successfully processed ${items.length} items`);
       setScannedItems(items);
       setCurrentStep("confirmation");
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      addDebugLog(`ERROR in processImage: ${errorMsg}`);
       
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {
         showToast("error", "Session expired. Please log in again.");
@@ -635,23 +586,6 @@ const AllGroceryScanner = () => {
         onHide={() => setToast(prev => ({ ...prev, visible: false }))}
         topOffset={60}
       />
-
-      {/* Debug Overlay - Shows errors on screen */}
-      {debugInfo.length > 0 && (
-        <View style={styles.debugOverlay}>
-          <View style={styles.debugHeader}>
-            <Text style={styles.debugTitle}>Debug Log</Text>
-            <TouchableOpacity onPress={() => setDebugInfo([])}>
-              <Text style={styles.debugClear}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-          <ScrollView style={styles.debugScroll}>
-            {debugInfo.map((log, i) => (
-              <Text key={i} style={styles.debugText}>{log}</Text>
-            ))}
-          </ScrollView>
-        </View>
-      )}
 
       {currentStep === "selection" && renderSelectionScreen()}
       {currentStep === "processing" && renderProcessingScreen()}
@@ -1154,45 +1088,6 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 16,
     fontWeight: "600",
-  },
-  // Debug Overlay Styles
-  debugOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    padding: 12,
-    zIndex: 9999,
-    maxHeight: 200,
-  },
-  debugHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  debugTitle: {
-    color: '#00A86B',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  debugClear: {
-    color: '#FF3B30',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  debugScroll: {
-    maxHeight: 140,
-  },
-  debugText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginBottom: 4,
   },
 });
 

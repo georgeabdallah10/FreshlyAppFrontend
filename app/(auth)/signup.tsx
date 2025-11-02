@@ -70,6 +70,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
   const [toast, setToast] = useState<ToastState>({
     visible: false,
     type: "success",
@@ -154,10 +156,27 @@ export default function CreateAccountScreen(): React.JSX.Element {
     }
   }, [isCreatingAccount]);
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  const startCooldown = (seconds: number = 60) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
+
   async function onsubmit() {
     setIsCreatingAccount(true);
     try {
-      console.log("Something happened");
+      console.log("Starting account registration...");
       const result = await registerUser({
         email: email,
         password: password,
@@ -171,24 +190,39 @@ export default function CreateAccountScreen(): React.JSX.Element {
           calorie_target: 0,
         },
       });
+      
       if (result.ok) {
         setUsername("");
         setEmail("");
         setPassword("");
         setConfirmPassword("");
         setMobile("");
-        console.log(result);
+        console.log("Registration successful, attempting auto-login...");
+        
         const login = await loginUser({ email, password });
         if (!login.ok) {
           setIsCreatingAccount(false);
-          showToast(
-            "error",
-            login.message ?? "Auto-login failed. Please try again."
-          );
+          
+          // Provide specific error messages based on status code
+          let errorMessage = "Unable to sign you in automatically. ";
+          if (login.status === 401) {
+            errorMessage += "Invalid credentials. Please try signing in manually.";
+          } else if (login.status === 429) {
+            errorMessage += "Too many login attempts. Please wait a moment and try again.";
+          } else if (login.status === 500) {
+            errorMessage += "Server error. Please try signing in manually.";
+          } else if (login.status === -1) {
+            errorMessage += "Network connection issue. Please check your internet and try again.";
+          } else {
+            errorMessage += login.message || "Please try signing in manually.";
+          }
+          
+          showToast("error", errorMessage);
           return;
         }
+        
         await Storage.setItem("access_token", login.data.access_token);
-        showToast("success", "Account created successfully");
+        showToast("success", "Account created successfully! Welcome to Freshly!");
 
         // Send verification code before navigating
         try {
@@ -206,19 +240,66 @@ export default function CreateAccountScreen(): React.JSX.Element {
           router.replace("/(user)/setPfp");
         }, 800);
 
-        // Navigate to the verification screen
-        //router.replace({
-        //pathname: "/(auth)/emailVerficationCode",
-        //params: { fromSignUp: "true", email },
-        //});
         return;
       } else {
         setIsCreatingAccount(false);
-        showToast("error", result.message || "Sign up failed. Please try again.");
+        
+        // Start cooldown on failed signup to prevent spam
+        startCooldown(60);
+        
+        // Provide specific error messages based on status code and response
+        let errorMessage = "";
+        
+        if (result.status === 400) {
+          // Bad request - likely validation error
+          if (result.message.toLowerCase().includes("email")) {
+            errorMessage = "This email is already registered. Please use a different email or sign in.";
+          } else if (result.message.toLowerCase().includes("password")) {
+            errorMessage = "Password must be at least 8 characters long and contain letters and numbers.";
+          } else if (result.message.toLowerCase().includes("phone")) {
+            errorMessage = "Please enter a valid phone number.";
+          } else {
+            errorMessage = result.message || "Please check your information and try again.";
+          }
+        } else if (result.status === 409) {
+          // Conflict - user already exists
+          errorMessage = "An account with this email already exists. Please sign in instead.";
+        } else if (result.status === 422) {
+          // Validation error
+          errorMessage = result.message || "Please check that all fields are filled in correctly.";
+        } else if (result.status === 429) {
+          // Too many requests
+          errorMessage = "Too many signup attempts. Please wait a few minutes and try again.";
+          startCooldown(120); // Longer cooldown for rate limiting
+        } else if (result.status === 500) {
+          // Server error
+          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+        } else if (result.status === -1) {
+          // Network error
+          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+        } else {
+          errorMessage = result.message || "Unable to create your account. Please try again.";
+        }
+        
+        showToast("error", errorMessage);
       }
-    } catch (error) {
+    } catch (error: any) {
       setIsCreatingAccount(false);
-      showToast("error", "An unexpected error occurred. Please try again.");
+      startCooldown(60);
+      
+      // Handle different types of errors
+      let errorMessage = "";
+      if (error.name === "TypeError" && error.message.includes("Network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (error.name === "AbortError") {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = "An unexpected error occurred. Please try again.";
+      }
+      
+      showToast("error", errorMessage);
     }
   }
   const getMissingFields = (): string[] => {
@@ -233,20 +314,65 @@ export default function CreateAccountScreen(): React.JSX.Element {
   };
 
   const handleCreateAccount = () => {
+    // Check if button is disabled due to cooldown
+    if (isButtonDisabled || isCreatingAccount) {
+      if (cooldownRemaining > 0) {
+        showToast(
+          "error",
+          `Please wait ${cooldownRemaining} seconds before trying again.`
+        );
+      }
+      return;
+    }
+
     // 1) Validate required fields first
     const missing = getMissingFields();
     if (missing.length > 0) {
-      showToast("error", `Please fill: ${missing.join(", ")}`);
+      if (missing.length === 1) {
+        showToast("error", `Please enter your ${missing[0].toLowerCase()}.`);
+      } else {
+        showToast("error", `Please complete these fields: ${missing.join(", ")}.`);
+      }
       return;
     }
 
-    // 2) Validate password match
+    // 2) Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showToast("error", "Please enter a valid email address.");
+      return;
+    }
+
+    // 3) Validate phone number format
+    const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/;
+    if (!phoneRegex.test(mobile.trim())) {
+      showToast("error", "Please enter a valid phone number (at least 10 digits).");
+      return;
+    }
+
+    // 4) Validate password strength
+    if (password.length < 8) {
+      showToast("error", "Password must be at least 8 characters long.");
+      return;
+    }
+    
+    if (!/[a-zA-Z]/.test(password)) {
+      showToast("error", "Password must contain at least one letter.");
+      return;
+    }
+    
+    if (!/[0-9]/.test(password)) {
+      showToast("error", "Password must contain at least one number.");
+      return;
+    }
+
+    // 5) Validate password match
     if (password !== confirmPassword) {
-      showToast("error", "Passwords must match.");
+      showToast("error", "Passwords don't match. Please enter the same password in both fields.");
       return;
     }
 
-    // 3) Play tap animation then submit
+    // 6) Play tap animation then submit
     Animated.sequence([
       Animated.timing(buttonScale, {
         toValue: 0.9,
@@ -509,18 +635,31 @@ export default function CreateAccountScreen(): React.JSX.Element {
               style={styles.createButtonWrapper}
               onPress={handleCreateAccount}
               activeOpacity={1}
+              disabled={isButtonDisabled || isCreatingAccount}
             >
               <Animated.View
                 style={[
                   styles.createButton,
+                  (isButtonDisabled || isCreatingAccount) && styles.createButtonDisabled,
                   {
                     transform: [{ scale: buttonScale }],
                   },
                 ]}
               >
-                <Text style={styles.createButtonText}>→</Text>
+                {isButtonDisabled && cooldownRemaining > 0 ? (
+                  <Text style={styles.createButtonText}>{cooldownRemaining}s</Text>
+                ) : (
+                  <Text style={styles.createButtonText}>→</Text>
+                )}
               </Animated.View>
             </TouchableOpacity>
+            
+            {/* Cooldown message */}
+            {isButtonDisabled && cooldownRemaining > 0 && (
+              <Text style={styles.cooldownText}>
+                Please wait {cooldownRemaining} seconds before trying again
+              </Text>
+            )}
           </Animated.View>
 
           {/* Sign In Link */}
@@ -743,10 +882,21 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  createButtonDisabled: {
+    backgroundColor: "#B0B0B0",
+    shadowColor: "#B0B0B0",
+    shadowOpacity: 0.2,
+  },
   createButtonText: {
     fontSize: moderateScale(24),
     color: "#FFFFFF",
     fontWeight: "300",
+  },
+  cooldownText: {
+    fontSize: moderateScale(12),
+    color: "#B0B0B0",
+    textAlign: "center",
+    marginTop: verticalScale(12),
   },
   signInContainer: {
     flexDirection: "row",

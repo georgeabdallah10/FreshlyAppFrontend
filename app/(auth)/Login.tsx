@@ -53,6 +53,9 @@ export default function LoginScreen(): React.JSX.Element {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [nameFocused, setNameFocused] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -76,17 +79,79 @@ export default function LoginScreen(): React.JSX.Element {
   const slideAnim = useRef(new Animated.Value(30)).current;
   const buttonScale = useRef(new Animated.Value(1)).current;
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  const startCooldown = (seconds: number = 60) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
+
   async function onSubmit() {
-    const result = await loginUser({
-      email: email,
-      password: password,
-    });
-    if (result.ok) {
-      await Storage.setItem("access_token", result.data.access_token);
-      showToast("success", "Login successful! Redirecting...");
-      router.replace("/(home)/main");
-    } else {
-      showToast("error", result.message ?? "Login failed. Please try again.");
+    setIsLoggingIn(true);
+    try {
+      const result = await loginUser({
+        email: email,
+        password: password,
+      });
+      
+      if (result.ok) {
+        await Storage.setItem("access_token", result.data.access_token);
+        showToast("success", "Login successful! Redirecting...");
+        setTimeout(() => {
+          setIsLoggingIn(false);
+          router.replace("/(home)/main");
+        }, 500);
+      } else {
+        setIsLoggingIn(false);
+        startCooldown(30); // Shorter cooldown for login attempts
+        
+        // Provide specific error messages based on status code
+        let errorMessage = "";
+        
+        if (result.status === 401) {
+          errorMessage = "Incorrect email or password. Please check your credentials and try again.";
+        } else if (result.status === 404) {
+          errorMessage = "Account not found. Please check your email or sign up for a new account.";
+        } else if (result.status === 429) {
+          errorMessage = "Too many login attempts. Please wait a moment and try again.";
+          startCooldown(120); // Extended cooldown for rate limiting
+        } else if (result.status === 500) {
+          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+        } else if (result.status === -1) {
+          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+        } else {
+          errorMessage = result.message || "Login failed. Please check your credentials and try again.";
+        }
+        
+        showToast("error", errorMessage);
+      }
+    } catch (error: any) {
+      setIsLoggingIn(false);
+      startCooldown(30);
+      
+      // Handle different types of errors
+      let errorMessage = "";
+      if (error.name === "TypeError" && error.message.includes("Network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (error.name === "AbortError") {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage = "An unexpected error occurred. Please try again.";
+      }
+      
+      showToast("error", errorMessage);
     }
   }
 
@@ -107,6 +172,35 @@ export default function LoginScreen(): React.JSX.Element {
   }, []);
 
   const handleLogin = () => {
+    // Check if button is disabled due to cooldown
+    if (isButtonDisabled || isLoggingIn) {
+      if (cooldownRemaining > 0) {
+        showToast(
+          "error",
+          `Please wait ${cooldownRemaining} seconds before trying again.`
+        );
+      }
+      return;
+    }
+
+    // Validate fields
+    if (!email?.trim()) {
+      showToast("error", "Please enter your email address.");
+      return;
+    }
+
+    if (!password?.trim()) {
+      showToast("error", "Please enter your password.");
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      showToast("error", "Please enter a valid email address.");
+      return;
+    }
+
     Animated.sequence([
       Animated.timing(buttonScale, {
         toValue: 0.9,
@@ -119,9 +213,8 @@ export default function LoginScreen(): React.JSX.Element {
         useNativeDriver: true,
       }),
     ]).start(() => {
-      console.log("Login with:", { email, password });
+      onSubmit();
     });
-    onSubmit();
   };
 
   const handleForgotPassword = () => {
@@ -268,18 +361,31 @@ export default function LoginScreen(): React.JSX.Element {
               style={styles.loginButtonWrapper}
               onPress={handleLogin}
               activeOpacity={1}
+              disabled={isButtonDisabled || isLoggingIn}
             >
               <Animated.View
                 style={[
                   styles.loginButton,
+                  (isButtonDisabled || isLoggingIn) && styles.loginButtonDisabled,
                   {
                     transform: [{ scale: buttonScale }],
                   },
                 ]}
               >
-                <Text style={styles.loginButtonText}>→</Text>
+                {isButtonDisabled && cooldownRemaining > 0 ? (
+                  <Text style={styles.loginButtonText}>{cooldownRemaining}s</Text>
+                ) : (
+                  <Text style={styles.loginButtonText}>→</Text>
+                )}
               </Animated.View>
             </TouchableOpacity>
+            
+            {/* Cooldown message */}
+            {isButtonDisabled && cooldownRemaining > 0 && (
+              <Text style={styles.cooldownText}>
+                Please wait {cooldownRemaining} seconds before trying again
+              </Text>
+            )}
           </Animated.View>
 
           {/* Sign Up Link */}
@@ -422,10 +528,21 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 8,
   },
+  loginButtonDisabled: {
+    backgroundColor: "#B0B0B0",
+    shadowColor: "#B0B0B0",
+    shadowOpacity: 0.2,
+  },
   loginButtonText: {
     fontSize: 28,
     color: "#FFFFFF",
     fontWeight: "300",
+  },
+  cooldownText: {
+    fontSize: 12,
+    color: "#B0B0B0",
+    textAlign: "center",
+    marginTop: 12,
   },
   signUpContainer: {
     flexDirection: "row",

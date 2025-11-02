@@ -47,6 +47,11 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [unitSearch, setUnitSearch] = useState("");
 
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  
+  // Rate limiting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   const modalAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -106,14 +111,50 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     setUnitSearch("");
   };
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  const startCooldown = (seconds: number = 30) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
+
   const addsignleproduct = async () => {
-    const res = await createMyPantryItem({
-      ingredient_name: productName,
-      quantity: productQuantity,
-      category: selectedCategory,
-      unit: productUnit || null, // NEW: pass unit
-    });
-    console.log(res);
+    try {
+      const res = await createMyPantryItem({
+        ingredient_name: productName,
+        quantity: productQuantity,
+        category: selectedCategory,
+        unit: productUnit || null, // NEW: pass unit
+      });
+      console.log(res);
+      return { success: true };
+    } catch (error: any) {
+      let errorMessage = "Unable to add item to pantry. ";
+      
+      if (error.message?.toLowerCase().includes("network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (error.message?.toLowerCase().includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (error.message?.toLowerCase().includes("already exists")) {
+        errorMessage = "This item already exists in your pantry. Please update the existing item instead.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      throw new Error(errorMessage);
+    }
   };
 
   const handleTakePicture = async () => {
@@ -146,22 +187,57 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   };
 
   const handleAddSingleProduct = async () => {
-    if (!selectedCategory || !productName || !productQuantity) {
-      Alert.alert("Missing Information", "Please fill in all fields");
+    // Check if button is disabled due to cooldown
+    if (isButtonDisabled || isSubmitting) {
+      if (cooldownRemaining > 0) {
+        Alert.alert(
+          "Please Wait",
+          `Please wait ${cooldownRemaining} seconds before adding another item.`
+        );
+      }
       return;
     }
-    await addsignleproduct();
 
-    Alert.alert(
-      "Success!",
-      `${productName} added successfully to your pantry`,
-      [
-        {
-          text: "OK",
-          onPress: () => onClose(),
-        },
-      ]
-    );
+    // Validation
+    if (!productName?.trim()) {
+      Alert.alert("Missing Information", "Please enter a product name.");
+      return;
+    }
+
+    if (!selectedCategory?.trim()) {
+      Alert.alert("Missing Information", "Please select a category.");
+      return;
+    }
+
+    if (!productQuantity || productQuantity <= 0) {
+      Alert.alert("Invalid Quantity", "Please enter a valid quantity greater than 0.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      await addsignleproduct();
+
+      Alert.alert(
+        "Success!",
+        `${productName} added successfully to your pantry`,
+        [
+          {
+            text: "OK",
+            onPress: () => {
+              resetForm();
+              onClose();
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      startCooldown(30);
+      Alert.alert("Unable to Add Item", error.message || "Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const renderChoiceModal = () => (

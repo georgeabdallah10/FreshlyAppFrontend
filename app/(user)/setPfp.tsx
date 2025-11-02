@@ -225,7 +225,25 @@ export const SetPfp = () => {
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
         console.error('[UPLOAD] Backend upload failed:', uploadError);
-        showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
+        
+        let errorMessage = "Unable to upload your photo. ";
+        if (uploadError?.message?.toLowerCase().includes("network")) {
+          errorMessage = "No internet connection. Please check your network and try again.";
+        } else if (uploadError?.message?.toLowerCase().includes("timeout")) {
+          errorMessage = "Upload timed out. Please try again with a smaller image.";
+        } else if (uploadError?.message?.toLowerCase().includes("size") || uploadError?.message?.toLowerCase().includes("large")) {
+          errorMessage = "Image is too large. Please choose a smaller photo.";
+        } else if (uploadError?.message?.toLowerCase().includes("format") || uploadError?.message?.toLowerCase().includes("type")) {
+          errorMessage = "Invalid image format. Please use a JPG or PNG image.";
+        } else if (uploadError?.message?.toLowerCase().includes("permission")) {
+          errorMessage = "Permission denied. Please check your account settings.";
+        } else if (uploadError?.message) {
+          errorMessage = uploadError.message;
+        } else {
+          errorMessage += "Please try again.";
+        }
+        
+        showToast("error", errorMessage);
         setUploading(false);
         setCurrentStep("initial");
         return;
@@ -235,7 +253,21 @@ export const SetPfp = () => {
       setCurrentStep("captured");
     } catch (err: any) {
       setUploading(false);
-      showToast("error", err?.message ?? "Upload failed. Please try again.");
+      
+      let errorMessage = "Unable to capture photo. ";
+      if (err?.message?.toLowerCase().includes("permission")) {
+        errorMessage = "Camera permission denied. Please enable camera access in your device settings.";
+      } else if (err?.message?.toLowerCase().includes("cancelled") || err?.message?.toLowerCase().includes("canceled")) {
+        // User cancelled, don't show error
+        setCurrentStep("initial");
+        return;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      showToast("error", errorMessage);
       setCurrentStep("initial");
     }
   };
@@ -311,7 +343,25 @@ export const SetPfp = () => {
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
         console.error('[UPLOAD] Backend upload failed:', uploadError);
-        showToast("error", `Upload failed: ${uploadError?.message || 'Unknown error'}`);
+        
+        let errorMessage = "Unable to upload your photo. ";
+        if (uploadError?.message?.toLowerCase().includes("network")) {
+          errorMessage = "No internet connection. Please check your network and try again.";
+        } else if (uploadError?.message?.toLowerCase().includes("timeout")) {
+          errorMessage = "Upload timed out. Please try again with a smaller image.";
+        } else if (uploadError?.message?.toLowerCase().includes("size") || uploadError?.message?.toLowerCase().includes("large")) {
+          errorMessage = "Image is too large. Please choose a smaller photo.";
+        } else if (uploadError?.message?.toLowerCase().includes("format") || uploadError?.message?.toLowerCase().includes("type")) {
+          errorMessage = "Invalid image format. Please use a JPG or PNG image.";
+        } else if (uploadError?.message?.toLowerCase().includes("permission")) {
+          errorMessage = "Permission denied. Please check your account settings.";
+        } else if (uploadError?.message) {
+          errorMessage = uploadError.message;
+        } else {
+          errorMessage += "Please try again.";
+        }
+        
+        showToast("error", errorMessage);
         setUploading(false);
         setCurrentStep("initial");
         return;
@@ -321,7 +371,21 @@ export const SetPfp = () => {
       setCurrentStep("captured");
     } catch (err: any) {
       setUploading(false);
-      showToast("error", err?.message ?? "Upload failed. Please try again.");
+      
+      let errorMessage = "Unable to select photo. ";
+      if (err?.message?.toLowerCase().includes("permission")) {
+        errorMessage = "Gallery permission denied. Please enable photo access in your device settings.";
+      } else if (err?.message?.toLowerCase().includes("cancelled") || err?.message?.toLowerCase().includes("canceled")) {
+        // User cancelled, don't show error
+        setCurrentStep("initial");
+        return;
+      } else if (err?.message) {
+        errorMessage = err.message;
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      showToast("error", errorMessage);
       setCurrentStep("initial");
     }
   };

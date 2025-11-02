@@ -178,9 +178,15 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
   const handleCreateSubmit = async () => {
     if (!familyName.trim()) {
-      Alert.alert("Error", "Please enter a family name");
+      Alert.alert("Missing Information", "Please enter a name for your family.");
       return;
     }
+
+    if (familyName.trim().length < 2) {
+      Alert.alert("Invalid Name", "Family name must be at least 2 characters long.");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await createFamily(familyName.trim()); // { id, display_name, invite_code }
@@ -220,7 +226,23 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
         ]
       );
     } catch (e: any) {
-      Alert.alert("Create failed", e.message || "Could not create family");
+      let errorMessage = "Unable to create your family. ";
+      
+      if (e.message?.toLowerCase().includes("network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (e.message?.toLowerCase().includes("timeout")) {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (e.message?.toLowerCase().includes("already exists")) {
+        errorMessage = "A family with this name already exists. Please choose a different name.";
+      } else if (e.message?.toLowerCase().includes("limit")) {
+        errorMessage = "You've reached the maximum number of families. Please contact support.";
+      } else if (e.message) {
+        errorMessage = e.message;
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      Alert.alert("Unable to Create Family", errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -235,9 +257,15 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
   const handleJoinSubmit = async () => {
     if (!joinCode.trim()) {
-      Alert.alert("Error", "Please enter a valid family code");
+      Alert.alert("Missing Code", "Please enter a family invite code.");
       return;
     }
+
+    if (joinCode.trim().length < 6) {
+      Alert.alert("Invalid Code", "The invite code appears to be too short. Please check and try again.");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const res = await joinFamilyByCode(joinCode.trim());
@@ -245,7 +273,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
       if (!fid)
         throw new Error(
-          "Joined, but could not resolve family id from response"
+          "Successfully joined, but could not load family details. Please refresh the app."
         );
 
       setCurrentFamilyId(fid);
@@ -259,7 +287,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       await refreshMembers(fid);
 
       Alert.alert(
-        "Joined", 
+        "Welcome to the Family!", 
         "You have successfully joined the family.",
         [
           { 
@@ -273,7 +301,27 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
         ]
       );
     } catch (e: any) {
-      Alert.alert("Join failed", e.message || "Invalid or expired invite code");
+      let errorMessage = "Unable to join the family. ";
+      
+      if (e.message?.toLowerCase().includes("network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (e.message?.toLowerCase().includes("timeout")) {
+        errorMessage = "Request timed out. Please check your connection and try again.";
+      } else if (e.message?.toLowerCase().includes("not found") || e.message?.toLowerCase().includes("invalid")) {
+        errorMessage = "This invite code is not valid. Please check the code and try again.";
+      } else if (e.message?.toLowerCase().includes("expired")) {
+        errorMessage = "This invite code has expired. Please request a new code from the family owner.";
+      } else if (e.message?.toLowerCase().includes("already a member")) {
+        errorMessage = "You are already a member of this family.";
+      } else if (e.message?.toLowerCase().includes("limit")) {
+        errorMessage = "This family has reached its maximum number of members.";
+      } else if (e.message) {
+        errorMessage = e.message;
+      } else {
+        errorMessage += "Please check the invite code and try again.";
+      }
+      
+      Alert.alert("Unable to Join Family", errorMessage);
     } finally {
       setIsLoading(false);
     }

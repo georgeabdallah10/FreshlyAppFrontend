@@ -208,40 +208,30 @@ const AllGroceryScanner = () => {
                 throw new Error('Invalid data URL format');
               }
             }
-            // STRATEGY 3: Try to fetch blob URLs (may fail on iOS Safari)
+            // STRATEGY 3: Robust blob: URL handling (no fetch; use .file if available)
             else if (assetUri.startsWith("blob:")) {
-              addDebugLog('Blob URL detected - attempting fetch (may fail on iOS Safari)');
-              try {
-                const response = await fetch(assetUri);
-                if (!response.ok) {
-                  throw new Error(`Fetch failed: ${response.status} ${response.statusText}`);
-                }
-                const blob = await response.blob();
-                
-                if (blob.size === 0) {
-                  throw new Error('Fetched blob is empty');
-                }
-                
-                addDebugLog(`Blob fetched successfully: size=${blob.size}, type=${blob.type}`);
-                
+              addDebugLog('Blob URL detected');
+              const fileObj = (asset as any).file;
+              if (fileObj instanceof File || fileObj instanceof Blob) {
+                addDebugLog('Using .file object instead of fetch');
                 base64 = await new Promise<string>((resolve, reject) => {
                   const reader = new FileReader();
                   reader.onloadend = () => {
                     const result = reader.result as string;
                     const base64Data = result.split(',')[1];
-                    addDebugLog(`Blob->Base64 complete: ${base64Data.length} chars`);
+                    addDebugLog(`FileReader conversion from .file complete: ${base64Data.length} chars`);
                     resolve(base64Data);
                   };
                   reader.onerror = (error) => {
-                    addDebugLog(`FileReader error on blob: ${error}`);
-                    reject(new Error('FileReader failed on blob'));
+                    addDebugLog(`FileReader error from .file: ${error}`);
+                    reject(new Error('FileReader failed on .file'));
                   };
-                  reader.readAsDataURL(blob);
+                  reader.readAsDataURL(fileObj);
                 });
-              } catch (fetchError) {
-                const fetchMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
-                addDebugLog(`Fetch blob failed: ${fetchMsg} - iOS Safari likely blocked it`);
-                throw new Error('iOS Safari blocked blob access. Please try a different image or use the native app.');
+              } else {
+                addDebugLog('No .file object available on blob URI - iOS Safari likely blocked fetch');
+                showToast("error", "iOS Safari blocked image access. Please use 'Take Photo' instead of 'Choose File'.");
+                throw new Error('Blocked blob fetch on iOS Safari');
               }
             }
             // STRATEGY 4: Unsupported URI format

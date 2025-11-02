@@ -287,16 +287,23 @@ const AllGroceryScanner = () => {
       
       // Convert image URI to base64 if needed
       let base64Image: string;
-      if (imageData.length < 500 && (imageData.startsWith('blob:') || imageData.startsWith('file:') || imageData.startsWith('http'))) {
-        // It's a URI, needs conversion
+      
+      // Check if it's already pure base64 (no URI scheme, long string)
+      const isPureBase64 = imageData.length > 1000 && !imageData.includes(':');
+      
+      if (isPureBase64) {
+        addDebugLog('Already pure base64, using directly');
+        base64Image = imageData;
+      } else if (imageData.startsWith('data:')) {
+        // Extract base64 from data URL
+        addDebugLog('Extracting base64 from data URL...');
+        base64Image = imageData.split(',')[1];
+        addDebugLog(`Base64 extracted, length: ${base64Image.length}`);
+      } else {
+        // It's a URI (blob:, file:, http:), needs conversion
         addDebugLog('Converting URI to base64...');
         base64Image = await imageUriToBase64(imageData);
         addDebugLog(`Base64 length after conversion: ${base64Image.length}`);
-      } else {
-        // It's already base64 or will be handled by imageUriToBase64
-        addDebugLog('Using data as-is or converting...');
-        base64Image = await imageUriToBase64(imageData);
-        addDebugLog(`Base64 length: ${base64Image.length}`);
       }
       
       // Call AI API

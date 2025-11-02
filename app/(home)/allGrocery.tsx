@@ -156,6 +156,32 @@ const AllGroceryScanner = () => {
       // On web, use image picker library (supports both camera and gallery on mobile browsers)
       if (Platform.OS === 'web') {
         addDebugLog('Using web image picker...');
+        // iOS Safari camera workaround: prefer camera for image capture
+        const isIOSSafari = () => {
+          const ua = navigator.userAgent;
+          return /iP(ad|hone|od)/.test(ua) && /Safari/.test(ua) && !/Chrome/.test(ua);
+        };
+
+        if (isIOSSafari()) {
+          addDebugLog('iOS Safari detected – forcing camera input');
+          const cameraResult = await ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            quality: 0.8,
+          });
+
+          if (!cameraResult.canceled && cameraResult.assets[0]) {
+            const imageUri = cameraResult.assets[0].uri;
+            addDebugLog(`Camera captured URI: ${imageUri}`);
+            setCapturedImage(imageUri);
+            setCurrentStep("processing");
+            await processImage(imageUri);
+          } else {
+            addDebugLog('iOS Safari camera capture canceled');
+            setCurrentStep("selection");
+          }
+          return; // Skip rest of web logic
+        }
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,

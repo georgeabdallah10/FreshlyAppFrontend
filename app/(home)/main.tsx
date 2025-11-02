@@ -250,7 +250,7 @@ const HomeDashboard = () => {
         <TouchableOpacity 
           style={styles.menuButton} 
           activeOpacity={0.6}
-          onPress={() => router.push("./(home)/faq" as any)}
+          onPress={() => router.push("/(home)/faq")}
         >
           <View style={styles.menuIcon}>
           <Image

@@ -1,27 +1,27 @@
-import { askAI } from "@/src/home/chat";
-import { createMealForSignleUser } from "@/src/user/meals";
 import RecipeItem from "@/components/meal/mealPreview";
 import { useUser } from "@/context/usercontext";
+import { askAI } from "@/src/home/chat";
+import { createMealForSignleUser } from "@/src/user/meals";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    Easing,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  Animated,
+  Easing,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 type FormState = {
@@ -772,7 +772,7 @@ ${JSON_DIRECTIVE}`;
           style={styles.btnSolid}
         >
           <Text style={styles.btnSolidText}>
-            {phase === TOTAL_PHASES - 1 ? "Finish" : "Next"}
+            {phase === TOTAL_PHASES - 1 ? "Generate Meal" : "Next"}
           </Text>
           <Ionicons name="chevron-forward" size={18} color="#fff" />
         </TouchableOpacity>
@@ -847,6 +847,8 @@ const ReviewRow: React.FC<{ k: string; v: string }> = React.memo(({ k, v }) => (
     <Text style={styles.rowV}>{v}</Text>
   </View>
 ));
+
+ReviewRow.displayName = "ReviewRow";
 
 /* ---------- Styles ---------- */
 const styles = StyleSheet.create({

@@ -1,25 +1,26 @@
 // ==================== screens/MealListScreen.tsx ====================
-import React, { useState, useEffect } from "react";
+import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
+  ActivityIndicator,
   LayoutAnimation,
   Platform,
-  UIManager,
   Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  ActivityIndicator,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { createMealForSignleUser } from "@/src/user/meals";
 import { AddMealModal } from "./addMealModal";
-import { getAllmealsforSignelUser } from "@/src/user/meals";
 
 interface MealListScreenProps {
   onMealSelect: (meal: any) => void;
+  isLoading?: boolean;
+  hasError?: boolean;
 }
 const CATEGORIES = [
   "All",
@@ -33,12 +34,16 @@ const CATEGORIES = [
 
 type Category = (typeof CATEGORIES)[number];
 
-const MealListScreen: React.FC<MealListScreenProps> = ({ onMealSelect }) => {
+const MealListScreen: React.FC<MealListScreenProps> = ({ 
+  onMealSelect,
+  isLoading: parentLoading = false,
+  hasError: parentError = false 
+}) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [meals, setMeals] = useState<any[]>([]); // Placeholder for backend meals
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -73,7 +78,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({ onMealSelect }) => {
 
   const handleMealSubmit = async (meal: any) => {
     try {
-      setIsLoading(true);
+      setIsSubmitting(true);
 
       // Call your API
       const response = await createMealForSignleUser(meal);
@@ -89,7 +94,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({ onMealSelect }) => {
       console.error("Error creating meal:", error);
       alert("Failed to add meal. Please try again.");
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -113,7 +118,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({ onMealSelect }) => {
         onClose={() => setShowAddMealModal(false)}
         onSubmit={handleMealSubmit}
       />
-      {isLoading && (
+      {isSubmitting && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#10B981" />
         </View>
@@ -184,82 +189,123 @@ const MealListScreen: React.FC<MealListScreenProps> = ({ onMealSelect }) => {
         </ScrollView>
       </View>
 
-      {/* Meal cards */}
-      <ScrollView
-        style={styles.mealsContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {filteredMeals.map((meal: any, index: any) => (
-          <TouchableOpacity
-            key={meal.id}
-            style={[styles.mealCard, index === 0 && styles.mealCardHighlighted]}
-            onPress={() => onMealSelect(meal)}
-            activeOpacity={0.9}
+      {/* Loading State */}
+      {parentLoading ? (
+        <View style={styles.emptyStateContainer}>
+          <ActivityIndicator size="large" color="#00A86B" />
+          <Text style={styles.emptyStateTitle}>Loading your meals...</Text>
+          <Text style={styles.emptyStateSubtitle}>Just a moment</Text>
+        </View>
+      ) : parentError ? (
+        /* Error State */
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateEmoji}>😕</Text>
+          <Text style={styles.emptyStateTitle}>Couldn't Load Meals</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            We had trouble loading your meals. Please check your connection and try again.
+          </Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => window.location.reload()}
+            activeOpacity={0.8}
           >
-            <View style={styles.mealImageContainer}>
-              <Text style={styles.mealImageEmoji}>{meal.image}</Text>
-            </View>
-
-            <View style={styles.mealOverlay}>
-              <Text style={styles.mealName}>{meal.name}</Text>
-
-              <View style={styles.mealMetaRow}>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaIcon}>🔥</Text>
-                  <Text style={styles.metaText}>{meal.calories}kcal</Text>
-                </View>
-                {meal.totalTime !== 0 ? (
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>⏱</Text>
-                    <Text style={styles.metaText}>{meal.totalTime}min</Text>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.macrosRow}>
-                {meal.macros.protein !== 0 ? (
-                  <View style={styles.macroItem}>
-                    <View style={styles.macroCircle}>
-                      <View style={[styles.macroProgress, { width: "70%" }]} />
-                    </View>
-
-                    <View>
-                      <Text style={styles.macroValue}>
-                        {meal.macros.protein}g
-                      </Text>
-                      <Text style={styles.macroLabel}>Protein</Text>
-                    </View>
-                  </View>
-                ) : null}
-                {meal.macros.fats !== 0 ? (
-                  <View style={styles.macroItem}>
-                    <View style={styles.macroCircle}>
-                      <View style={[styles.macroProgress, { width: "40%" }]} />
-                    </View>
-                    <View>
-                      <Text style={styles.macroValue}>{meal.macros.fats}g</Text>
-                      <Text style={styles.macroLabel}>Fats</Text>
-                    </View>
-                  </View>
-                ) : null}
-                {meal.macros.carbs !== 0 ? (
-                  <View style={styles.macroItem}>
-                    <View style={styles.macroCircle}>
-                      <View style={[styles.macroProgress, { width: "60%" }]} />
-                    </View>
-                    <View>
-                      <Text style={styles.macroValue}>
-                        {meal.macros.carbs}g
-                      </Text>
-                      <Text style={styles.macroLabel}>Carbs</Text>
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-            </View>
+            <Text style={styles.retryButtonText}>Try Again</Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        </View>
+      ) : filteredMeals.length === 0 ? (
+        /* Empty State */
+        <View style={styles.emptyStateContainer}>
+          <Text style={styles.emptyStateEmoji}>🍽️</Text>
+          <Text style={styles.emptyStateTitle}>No Meals Yet</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            Start by adding your first meal plan or use Quick Meals to generate one!
+          </Text>
+          <TouchableOpacity 
+            style={styles.addFirstMealButton}
+            onPress={onAddMeal}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.addFirstMealButtonText}>+ Add Your First Meal</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        /* Meal cards */
+        <ScrollView
+          style={styles.mealsContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {filteredMeals.map((meal: any, index: any) => (
+            <TouchableOpacity
+              key={meal.id}
+              style={[styles.mealCard, index === 0 && styles.mealCardHighlighted]}
+              onPress={() => onMealSelect(meal)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.mealImageContainer}>
+                <Text style={styles.mealImageEmoji}>{meal.image}</Text>
+              </View>
+
+              <View style={styles.mealOverlay}>
+                <Text style={styles.mealName}>{meal.name}</Text>
+
+                <View style={styles.mealMetaRow}>
+                  <View style={styles.metaItem}>
+                    <Text style={styles.metaIcon}>🔥</Text>
+                    <Text style={styles.metaText}>{meal.calories}kcal</Text>
+                  </View>
+                  {meal.totalTime !== 0 ? (
+                    <View style={styles.metaItem}>
+                      <Text style={styles.metaIcon}>⏱</Text>
+                      <Text style={styles.metaText}>{meal.totalTime}min</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={styles.macrosRow}>
+                  {meal.macros.protein !== 0 ? (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroCircle}>
+                        <View style={[styles.macroProgress, { width: "70%" }]} />
+                      </View>
+
+                      <View>
+                        <Text style={styles.macroValue}>
+                          {meal.macros.protein}g
+                        </Text>
+                        <Text style={styles.macroLabel}>Protein</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  {meal.macros.fats !== 0 ? (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroCircle}>
+                        <View style={[styles.macroProgress, { width: "40%" }]} />
+                      </View>
+                      <View>
+                        <Text style={styles.macroValue}>{meal.macros.fats}g</Text>
+                        <Text style={styles.macroLabel}>Fats</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                  {meal.macros.carbs !== 0 ? (
+                    <View style={styles.macroItem}>
+                      <View style={styles.macroCircle}>
+                        <View style={[styles.macroProgress, { width: "60%" }]} />
+                      </View>
+                      <View>
+                        <Text style={styles.macroValue}>
+                          {meal.macros.carbs}g
+                        </Text>
+                        <Text style={styles.macroLabel}>Carbs</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Add Meal Floating Button */}
       <TouchableOpacity
@@ -514,6 +560,50 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1000,
+  },
+
+  /* Empty State */
+  emptyStateContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+  },
+  emptyStateEmoji: { fontSize: 64, marginBottom: 20 },
+  emptyStateTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  emptyStateSubtitle: {
+    fontSize: 16,
+    color: "#6B7280",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: "#10B981",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  addFirstMealButton: {
+    backgroundColor: "#10B981",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 30,
+  },
+  addFirstMealButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 16,
   },
 });
 

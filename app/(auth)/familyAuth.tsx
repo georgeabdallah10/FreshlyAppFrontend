@@ -1,30 +1,26 @@
 // ==================== FamilyMemberFlow.tsx ====================
-import React, { useState, useRef, useEffect } from "react";
+import { useUser } from "@/context/usercontext";
 import {
-  View,
+  createFamily,
+  joinFamilyByCode,
+  listFamilyMembers,
+  regenerateInviteCode
+} from "@/src/user/family";
+import { Ionicons } from "@expo/vector-icons";
+import * as Clipboard from "expo-clipboard";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Modal,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Modal,
-  ScrollView,
-  Alert,
-  Animated,
+  View
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useUser } from "@/context/usercontext";
-import { Ionicons } from "@expo/vector-icons";
-import {
-  createFamily,
-  listFamilyMembers,
-  removeFamilyMember,
-  leaveFamily,
-  regenerateInviteCode,
-  joinFamilyByCode,
-  listMyFamilies,
-} from "@/src/user/family";
-import * as Clipboard from "expo-clipboard";
 
 
 type Screen = "initial" | "addMember" | "memberList";
@@ -35,7 +31,13 @@ type Member = {
   phone: string;
 };
 
-const FamilyMemberFlow = () => {
+interface FamilyMemberFlowProps {
+  onBack?: () => void;
+  onComplete?: () => void;
+  showBackButton?: boolean;
+}
+
+const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: FamilyMemberFlowProps = {}) => {
   const router = useRouter();
   const {user, updateUserInfo} = useUser();
   const [currentScreen, setCurrentScreen] = useState<Screen>("initial");
@@ -205,7 +207,16 @@ const FamilyMemberFlow = () => {
             text: "Copy Code",
             onPress: () => invite && Clipboard.setStringAsync(invite),
           },
-          { text: "OK", onPress: () =>  router.replace('/(user)/prefrences')},
+          { 
+            text: "OK", 
+            onPress: () => {
+              if (onComplete) {
+                onComplete();
+              } else {
+                router.replace('/(user)/prefrences');
+              }
+            }
+          },
         ]
       );
     } catch (e: any) {
@@ -247,7 +258,20 @@ const FamilyMemberFlow = () => {
 
       await refreshMembers(fid);
 
-      Alert.alert("Joined", "You have successfully joined the family.");
+      Alert.alert(
+        "Joined", 
+        "You have successfully joined the family.",
+        [
+          { 
+            text: "OK", 
+            onPress: () => {
+              if (onComplete) {
+                onComplete();
+              }
+            }
+          }
+        ]
+      );
     } catch (e: any) {
       Alert.alert("Join failed", e.message || "Invalid or expired invite code");
     } finally {
@@ -292,6 +316,16 @@ const FamilyMemberFlow = () => {
 
   const renderInitialScreen = () => (
     <View style={styles.content}>
+      {showBackButton && (
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onBack}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <Text style={styles.backButtonText}>Back</Text>
+        </TouchableOpacity>
+      )}
       <Text style={styles.title}>Add a Family Member</Text>
       <Text style={styles.subtitle}>
         Share access and stay connected with your loved ones
@@ -769,6 +803,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 48,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    marginBottom: 24,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  backButtonText: {
+    fontSize: 17,
+    color: "#1F2937",
+    fontWeight: "500",
+    marginLeft: 4,
   },
   illustrationContainer: {
     alignItems: "center",

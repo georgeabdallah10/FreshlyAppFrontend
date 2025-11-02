@@ -1,13 +1,12 @@
 // ==================== App.tsx ====================
-import React, { useState, useEffect } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
-import MealDetailScreen from '@/components/meal/mealDetailScreen';
-import { type Meal } from '@/components/meal/mealsData';
-import MealListScreen from '@/components/meal/mealListScreen';
-type Screen = 'list' | 'detail';
-import { getAllmealsforSignelUser } from '@/src/user/meals';
-import { AddMealModal } from '@/components/meal/addMealModal';
 import ToastBanner from "@/components/generalMessage";
+import MealDetailScreen from '@/components/meal/mealDetailScreen';
+import MealListScreen from '@/components/meal/mealListScreen';
+import { type Meal } from '@/components/meal/mealsData';
+import { getAllmealsforSignelUser } from '@/src/user/meals';
+import React, { useEffect, useState } from 'react';
+import { StatusBar, StyleSheet, View } from 'react-native';
+type Screen = 'list' | 'detail';
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -21,6 +20,8 @@ interface ToastState {
 const MealsDashboard: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>('list');
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -66,17 +67,24 @@ const MealsDashboard: React.FC = () => {
     console.log("PRETEST");
     const test = async () => {
       try {
+        setIsLoading(true);
+        setHasError(false);
         const res = await getAllmealsforSignelUser();
         if (!res?.ok) {
           const errText = await res?.text();
           showToast("error", errText || "Failed to fetch meals.");
+          setHasError(true);
           return;
         }
         const data = await res.json();
         console.log(data);
-        showToast("success", "Meals loaded successfully!");
+        // Don't show success toast on initial load, only on errors
       } catch (err: any) {
+        console.error("Error loading meals:", err);
         showToast("error", err?.message ?? "Error loading meals.");
+        setHasError(true);
+      } finally {
+        setIsLoading(false);
       }
     };
     test();
@@ -86,7 +94,11 @@ const MealsDashboard: React.FC = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" />
       {currentScreen === 'list' ? (
-        <MealListScreen onMealSelect={handleMealSelect} />
+        <MealListScreen 
+          onMealSelect={handleMealSelect}
+          isLoading={isLoading}
+          hasError={hasError}
+        />
       ) : (
         selectedMeal && <MealDetailScreen meal={selectedMeal} onBack={handleBack} />
       )}

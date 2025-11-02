@@ -1,17 +1,17 @@
 // ==================== FamilyManagementScreen.tsx ====================
-import React, { useState, useEffect } from "react";
-import { SafeAreaView, StyleSheet, ActivityIndicator, View } from "react-native";
-import { useRouter } from "expo-router";
-import { useUser } from "@/context/usercontext";
-import OwnerView from "@/components/familyMangment/OwnerView";
 import MemberView from "@/components/familyMangment/MemberView";
+import OwnerView from "@/components/familyMangment/OwnerView";
+import { useUser } from "@/context/usercontext";
 import {
-  listMyFamilies,
-  listFamilyMembers,
   leaveFamily,
-  removeFamilyMember,
+  listFamilyMembers,
+  listMyFamilies,
   regenerateInviteCode,
+  removeFamilyMember,
 } from "@/src/user/family";
+import { useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import FamilyMemberFlow from "../(auth)/familyAuth";
 
 type UserRole = "owner" | "member" | "user";
@@ -172,7 +172,14 @@ const FamilyManagementScreen = () => {
           onLeaveFamily={handleLeaveFamily}
         />
       ) : (
-        <FamilyMemberFlow/>
+        <FamilyMemberFlow
+          showBackButton={true}
+          onBack={() => router.back()}
+          onComplete={async () => {
+            // Refresh family data after creating/joining
+            await fetchUserRoleAndFamily();
+          }}
+        />
       )}
     </View>
   );

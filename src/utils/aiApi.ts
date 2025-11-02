@@ -50,11 +50,25 @@ export const fileToBase64 = (file: File | Blob): Promise<string> => {
  */
 export const imageUriToBase64 = async (uri: string): Promise<string> => {
   try {
+    console.log('[imageUriToBase64] Fetching URI:', uri);
     const response = await fetch(uri);
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    }
+    
+    console.log('[imageUriToBase64] Converting to blob...');
     const blob = await response.blob();
-    return await fileToBase64(blob);
+    console.log('[imageUriToBase64] Blob size:', blob.size, 'type:', blob.type);
+    
+    console.log('[imageUriToBase64] Converting to base64...');
+    const base64 = await fileToBase64(blob);
+    console.log('[imageUriToBase64] Conversion complete');
+    
+    return base64;
   } catch (error) {
-    throw new Error(`Failed to convert image URI to base64: ${error}`);
+    console.error('[imageUriToBase64] Error:', error);
+    throw new Error(`Failed to convert image URI to base64: ${error instanceof Error ? error.message : error}`);
   }
 };
 

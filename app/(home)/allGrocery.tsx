@@ -9,19 +9,19 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Animated,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 type ScanType = "groceries" | "receipt" | "barcode";
@@ -141,27 +141,71 @@ const AllGroceryScanner = () => {
   // Open camera for image capture
   const openImageCapture = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== "granted") {
-        showToast("error", "Camera permission is required");
-        return;
-      }
+      console.log('[Grocery Scanner] Platform:', Platform.OS);
+      
+      // On web, use image picker library (supports both camera and gallery on mobile browsers)
+      if (Platform.OS === 'web') {
+        console.log('[Grocery Scanner] Using web image picker...');
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+          // On mobile browsers, this will show camera option
+        });
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: 0.8,
-      });
+        console.log('[Grocery Scanner] Image picker result:', { 
+          canceled: result.canceled, 
+          hasAssets: !!result.assets?.[0] 
+        });
 
-      if (!result.canceled && result.assets[0]) {
-        setCapturedImage(result.assets[0].uri);
-        setCurrentStep("processing");
-        await processImage(result.assets[0].uri);
+        if (!result.canceled && result.assets[0]) {
+          const imageUri = result.assets[0].uri;
+          console.log('[Grocery Scanner] Image selected:', imageUri);
+          setCapturedImage(imageUri);
+          setCurrentStep("processing");
+          await processImage(imageUri);
+        } else {
+          console.log('[Grocery Scanner] Image selection canceled');
+          setCurrentStep("selection");
+        }
       } else {
-        setCurrentStep("selection");
+        // Native app - use camera
+        console.log('[Grocery Scanner] Requesting camera permissions...');
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        
+        if (status !== "granted") {
+          console.log('[Grocery Scanner] Camera permission denied');
+          showToast("error", "Camera permission is required");
+          setCurrentStep("selection");
+          return;
+        }
+
+        console.log('[Grocery Scanner] Launching camera...');
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          quality: 0.8,
+        });
+
+        console.log('[Grocery Scanner] Camera result:', { 
+          canceled: result.canceled, 
+          hasAssets: !!result.assets?.[0] 
+        });
+
+        if (!result.canceled && result.assets[0]) {
+          const imageUri = result.assets[0].uri;
+          console.log('[Grocery Scanner] Image captured:', imageUri);
+          setCapturedImage(imageUri);
+          setCurrentStep("processing");
+          await processImage(imageUri);
+        } else {
+          console.log('[Grocery Scanner] Image capture canceled');
+          setCurrentStep("selection");
+        }
       }
     } catch (error) {
-      showToast("error", "Failed to capture image");
+      console.error('[Grocery Scanner] Error in openImageCapture:', error);
+      showToast("error", error instanceof Error ? error.message : "Failed to capture image");
       setCurrentStep("selection");
     }
   };
@@ -189,12 +233,17 @@ const AllGroceryScanner = () => {
   const processImage = async (imageUri: string) => {
     try {
       console.log('[Grocery Scanner] Processing image:', selectedScanType);
+      console.log('[Grocery Scanner] Image URI:', imageUri);
       
       // Convert image URI to base64
+      console.log('[Grocery Scanner] Converting image to base64...');
       const base64Image = await imageUriToBase64(imageUri);
+      console.log('[Grocery Scanner] Base64 conversion complete. Length:', base64Image.length);
       
       // Call AI API
+      console.log('[Grocery Scanner] Calling AI API...');
       const response = await scanGroceryImage(base64Image);
+      console.log('[Grocery Scanner] API response received:', response);
       
       // Convert API response to ScannedItem format
       const items: ScannedItem[] = response.items.map(item => ({
@@ -210,10 +259,16 @@ const AllGroceryScanner = () => {
       setScannedItems(items);
       setCurrentStep("confirmation");
     } catch (error) {
-      console.error('[Grocery Scanner] Error:', error);
+      console.error('[Grocery Scanner] Error in processImage:', error);
+      console.error('[Grocery Scanner] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       
       if (error instanceof Error && error.message === 'UNAUTHORIZED') {
         showToast("error", "Session expired. Please log in again.");
+      } else if (error instanceof Error && error.message.includes('Failed to convert')) {
+        showToast("error", "Failed to load image. Please try again.");
       } else {
         showToast("error", error instanceof Error ? error.message : "Failed to process image. Please try again.");
       }
@@ -339,7 +394,9 @@ const AllGroceryScanner = () => {
             </View>
             <Text style={styles.optionTitle}>Scan Groceries</Text>
             <Text style={styles.optionDescription}>
-              Take a photo of your groceries to automatically identify items
+              {Platform.OS === 'web' 
+                ? "Upload a photo of your groceries to automatically identify items"
+                : "Take a photo of your groceries to automatically identify items"}
             </Text>
           </TouchableOpacity>
 
@@ -353,27 +410,31 @@ const AllGroceryScanner = () => {
             </View>
             <Text style={styles.optionTitle}>Scan Receipt</Text>
             <Text style={styles.optionDescription}>
-              Take a photo of your receipt to extract purchased items
+              {Platform.OS === 'web'
+                ? "Upload a photo of your receipt to extract purchased items"
+                : "Take a photo of your receipt to extract purchased items"}
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.optionCard}
-            onPress={() => handleScanTypeSelect("barcode")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.optionIcon}>
-              <Image
-                source={require("../../assets/icons/barcode.png")}
-                style={styles.barcodeIcon}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.optionTitle}>Scan Barcode</Text>
-            <Text style={styles.optionDescription}>
-              Scan individual barcodes to add specific products
-            </Text>
-          </TouchableOpacity>
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity
+              style={styles.optionCard}
+              onPress={() => handleScanTypeSelect("barcode")}
+              activeOpacity={0.8}
+            >
+              <View style={styles.optionIcon}>
+                <Image
+                  source={require("../../assets/icons/barcode.png")}
+                  style={styles.barcodeIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <Text style={styles.optionTitle}>Scan Barcode</Text>
+              <Text style={styles.optionDescription}>
+                Scan individual barcodes to add specific products
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </ScrollView>

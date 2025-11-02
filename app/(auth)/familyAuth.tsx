@@ -734,13 +734,13 @@ onPress={() => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {currentScreen === "initial" && renderInitialScreen()}
       {currentScreen === "memberList" && renderMemberListScreen()}
       {renderAddMemberModal()}
       {renderJoinFamilyModal()}
       {renderCreateFamilyModal()}
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -50,7 +50,14 @@ export const fileToBase64 = (file: File | Blob): Promise<string> => {
  */
 export const imageUriToBase64 = async (uri: string): Promise<string> => {
   try {
-    console.log('[imageUriToBase64] Converting URI:', uri.substring(0, 100));
+    console.log('[imageUriToBase64] Input length:', uri.length);
+    console.log('[imageUriToBase64] Input start:', uri.substring(0, 100));
+    
+    // If it's already base64 (long string without URI schemes)
+    if (uri.length > 1000 && !uri.includes(':')) {
+      console.log('[imageUriToBase64] Already base64 string, returning as-is');
+      return uri;
+    }
     
     // For web, if it's already a data URL, extract the base64 part
     if (uri.startsWith('data:')) {
@@ -63,26 +70,34 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
       return base64;
     }
     
-    console.log('[imageUriToBase64] Fetching URI...');
-    const response = await fetch(uri);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+    // For URIs (blob:, file:, http:, etc.)
+    if (uri.includes(':') && uri.length < 1000) {
+      console.log('[imageUriToBase64] Fetching URI...');
+      const response = await fetch(uri);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+      }
+      
+      console.log('[imageUriToBase64] Converting to blob...');
+      const blob = await response.blob();
+      console.log('[imageUriToBase64] Blob size:', blob.size, 'type:', blob.type);
+      
+      if (blob.size === 0) {
+        throw new Error('Blob is empty - image may not have loaded');
+      }
+      
+      console.log('[imageUriToBase64] Converting to base64...');
+      const base64 = await fileToBase64(blob);
+      console.log('[imageUriToBase64] Conversion complete, length:', base64.length);
+      
+      return base64;
     }
     
-    console.log('[imageUriToBase64] Converting to blob...');
-    const blob = await response.blob();
-    console.log('[imageUriToBase64] Blob size:', blob.size, 'type:', blob.type);
+    // Fallback: assume it's already base64
+    console.log('[imageUriToBase64] Assuming base64 format, returning as-is');
+    return uri;
     
-    if (blob.size === 0) {
-      throw new Error('Blob is empty - image may not have loaded');
-    }
-    
-    console.log('[imageUriToBase64] Converting to base64...');
-    const base64 = await fileToBase64(blob);
-    console.log('[imageUriToBase64] Conversion complete, length:', base64.length);
-    
-    return base64;
   } catch (error) {
     console.error('[imageUriToBase64] Error:', error);
     const errorMsg = error instanceof Error ? error.message : String(error);

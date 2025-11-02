@@ -160,7 +160,7 @@ const AllGroceryScanner = () => {
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
-          base64: true, // Get base64 directly on web
+          base64: true, // Request base64 (may not work on web)
         });
 
         addDebugLog(`Result: canceled=${result.canceled}, hasAssets=${!!result.assets?.[0]}`);
@@ -169,8 +169,45 @@ const AllGroceryScanner = () => {
           const asset = result.assets[0];
           addDebugLog(`Image type: ${asset.type}, size: ${asset.fileSize || 'unknown'}`);
           addDebugLog(`Has base64: ${!!asset.base64}`);
+          addDebugLog(`URI: ${asset.uri.substring(0, 50)}...`);
           
-          // On web, prefer base64 if available, otherwise use URI
+          // On web, base64 option doesn't work - we need to read the blob directly
+          if (!asset.base64 && typeof window !== 'undefined') {
+            addDebugLog('Base64 not available, reading blob directly...');
+            try {
+              // Fetch the blob URL and convert to base64
+              const response = await fetch(asset.uri);
+              const blob = await response.blob();
+              addDebugLog(`Blob fetched: size=${blob.size}, type=${blob.type}`);
+              
+              // Convert blob to base64 using FileReader
+              const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                  const result = reader.result as string;
+                  // Extract base64 part (remove data:image/...;base64, prefix)
+                  const base64Data = result.split(',')[1];
+                  resolve(base64Data);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+              });
+              
+              addDebugLog(`Base64 conversion complete: ${base64.length} chars`);
+              setCapturedImage(asset.uri);
+              setCurrentStep("processing");
+              await processImage(base64);
+              return;
+            } catch (error) {
+              const errorMsg = error instanceof Error ? error.message : String(error);
+              addDebugLog(`ERROR reading blob: ${errorMsg}`);
+              showToast("error", `Failed to read image: ${errorMsg}`);
+              setCurrentStep("selection");
+              return;
+            }
+          }
+          
+          // If base64 is available, use it
           const imageData = asset.base64 || asset.uri;
           addDebugLog(`Using ${asset.base64 ? 'base64' : 'URI'}: ${imageData.substring(0, 50)}...`);
           

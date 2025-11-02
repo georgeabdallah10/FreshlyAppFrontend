@@ -228,6 +228,11 @@ const PantryDashboard = () => {
   ]);
   const [groceryItems, setGroceryItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  
+  // Rate limiting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
   // Animations
   const dropdownAnim = useRef(new Animated.Value(0)).current;
@@ -569,14 +574,46 @@ const PantryDashboard = () => {
     }
   };
 
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  const startCooldown = (seconds: number = 30) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
+
   const handleDeleteItem = async (id: any) => {
     try {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       await deletePantryItem(id);
       await refreshList();
+      showToast("success", "Item deleted successfully.");
     } catch (err: any) {
       console.log("deletePantryItem error", err);
-      showToast("error", "Failed to delete item.");
+      
+      let errorMessage = "Unable to delete item. ";
+      if (err.message?.toLowerCase().includes("network")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (err.message?.toLowerCase().includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (err.message?.toLowerCase().includes("not found")) {
+        errorMessage = "This item no longer exists. Please refresh the list.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      } else {
+        errorMessage += "Please try again.";
+      }
+      
+      showToast("error", errorMessage);
     }
   };
 

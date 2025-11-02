@@ -362,6 +362,29 @@ export default function ChatAIScreen() {
     type: 'success',
     message: '',
   });
+  
+  // Rate limiting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  // Start cooldown function
+  const startCooldown = (seconds: number = 30) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
 
   const showToast = (
     type: 'success' | 'error' | 'confirm' | 'info',
@@ -562,15 +585,41 @@ Rules:
 
   // Create a new conversation
   const handleNewConversation = async () => {
+    if (isSubmitting || isButtonDisabled) return;
+
+    setIsSubmitting(true);
     try {
       const newConvo = await createConversation('New Chat');
       setConversations([newConvo, ...conversations]);
       setCurrentConversationId(newConvo.id);
       setMessages([]);
       setShowConversationList(false);
+      showToast('success', 'New conversation created');
     } catch (error: any) {
+      startCooldown(30);
       console.error('Failed to create conversation:', error);
-      showToast('error', 'Failed to create new conversation');
+      
+      let errorMessage = "Unable to create conversation. ";
+      const errorStr = error.message?.toLowerCase() || "";
+      
+      if (errorStr.includes("network") || errorStr.includes("fetch")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (errorStr.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (errorStr.includes("401")) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (errorStr.includes("429")) {
+        startCooldown(120);
+        errorMessage = "Too many requests. Please wait before trying again.";
+      } else if (errorStr.includes("500") || errorStr.includes("503")) {
+        errorMessage = "Server error. Please try again later.";
+      } else {
+        errorMessage = "Failed to create conversation. Please try again.";
+      }
+      
+      showToast('error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -586,6 +635,9 @@ Rules:
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (isSubmitting || isButtonDisabled) return;
+
+            setIsSubmitting(true);
             try {
               await deleteConversation(conversationId);
               setConversations(conversations.filter(c => c.id !== conversationId));
@@ -595,8 +647,32 @@ Rules:
               }
               showToast('success', 'Conversation deleted');
             } catch (error: any) {
+              startCooldown(30);
               console.error('Failed to delete conversation:', error);
-              showToast('error', 'Failed to delete conversation');
+              
+              let errorMessage = "Unable to delete conversation. ";
+              const errorStr = error.message?.toLowerCase() || "";
+              
+              if (errorStr.includes("network") || errorStr.includes("fetch")) {
+                errorMessage = "No internet connection. Please check your network and try again.";
+              } else if (errorStr.includes("timeout")) {
+                errorMessage = "Request timed out. Please try again.";
+              } else if (errorStr.includes("401")) {
+                errorMessage = "Session expired. Please log in again.";
+              } else if (errorStr.includes("404")) {
+                errorMessage = "Conversation not found. It may have already been deleted.";
+              } else if (errorStr.includes("429")) {
+                startCooldown(120);
+                errorMessage = "Too many requests. Please wait before trying again.";
+              } else if (errorStr.includes("500") || errorStr.includes("503")) {
+                errorMessage = "Server error. Please try again later.";
+              } else {
+                errorMessage = "Failed to delete conversation. Please try again.";
+              }
+              
+              showToast('error', errorMessage);
+            } finally {
+              setIsSubmitting(false);
             }
           },
         },
@@ -609,6 +685,9 @@ Rules:
     // Helper function to perform the actual rename
     const performRename = async (newTitle: string) => {
       if (!newTitle?.trim()) return;
+      if (isSubmitting || isButtonDisabled) return;
+
+      setIsSubmitting(true);
       try {
         await updateConversationTitle(conversationId, newTitle.trim());
         setConversations(conversations.map(c => 
@@ -616,8 +695,32 @@ Rules:
         ));
         showToast('success', 'Conversation renamed');
       } catch (error: any) {
+        startCooldown(30);
         console.error('Failed to rename conversation:', error);
-        showToast('error', 'Failed to rename conversation');
+        
+        let errorMessage = "Unable to rename conversation. ";
+        const errorStr = error.message?.toLowerCase() || "";
+        
+        if (errorStr.includes("network") || errorStr.includes("fetch")) {
+          errorMessage = "No internet connection. Please check your network and try again.";
+        } else if (errorStr.includes("timeout")) {
+          errorMessage = "Request timed out. Please try again.";
+        } else if (errorStr.includes("401")) {
+          errorMessage = "Session expired. Please log in again.";
+        } else if (errorStr.includes("404")) {
+          errorMessage = "Conversation not found.";
+        } else if (errorStr.includes("429")) {
+          startCooldown(120);
+          errorMessage = "Too many requests. Please wait before trying again.";
+        } else if (errorStr.includes("500") || errorStr.includes("503")) {
+          errorMessage = "Server error. Please try again later.";
+        } else {
+          errorMessage = "Failed to rename conversation. Please try again.";
+        }
+        
+        showToast('error', errorMessage);
+      } finally {
+        setIsSubmitting(false);
       }
     };
 

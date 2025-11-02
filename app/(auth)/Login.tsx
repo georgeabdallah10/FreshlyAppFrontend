@@ -1,20 +1,20 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-  ScrollView,
-  Animated,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { loginUser } from "../../src/auth/auth";
-import { useRouter } from "expo-router";
 import ToastBanner from "@/components/generalMessage";
 import { Storage } from "@/src/utils/storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { loginUser } from "../../src/auth/auth";
 
 type ToastType = "success" | "error";
 interface ToastState {

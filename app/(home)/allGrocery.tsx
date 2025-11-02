@@ -69,6 +69,29 @@ const AllGroceryScanner = () => {
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   
+  // Rate limiting state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  
+  // Cooldown timer effect
+  useEffect(() => {
+    if (cooldownRemaining > 0) {
+      const timer = setTimeout(() => {
+        setCooldownRemaining(cooldownRemaining - 1);
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (cooldownRemaining === 0 && isButtonDisabled) {
+      setIsButtonDisabled(false);
+    }
+  }, [cooldownRemaining, isButtonDisabled]);
+
+  // Start cooldown function
+  const startCooldown = (seconds: number = 30) => {
+    setIsButtonDisabled(true);
+    setCooldownRemaining(seconds);
+  };
+  
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -317,8 +340,10 @@ const AllGroceryScanner = () => {
   // Add all items to pantry
   const handleAddAllToPantry = async () => {
     if (scannedItems.length === 0) return;
+    if (isSubmitting || isButtonDisabled) return;
     
     setCurrentStep("processing");
+    setIsSubmitting(true);
     
     try {
       for (const item of scannedItems) {
@@ -333,9 +358,36 @@ const AllGroceryScanner = () => {
       await loadPantryItems();
       setCurrentStep("success");
       showToast("success", `${scannedItems.length} items added to pantry!`);
-    } catch (error) {
-      showToast("error", "Failed to add items to pantry");
+    } catch (error: any) {
+      startCooldown(30);
+      console.error("Failed to add items to pantry:", error);
+      
+      let errorMessage = "Unable to add items to pantry. ";
+      const errorStr = error.message?.toLowerCase() || "";
+      
+      if (errorStr.includes("network") || errorStr.includes("fetch")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (errorStr.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (errorStr.includes("401")) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (errorStr.includes("409")) {
+        errorMessage = "Some items already exist in your pantry. Try updating quantities instead.";
+      } else if (errorStr.includes("422")) {
+        errorMessage = "Invalid item data. Please check all fields and try again.";
+      } else if (errorStr.includes("429")) {
+        startCooldown(120);
+        errorMessage = "Too many requests. Please wait before trying again.";
+      } else if (errorStr.includes("500") || errorStr.includes("503")) {
+        errorMessage = "Server error. Please try again later.";
+      } else {
+        errorMessage = "Failed to add items. Please try again.";
+      }
+      
+      showToast("error", errorMessage);
       setCurrentStep("confirmation");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 

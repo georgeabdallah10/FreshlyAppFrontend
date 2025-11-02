@@ -11,8 +11,6 @@ import {
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-// @ts-ignore - Web-only component
-import WebBarcodeScanner from "@/components/WebBarcodeScanner";
 import {
   ActivityIndicator,
   Animated,
@@ -286,36 +284,27 @@ const PantryDashboard = () => {
   };
 
   const openScanner = async () => {
-    console.log('Platform.OS:', Platform.OS);
-    console.log('Camera permission:', perm);
-    
-    // On web, we use html5-qrcode which handles permissions automatically
+    // Web platform: barcode scanning not available
     if (Platform.OS === 'web') {
-      console.log('Opening web scanner...');
-      setShowQRScanner(true);
+      showToast('info', 'Barcode scanning is not available on web browsers. Please use the mobile app.');
       return;
     }
     
     // Native: Request camera permission for expo-camera
     if (!perm) {
-      console.log('No permission object, requesting...');
       const req = await requestPermission();
-      console.log('Permission result:', req);
       if (!req?.granted) {
         showToast('error', 'Camera permission denied. Please enable it in settings.');
         return;
       }
     } else if (!perm.granted) {
-      console.log('Permission not granted, requesting...');
       const req = await requestPermission();
-      console.log('Permission result:', req);
       if (!req?.granted) {
         showToast('error', 'Camera permission denied. Please enable it in settings.');
         return;
       }
     }
     
-    console.log('Opening native scanner...');
     if (scanCooldownRef.current) {
       clearTimeout(scanCooldownRef.current);
       scanCooldownRef.current = null;
@@ -1166,61 +1155,38 @@ const PantryDashboard = () => {
           </TouchableOpacity>
           <Text style={styles.scannerTitle}>Scan Barcode</Text>
 
-          {Platform.OS === 'web' ? (
-            // Web: Render outside React Native View to prevent re-renders
-            // @ts-ignore - Web-only JSX
-            <div style={{ 
-              width: '340px', 
-              height: '340px', 
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              margin: '0 auto',
-            }}>
-              {/* @ts-ignore - Web-only component */}
-              <WebBarcodeScanner
-                key="web-scanner"
-                onScan={handleBarcodeScan}
-                onError={(error) => {
-                  console.error('[Pantry] Web scanner error:', error);
-                  showToast('error', `Camera error: ${error}`);
-                }}
-              />
-            </div>
-          ) : (
-            <View style={styles.scannerBox}>
-              <CameraView
-                key={showQRScanner ? "scanner-on" : "scanner-off"}
+          <View style={styles.scannerBox}>
+            <CameraView
+              key={showQRScanner ? "scanner-on" : "scanner-off"}
+              style={{
+                width: 340,
+                height: 340,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+              facing="back"
+              onCameraReady={() => console.log("Camera ready")}
+              onMountError={(e) => {
+                console.log("Camera mount error", e);
+                showToast("error", "Camera error: could not start.");
+              }}
+              onBarcodeScanned={handleBarcodeScan}
+            />
+            
+            {scanned && (
+              <View
                 style={{
-                  width: 340,
-                  height: 340,
-                  borderRadius: 12,
-                  overflow: "hidden",
+                  position: "absolute",
+                  bottom: 12,
+                  left: 0,
+                  right: 0,
+                  alignItems: "center",
                 }}
-                facing="back"
-                onCameraReady={() => console.log("Camera ready")}
-                onMountError={(e) => {
-                  console.log("Camera mount error", e);
-                  showToast("error", "Camera error: could not start.");
-                }}
-                onBarcodeScanned={handleBarcodeScan}
-              />
-              
-              {scanned && (
-                <View
-                  style={{
-                    position: "absolute",
-                    bottom: 12,
-                    left: 0,
-                    right: 0,
-                    alignItems: "center",
-                  }}
-                >
-                  <Button title="Scan again" onPress={() => setScanned(false)} />
-                </View>
-              )}
-            </View>
-          )}
+              >
+                <Button title="Scan again" onPress={() => setScanned(false)} />
+              </View>
+            )}
+          </View>
 
           <ScanConfirmModal
               visible={confirmVisible}

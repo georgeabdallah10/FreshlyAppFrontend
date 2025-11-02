@@ -772,10 +772,10 @@ const PantryDashboard = () => {
                       borderWidth: 2,
                     },
                   ]}
-                >
+                >{/*
                   <Text style={styles.itemImage} accessibilityLabel={`${item.category || 'item'} icon`}>
                     {item.image}
-                  </Text>
+                  </Text>*/}
                 </View>
                 <View>
                   <Text style={styles.itemName}>{item.name}</Text>

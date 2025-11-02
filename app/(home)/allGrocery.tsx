@@ -160,60 +160,68 @@ const AllGroceryScanner = () => {
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
           quality: 0.8,
-          base64: true, // Request base64 (may not work on web)
         });
 
         addDebugLog(`Result: canceled=${result.canceled}, hasAssets=${!!result.assets?.[0]}`);
 
         if (!result.canceled && result.assets[0]) {
           const asset = result.assets[0];
+          const assetUri = asset.uri;
           addDebugLog(`Image type: ${asset.type}, size: ${asset.fileSize || 'unknown'}`);
-          addDebugLog(`Has base64: ${!!asset.base64}`);
-          addDebugLog(`URI: ${asset.uri.substring(0, 50)}...`);
+          addDebugLog(`URI: ${assetUri.substring(0, 50)}...`);
           
-          // On web, base64 option doesn't work - we need to read the blob directly
-          if (!asset.base64 && typeof window !== 'undefined') {
-            addDebugLog('Base64 not available, reading blob directly...');
-            try {
-              // Fetch the blob URL and convert to base64
-              const response = await fetch(asset.uri);
-              const blob = await response.blob();
-              addDebugLog(`Blob fetched: size=${blob.size}, type=${blob.type}`);
-              
-              // Convert blob to base64 using FileReader
-              const base64 = await new Promise<string>((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                  const result = reader.result as string;
-                  // Extract base64 part (remove data:image/...;base64, prefix)
-                  const base64Data = result.split(',')[1];
-                  resolve(base64Data);
-                };
-                reader.onerror = reject;
-                reader.readAsDataURL(blob);
-              });
-              
-              addDebugLog(`Base64 conversion complete: ${base64.length} chars`);
-              setCapturedImage(asset.uri);
-              setCurrentStep("processing");
-              await processImage(base64);
-              return;
-            } catch (error) {
-              const errorMsg = error instanceof Error ? error.message : String(error);
-              addDebugLog(`ERROR reading blob: ${errorMsg}`);
-              showToast("error", `Failed to read image: ${errorMsg}`);
-              setCurrentStep("selection");
-              return;
-            }
-          }
-          
-          // If base64 is available, use it
-          const imageData = asset.base64 || asset.uri;
-          addDebugLog(`Using ${asset.base64 ? 'base64' : 'URI'}: ${imageData.substring(0, 50)}...`);
-          
-          setCapturedImage(asset.uri);
+          setCapturedImage(assetUri);
           setCurrentStep("processing");
-          await processImage(imageData);
+          
+          // Convert to base64 using the same method as setPfp.tsx
+          try {
+            let fileToConvert: File | Blob;
+            
+            // Try to use File object if available (newer Expo SDKs)
+            const fileObj = asset.file;
+            if (fileObj) {
+              addDebugLog('Using File object from asset');
+              fileToConvert = fileObj;
+            } else if (assetUri.startsWith("data:")) {
+              addDebugLog('Converting data URI to Blob');
+              const res = await fetch(assetUri);
+              const blob = await res.blob();
+              fileToConvert = new File([blob], "grocery.jpg", { type: blob.type });
+            } else if (assetUri.startsWith("blob:")) {
+              addDebugLog('Fetching blob URI');
+              const res = await fetch(assetUri);
+              const blob = await res.blob();
+              addDebugLog(`Blob fetched: size=${blob.size}, type=${blob.type}`);
+              fileToConvert = new File([blob], "grocery.jpg", { type: blob.type });
+            } else {
+              throw new Error('Unsupported URI format');
+            }
+            
+            // Convert File/Blob to base64 using FileReader
+            addDebugLog('Converting to base64 with FileReader...');
+            const base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                // Extract base64 part (remove data:image/...;base64, prefix)
+                const base64Data = result.split(',')[1];
+                addDebugLog(`Base64 conversion complete: ${base64Data.length} chars`);
+                resolve(base64Data);
+              };
+              reader.onerror = (error) => {
+                addDebugLog(`FileReader error: ${error}`);
+                reject(error);
+              };
+              reader.readAsDataURL(fileToConvert);
+            });
+            
+            await processImage(base64);
+          } catch (error) {
+            const errorMsg = error instanceof Error ? error.message : String(error);
+            addDebugLog(`ERROR converting image: ${errorMsg}`);
+            showToast("error", `Failed to process image: ${errorMsg}`);
+            setCurrentStep("selection");
+          }
         } else {
           addDebugLog('Image selection canceled');
           setCurrentStep("selection");

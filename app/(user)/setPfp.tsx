@@ -17,6 +17,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { Storage } from "@/src/utils/storage";
+
 
 
 type Step = "initial" | "scanning" | "captured" | "success";
@@ -94,8 +96,8 @@ export const SetPfp = () => {
     // Check if token exists before making API call
     const fetchUser = async () => {
       console.log('[setPfp] Checking for auth token...');
-      const token = await getAuthToken();
-      console.log('[setPfp] Token exists:', !!token);
+      const token = await Storage.getItem("access_token")
+      console.log('[setPfp] Token exists:', token);
       
       // No token means user is not logged in - don't spam the backend
       if (!token) {

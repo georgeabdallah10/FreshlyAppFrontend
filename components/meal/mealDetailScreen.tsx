@@ -1,21 +1,24 @@
 // ==================== screens/MealDetailScreen.tsx ====================
+import { useUser } from "@/context/usercontext";
+import {
+    deleteMealForSignleUser,
+    updateMealForSignleUser,
+} from "@/src/user/meals";
 import React, { useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  Image,
+    ActivityIndicator,
+    Alert,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { type Meal } from "./mealsData";
-import {
-  deleteMealForSignleUser,
-  updateMealForSignleUser,
-} from "@/src/user/meals";
+import SendShareRequestModal from "./SendShareRequestModal";
+
 type Props = {
   meal: Meal;
   onBack: () => void;
@@ -51,6 +54,25 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [editedMeal, setEditedMeal] = useState<Meal>({ ...meal });
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [familyId, setFamilyId] = useState<number | null>(null);
+  const { user } = useUser();
+
+  // Load family information
+  React.useEffect(() => {
+    const loadFamily = async () => {
+      try {
+        const { listMyFamilies } = await import("@/src/user/family");
+        const families = await listMyFamilies();
+        if (families && families.length > 0) {
+          setFamilyId(families[0].id);
+        }
+      } catch (error) {
+        console.error("Failed to load family:", error);
+      }
+    };
+    loadFamily();
+  }, []);
 
   const handleSave = async () => {
     try {
@@ -123,6 +145,16 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               {editedMeal.isFavorite ? "❤️" : "🤍"}
             </Text>
           </TouchableOpacity>
+          {familyId && (
+            <TouchableOpacity
+              onPress={() => setShowShareModal(true)}
+              style={[styles.editButton, { backgroundColor: "#00A86B" }]}
+              activeOpacity={0.9}
+              disabled={isEditing}
+            >
+              <Text style={styles.editButtonText}>Share</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={handleDelete}
             style={[styles.editButton, { backgroundColor: "#FF3B30" }]}
@@ -501,6 +533,21 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Share Request Modal */}
+      {familyId && (
+        <SendShareRequestModal
+          visible={showShareModal}
+          mealId={meal.id}
+          mealName={meal.name}
+          familyId={familyId}
+          onClose={() => setShowShareModal(false)}
+          onSuccess={() => {
+            setShowShareModal(false);
+            Alert.alert("Success", "Share request sent successfully!");
+          }}
+        />
+      )}
     </View>
   );
 };

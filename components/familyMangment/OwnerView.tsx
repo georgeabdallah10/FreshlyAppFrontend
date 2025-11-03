@@ -1,23 +1,25 @@
 // ==================== OwnerView.tsx ====================
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
+import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-    listFamilyMembers,
-    regenerateInviteCode,
-    removeFamilyMember
+  listFamilyMembers,
+  regenerateInviteCode,
+  removeFamilyMember
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-    Animated,
-    Clipboard,
-    Modal,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Clipboard,
+  Modal,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
 
@@ -39,6 +41,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   onRegenerateCode,
   onKickMember,
 }) => {
+  const router = useRouter();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [localInviteCode, setLocalInviteCode] = useState(familyData.inviteCode);
@@ -48,6 +51,9 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   );
   const [loadingMembers, setLoadingMembers] = useState(false);
   const {user} = useUser();
+  
+  // Get pending meal share request count
+  const { data: pendingCount = 0 } = usePendingRequestCount();
 
   // Toast state
   const [toast, setToast] = useState<{
@@ -267,14 +273,30 @@ const OwnerView: React.FC<OwnerViewProps> = ({
             {familyData.memberCount} Members
           </Text>
 
-          <TouchableOpacity
-            style={styles.inviteButton}
-            onPress={() => setShowInviteModal(true)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="share-outline" size={20} color="#10B981" />
-            <Text style={styles.inviteButtonText}>Share Invite Code</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.inviteButton}
+              onPress={() => setShowInviteModal(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="share-outline" size={20} color="#10B981" />
+              <Text style={styles.inviteButtonText}>Share Invite</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.requestsButton}
+              onPress={() => router.push("/(home)/mealShareRequests")}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="restaurant-outline" size={20} color="#007AFF" />
+              <Text style={styles.requestsButtonText}>Meal Requests</Text>
+              {pendingCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -736,6 +758,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#6B7280",
+  },
+  buttonRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 16,
+  },
+  requestsButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    backgroundColor: "#EFF6FF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    position: "relative",
+  },
+  requestsButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#007AFF",
+  },
+  badge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });
 

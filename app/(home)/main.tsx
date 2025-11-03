@@ -1,4 +1,6 @@
+import NotificationBell from "@/components/NotificationBell";
 import { AddProductModal } from "@/components/quickAddModal";
+import { usePendingRequestCount } from "@/hooks/useMealShare";
 import { useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -41,6 +43,9 @@ const BottomNavigation = ({
   const router = useRouter();
   const segmants = useSegments() as string[];
   const [quickAddModal, setQuickAddModal] = useState(false);
+  
+  // Get pending meal share request count
+  const { data: pendingCount = 0 } = usePendingRequestCount();
 
   useEffect(() => {
     const activeIndex = tabs.indexOf(activeTab);
@@ -163,6 +168,14 @@ const BottomNavigation = ({
                   }}
                 />
               </Text>
+              {/* Notification badge for pending meal share requests */}
+              {pendingCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationText}>
+                    {pendingCount > 9 ? '9+' : pendingCount}
+                  </Text>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
 
@@ -261,17 +274,11 @@ const HomeDashboard = () => {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.notificationButton} 
-          activeOpacity={0.6}
-          onPress={() => router.push("./(home)/notifications" as any)}
-        >
-          <Image
-            source={require("../../assets/icons/noti.png")}
-            style={styles.menuCardIcon}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
+        <NotificationBell
+          iconSize={24}
+          iconColor="#1F2937"
+          badgeColor="#FF3B30"
+        />
       </View>
 
       <ScrollView
@@ -564,6 +571,25 @@ const styles = StyleSheet.create({
   },
   logoImageInactive: {
     opacity: 0.6,
+  },
+  notificationBadge: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    backgroundColor: "#FF3B30",
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  notificationText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
   },
 });
 

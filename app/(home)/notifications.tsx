@@ -1,110 +1,154 @@
+import ToastBanner from '@/components/generalMessage';
+import {
+  useDeleteAllRead,
+  useDeleteNotification,
+  useHandleNotificationClick,
+  useMarkAllAsRead,
+  useMarkAsRead,
+  useNotifications,
+  useUnreadNotifications,
+} from '@/hooks/useNotifications';
+import { type Notification, type NotificationType } from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-
-type NotificationType = 'expiring' | 'expired' | 'recipe' | 'family' | 'system';
-
-type Notification = {
-  id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  actionable?: boolean;
-};
-
-// Mock notifications data
-const MOCK_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    type: 'expiring',
-    title: 'Items Expiring Soon',
-    message: 'Milk and eggs will expire in 2 days',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    read: false,
-    actionable: true,
-  },
-  {
-    id: '2',
-    type: 'recipe',
-    title: 'New Recipe Suggestion',
-    message: 'Try our new Chicken Stir Fry using your pantry items',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    read: false,
-    actionable: true,
-  },
-  {
-    id: '3',
-    type: 'family',
-    title: 'Family Update',
-    message: 'John added 5 items to the shared pantry',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 5),
-    read: true,
-  },
-  {
-    id: '4',
-    type: 'expired',
-    title: 'Expired Items',
-    message: '2 items have expired and should be removed',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    read: true,
-    actionable: true,
-  },
-  {
-    id: '5',
-    type: 'system',
-    title: 'Welcome to Freshly!',
-    message: 'Start by adding items to your pantry',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 48),
-    read: true,
-  },
-];
 
 const NotificationsScreen = () => {
   const router = useRouter();
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ visible: false, type: 'success', message: '' });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  // Queries
+  const { data: allNotifications = [], isLoading, refetch, isRefetching } = useNotifications();
+  const { data: unreadNotifications = [] } = useUnreadNotifications();
 
-  const markAsRead = (id: string) => {
-    setNotifications(prev =>
-      prev.map(notif =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
+  // Mutations
+  const markAsRead = useMarkAsRead();
+  const markAllAsRead = useMarkAllAsRead();
+  const deleteNotification = useDeleteNotification();
+  const deleteAllRead = useDeleteAllRead();
+  const handleNotificationClick = useHandleNotificationClick();
+
+  const notifications = filter === 'unread' ? unreadNotifications : allNotifications;
+  const unreadCount = unreadNotifications.length;
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await markAsRead.mutateAsync(id);
+    } catch (error: any) {
+      setToast({
+        visible: true,
+        type: 'error',
+        message: error.message || 'Failed to mark as read',
+      });
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllAsRead.mutateAsync();
+      setToast({
+        visible: true,
+        type: 'success',
+        message: 'All notifications marked as read',
+      });
+    } catch (error: any) {
+      setToast({
+        visible: true,
+        type: 'error',
+        message: error.message || 'Failed to mark all as read',
+      });
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      await deleteNotification.mutateAsync(id);
+      setToast({
+        visible: true,
+        type: 'success',
+        message: 'Notification deleted',
+      });
+    } catch (error: any) {
+      setToast({
+        visible: true,
+        type: 'error',
+        message: error.message || 'Failed to delete notification',
+      });
+    }
+  };
+
+  const handleDeleteAllRead = () => {
+    Alert.alert(
+      'Delete Read Notifications',
+      'Are you sure you want to delete all read notifications?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteAllRead.mutateAsync();
+              setToast({
+                visible: true,
+                type: 'success',
+                message: 'Read notifications deleted',
+              });
+            } catch (error: any) {
+              setToast({
+                visible: true,
+                type: 'error',
+                message: error.message || 'Failed to delete notifications',
+              });
+            }
+          },
+        },
+      ]
     );
   };
 
-  const markAllAsRead = () => {
-    setNotifications(prev =>
-      prev.map(notif => ({ ...notif, read: true }))
-    );
+  const handleNotificationPress = async (notification: Notification) => {
+    try {
+      const relatedId = await handleNotificationClick.mutateAsync(notification);
+      
+      // Navigate based on notification type
+      if (notification.type === 'meal_share_request') {
+        router.push('/(home)/mealShareRequests');
+      } else if (notification.type === 'meal_share_accepted' || notification.type === 'meal_share_declined') {
+        router.push('/(home)/mealShareRequests');
+      }
+    } catch (error: any) {
+      setToast({
+        visible: true,
+        type: 'error',
+        message: error.message || 'Failed to handle notification',
+      });
+    }
   };
-
-  const deleteNotification = (id: string) => {
-    setNotifications(prev => prev.filter(notif => notif.id !== id));
-  };
-
-  const filteredNotifications = filter === 'unread'
-    ? notifications.filter(n => !n.read)
-    : notifications;
 
   const getIcon = (type: NotificationType) => {
     switch (type) {
-      case 'expiring':
-        return { name: 'time-outline' as const, color: '#FD8100' };
-      case 'expired':
-        return { name: 'alert-circle-outline' as const, color: '#FF4444' };
-      case 'recipe':
+      case 'meal_share_request':
         return { name: 'restaurant-outline' as const, color: '#00A86B' };
+      case 'meal_share_accepted':
+        return { name: 'checkmark-circle-outline' as const, color: '#10B981' };
+      case 'meal_share_declined':
+        return { name: 'close-circle-outline' as const, color: '#EF4444' };
       case 'family':
         return { name: 'people-outline' as const, color: '#6B7280' };
       case 'system':
@@ -112,21 +156,51 @@ const NotificationsScreen = () => {
     }
   };
 
-  const formatTime = (date: Date) => {
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
+    if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays === 1) return 'Yesterday';
     return `${diffDays}d ago`;
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.6}
+          >
+            <Ionicons name="arrow-back" size={24} color="#111" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00A86B" />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onHide={() => setToast({ ...toast, visible: false })}
+      />
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -138,10 +212,16 @@ const NotificationsScreen = () => {
         <Text style={styles.headerTitle}>Notifications</Text>
         <TouchableOpacity
           style={styles.markAllButton}
-          onPress={markAllAsRead}
+          onPress={handleMarkAllAsRead}
           activeOpacity={0.6}
+          disabled={unreadCount === 0}
         >
-          <Text style={styles.markAllText}>Mark all</Text>
+          <Text style={[
+            styles.markAllText,
+            unreadCount === 0 && styles.markAllTextDisabled
+          ]}>
+            Mark all
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -152,7 +232,7 @@ const NotificationsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            All
+            All ({allNotifications.length})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -166,26 +246,45 @@ const NotificationsScreen = () => {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.actionBar}>
+        <TouchableOpacity
+          style={styles.clearButton}
+          onPress={handleDeleteAllRead}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={18} color="#6B7280" />
+          <Text style={styles.clearButtonText}>Clear Read</Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            tintColor="#00A86B"
+          />
+        }
       >
-        {filteredNotifications.length === 0 ? (
+        {notifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyText}>No notifications</Text>
             <Text style={styles.emptySubtext}>
-              You're all caught up!
+              {filter === 'unread' ? 'No unread notifications' : "You're all caught up!"}
             </Text>
           </View>
         ) : (
-          filteredNotifications.map((notif) => (
+          notifications.map((notif) => (
             <NotificationItem
               key={notif.id}
               notification={notif}
-              onMarkAsRead={() => markAsRead(notif.id)}
-              onDelete={() => deleteNotification(notif.id)}
+              onPress={() => handleNotificationPress(notif)}
+              onMarkAsRead={() => handleMarkAsRead(notif.id)}
+              onDelete={() => handleDelete(notif.id)}
               getIcon={getIcon}
               formatTime={formatTime}
             />
@@ -198,17 +297,27 @@ const NotificationsScreen = () => {
 
 const NotificationItem: React.FC<{
   notification: Notification;
+  onPress: () => void;
   onMarkAsRead: () => void;
   onDelete: () => void;
   getIcon: (type: NotificationType) => { name: any; color: string };
-  formatTime: (date: Date) => string;
-}> = ({ notification, onMarkAsRead, onDelete, getIcon, formatTime }) => {
+  formatTime: (dateString: string) => string;
+}> = ({ notification, onPress, onMarkAsRead, onDelete, getIcon, formatTime }) => {
   const icon = getIcon(notification.type);
+
+  const handlePress = () => {
+    onPress();
+  };
+
+  const handleDelete = (e: any) => {
+    e?.stopPropagation?.();
+    onDelete();
+  };
 
   return (
     <TouchableOpacity
-      style={[styles.notificationItem, !notification.read && styles.notificationItemUnread]}
-      onPress={onMarkAsRead}
+      style={[styles.notificationItem, !notification.is_read && styles.notificationItemUnread]}
+      onPress={handlePress}
       activeOpacity={0.7}
     >
       <View style={[styles.iconContainer, { backgroundColor: icon.color + '20' }]}>
@@ -218,15 +327,17 @@ const NotificationItem: React.FC<{
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <Text style={styles.notificationTitle}>{notification.title}</Text>
-          {!notification.read && <View style={styles.unreadDot} />}
+          {!notification.is_read && <View style={styles.unreadDot} />}
         </View>
-        <Text style={styles.notificationMessage}>{notification.message}</Text>
-        <Text style={styles.notificationTime}>{formatTime(notification.timestamp)}</Text>
+        <Text style={styles.notificationMessage} numberOfLines={2}>
+          {notification.message}
+        </Text>
+        <Text style={styles.notificationTime}>{formatTime(notification.created_at)}</Text>
       </View>
 
       <TouchableOpacity
         style={styles.deleteButton}
-        onPress={onDelete}
+        onPress={handleDelete}
         activeOpacity={0.6}
       >
         <Ionicons name="close" size={20} color="#9CA3AF" />
@@ -271,6 +382,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#00A86B',
+  },
+  markAllTextDisabled: {
+    color: '#9CA3AF',
+  },
+  placeholder: {
+    width: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  clearButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    backgroundColor: '#F7F8FA',
+  },
+  clearButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   filterContainer: {
     flexDirection: 'row',

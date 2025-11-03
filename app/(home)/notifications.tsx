@@ -222,27 +222,6 @@ const NotificationsScreen = () => {
     return `${diffDays}d ago`;
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.6}
-          >
-            <Ionicons name="arrow-back" size={24} color="#111" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#00A86B" />
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
       <ToastBanner
@@ -394,7 +373,11 @@ const NotificationsScreen = () => {
           />
         }
       >
-        {notifications.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00A86B" />
+          </View>
+        ) : notifications.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={64} color="#D1D5DB" />
             <Text style={styles.emptyText}>No notifications</Text>

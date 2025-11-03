@@ -35,6 +35,7 @@ type FormState = {
   includeIngredients: string[];
   avoidIngredients: string[];
   servings: number;
+  additionalInstructions: string;
 };
 
 type CurrentMeal = {
@@ -132,10 +133,12 @@ type Phase4Props = {
   animateKey: number;
   includeInput: string;
   avoidInput: string;
+  additionalInstructions: string;
   includeIngredients: string[];
   avoidIngredients: string[];
   onChangeIncludeInput: (t: string) => void;
   onChangeAvoidInput: (t: string) => void;
+  onChangeAdditionalInstructions: (t: string) => void;
   addInclude: () => void;
   removeInclude: (idx: number) => void;
   addAvoid: () => void;
@@ -147,10 +150,12 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
     animateKey,
     includeInput,
     avoidInput,
+    additionalInstructions,
     includeIngredients,
     avoidIngredients,
     onChangeIncludeInput,
     onChangeAvoidInput,
+    onChangeAdditionalInstructions,
     addInclude,
     removeInclude,
     addAvoid,
@@ -159,14 +164,22 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
     return (
       <>
         <Question animateKey={animateKey} title="Must include (optional)">
-          <TextInput
-            style={styles.input}
-            value={includeInput}
-            onChangeText={onChangeIncludeInput}
-            placeholder="e.g. Chicken, onion"
-            returnKeyType="done"
-            onSubmitEditing={addInclude}
-          />
+          <View style={styles.inputWithButton}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={includeInput}
+              onChangeText={onChangeIncludeInput}
+              placeholder="e.g. Chicken, onion"
+              returnKeyType="done"
+              onSubmitEditing={addInclude}
+            />
+            <TouchableOpacity
+              onPress={addInclude}
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
           {includeIngredients.length > 0 && (
             <View style={styles.tokens}>
               {includeIngredients.map((ing, i) => (
@@ -182,14 +195,22 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
         </Question>
 
         <Question animateKey={animateKey} title="Avoid ingredients (optional)">
-          <TextInput
-            style={styles.input}
-            value={avoidInput}
-            onChangeText={onChangeAvoidInput}
-            placeholder="e.g. Peanuts, dairy"
-            returnKeyType="done"
-            onSubmitEditing={addAvoid}
-          />
+          <View style={styles.inputWithButton}>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              value={avoidInput}
+              onChangeText={onChangeAvoidInput}
+              placeholder="e.g. Peanuts, dairy"
+              returnKeyType="done"
+              onSubmitEditing={addAvoid}
+            />
+            <TouchableOpacity
+              onPress={addAvoid}
+              style={styles.addButton}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
           {avoidIngredients.length > 0 && (
             <View style={styles.tokens}>
               {avoidIngredients.map((ing, i) => (
@@ -202,6 +223,18 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
               ))}
             </View>
           )}
+        </Question>
+
+        <Question animateKey={animateKey} title="Additional Instructions (optional)">
+          <TextInput
+            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            value={additionalInstructions}
+            onChangeText={onChangeAdditionalInstructions}
+            placeholder="e.g. Make it spicy, add extra garlic, use olive oil only"
+            returnKeyType="default"
+            multiline
+            numberOfLines={4}
+          />
         </Question>
       </>
     );
@@ -312,6 +345,7 @@ Rules:
   const [phase, setPhase] = useState(0);
   const [includeInput, setIncludeInput] = useState("");
   const [avoidInput, setAvoidInput] = useState("");
+  const [additionalInstructions, setAdditionalInstructions] = useState("");
   const [form, setForm] = useState<FormState>({
     ingredientSource: "pantry",
     budget: null,
@@ -323,6 +357,7 @@ Rules:
     includeIngredients: [],
     avoidIngredients: [],
     servings: 2,
+    additionalInstructions: "",
   });
   // Stable handlers for Phase 4 so TextInput keeps focus (no remounts)
   const addInclude = useCallback(() => {
@@ -431,6 +466,7 @@ Rules:
         includeIngredients: form.includeIngredients,
         avoidIngredients: form.avoidIngredients,
         servings: form.servings,
+        additionalInstructions: form.additionalInstructions,
       };
       // Build a compact inputs block
       const inputsBlock = `preferences_json:
@@ -445,11 +481,11 @@ ${JSON.stringify(payload)}
 
       // SYSTEM: only hard, timeless rules
       const system_prompt = `
-You are Freshly AI professional chef.Make sure to have a real meals that is eatable and delicious .Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods. No prose, no markdown, no comments. provide all the follwoing informaiton about the meal you are about to create,   
+You are Freshly AI professional chef. Make sure to create real meals that are eatable and delicious. Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods and any additional instructions provided by the user. No prose, no markdown, no comments. Provide all the following information about the meal you are about to create:
   name,
   icon,
   calories,
-  prepTime:,
+  prepTime,
   cookTime,
   totalTime,
   mealType,
@@ -457,10 +493,12 @@ You are Freshly AI professional chef.Make sure to have a real meals that is eata
   difficulty,
   servings,
   goalFit,
-  ingredients
+  ingredients,
   instructions,
   cookingTools,
   notes,
+
+CRITICAL: If the user provides additionalInstructions in choices_json, follow them EXACTLY. Incorporate them into the recipe generation.
 `;
       // USER: inputs + JSON schema directive
       const user_prompt = `${inputsBlock}
@@ -985,10 +1023,12 @@ ${JSON_DIRECTIVE}`;
               animateKey={phase}
               includeInput={includeInput}
               avoidInput={avoidInput}
+              additionalInstructions={additionalInstructions}
               includeIngredients={form.includeIngredients}
               avoidIngredients={form.avoidIngredients}
               onChangeIncludeInput={setIncludeInput}
               onChangeAvoidInput={setAvoidInput}
+              onChangeAdditionalInstructions={setAdditionalInstructions}
               addInclude={addInclude}
               removeInclude={removeInclude}
               addAvoid={addAvoid}
@@ -1254,6 +1294,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: COLORS.bg,
+  },
+  inputWithButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   tokens: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   tag: {

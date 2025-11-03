@@ -60,16 +60,18 @@ const FamilyManagementScreen = () => {
         return;
       }
       const fam = families[0];
+      const rawMembers = await listFamilyMembers(Number(fam.id));
+      const membersList = rawMembers ?? [];
+      
       const normalizedFamily: FamilyData = {
         id: String(fam.id),
         name: fam.display_name ?? fam.name ?? "My Family",
         inviteCode: fam.invite_code ?? fam.inviteCode ?? "",
         createdAt: fam.created_at ?? fam.createdAt ?? "",
-        memberCount: fam.member_count ?? fam.memberCount ?? 0,
+        memberCount: membersList.length, // Use actual members count instead of API field
       };
       setFamilyData(normalizedFamily);
-      const rawMembers = await listFamilyMembers(Number(fam.id));
-      const normalizedMembers: FamilyMember[] = (rawMembers ?? []).map((m: any) => {
+      const normalizedMembers: FamilyMember[] = membersList.map((m: any) => {
         // Try multiple paths for user data (nested object or flat structure)
         const u = m.user ?? {};
         
@@ -159,6 +161,10 @@ const FamilyManagementScreen = () => {
         };
       });
       setMembers(normalizedMembers);
+      // Update family data with new member count
+      setFamilyData((prev) => 
+        prev ? { ...prev, memberCount: normalizedMembers.length } : prev
+      );
     } catch (error) {
       console.error("Error kicking member:", error);
       throw error;

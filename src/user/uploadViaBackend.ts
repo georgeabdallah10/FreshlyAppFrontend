@@ -54,7 +54,7 @@ export async function uploadAvatarViaProxy({
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('[uploadAvatarViaProxy] Upload failed:', errorText);
+    console.log('ERROR [uploadAvatarViaProxy] Upload failed:', errorText);
     
     let errorData;
     try {

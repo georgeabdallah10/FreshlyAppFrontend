@@ -60,7 +60,7 @@ export async function scanImageViaProxy({
 
   if (!res.ok) {
     const errorText = await res.text();
-    console.error('[scanImageViaProxy] Scan failed:', errorText);
+    console.log('ERROR [scanImageViaProxy] Scan failed:', errorText);
     
     let errorData;
     try {

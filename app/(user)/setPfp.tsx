@@ -3,6 +3,7 @@ import ToastBanner from "@/components/generalMessage";
 import Icon from "@/components/profileSection/components/icon";
 import { useUser } from "@/context/usercontext";
 import { getCurrentUser } from "@/src/auth/auth";
+import { getAuthToken } from "@/src/client/apiClient";
 import { uploadAvatarViaProxy } from "@/src/user/uploadViaBackend";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -81,14 +82,66 @@ export const SetPfp = () => {
   const successAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const test = async () => {
+    console.log('[setPfp] useEffect triggered, user:', user?.id);
+    
+    // Try to get user ID immediately from context
+    if (user?.id) {
+      console.log('[setPfp] Setting userID from context:', user.id);
+      setUserID(String(user.id));
+      return;
+    }
+
+    // Check if token exists before making API call
+    const fetchUser = async () => {
+      console.log('[setPfp] Checking for auth token...');
+      const token = await getAuthToken();
+      console.log('[setPfp] Token exists:', !!token);
+      
+      // No token means user is not logged in - don't spam the backend
+      if (!token) {
+        console.log('[setPfp] No token found');
+        if (fromProfile === "true") {
+          showToast("error", "Please log in to continue");
+          setTimeout(() => router.replace("/(auth)/Login"), 1000);
+        } else {
+          console.log('[setPfp] Coming from signup, will retry in 1 second...');
+          // Coming from signup - wait for token to be set
+          setTimeout(async () => {
+            console.log('[setPfp] Retrying token check...');
+            const retryToken = await getAuthToken();
+            console.log('[setPfp] Retry - Token exists:', !!retryToken);
+            if (retryToken) {
+              const retryRes = await getCurrentUser();
+              console.log('[setPfp] Retry - getCurrentUser result:', retryRes.ok, retryRes.data?.id);
+              if (retryRes.ok && retryRes.data) {
+                console.log('[setPfp] Setting userID from retry:', retryRes.data.id);
+                setUserID(String(retryRes.data.id));
+              }
+            }
+          }, 1500); // Increased to 1.5 seconds
+        }
+        return;
+      }
+
+      // Token exists - fetch user
+      console.log('[setPfp] Fetching user with token...');
       const res = await getCurrentUser();
-      console.log("TEST USER ID");
-      console.log(res);
-      setUserID(res.data.id);
+      console.log('[setPfp] getCurrentUser result:', res.ok, res.data?.id);
+      if (res.ok && res.data) {
+        console.log('[setPfp] Setting userID:', res.data.id);
+        setUserID(String(res.data.id));
+      } else {
+        console.log('[setPfp] Failed to get user');
+        // Failed to fetch user even with token
+        if (fromProfile === "true") {
+          showToast("error", "Please log in to continue");
+          setTimeout(() => router.replace("/(auth)/Login"), 1000);
+        }
+      }
     };
-    test();
-  }, []);
+
+    fetchUser();
+  }, [user]);
 
   const persistAvatar = async (publicUrl: string) => {
     // 1) Bust cache so RN doesn't show the old image
@@ -197,7 +250,7 @@ export const SetPfp = () => {
         console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
-        console.error('[UPLOAD] Backend upload failed:', uploadError);
+        console.log('ERROR [UPLOAD] Backend upload failed:', uploadError);
         
         let errorMessage = "Unable to upload your photo. ";
         if (uploadError?.message?.toLowerCase().includes("network")) {
@@ -289,7 +342,7 @@ export const SetPfp = () => {
         console.log('[UPLOAD] Upload successful, publicUrl:', publicUrl);
         await persistAvatar(publicUrl);
       } catch (uploadError: any) {
-        console.error('[UPLOAD] Backend upload failed:', uploadError);
+        console.log('ERROR [UPLOAD] Backend upload failed:', uploadError);
         
         let errorMessage = "Unable to upload your photo. ";
         if (uploadError?.message?.toLowerCase().includes("network")) {
@@ -372,6 +425,13 @@ export const SetPfp = () => {
       <Text style={styles.subtitle}>
         Choose a photo that represents you
       </Text>
+      
+      {/* Debug info - remove in production */}
+      {__DEV__ && (
+        <Text style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>
+          UserID: {userID || 'Not set'} | From: {fromProfile || 'signup'}
+        </Text>
+      )}
 
       <View style={styles.faceIconContainer}>
         <View style={styles.faceCircleOuter}>
@@ -384,7 +444,14 @@ export const SetPfp = () => {
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.scanButton, !userID && { opacity: 0.6 }]}
-          onPress={handleTakePhoto}
+          onPress={() => {
+            console.log('[setPfp] Take Photo pressed, userID:', userID);
+            if (!userID) {
+              showToast("error", "Please wait, loading user information...");
+              return;
+            }
+            handleTakePhoto();
+          }}
           activeOpacity={0.9}
           disabled={!userID}
         >
@@ -394,7 +461,14 @@ export const SetPfp = () => {
 
         <TouchableOpacity
           style={[styles.galleryButton, !userID && { opacity: 0.6 }]}
-          onPress={handleChooseFromGallery}
+          onPress={() => {
+            console.log('[setPfp] Choose from Gallery pressed, userID:', userID);
+            if (!userID) {
+              showToast("error", "Please wait, loading user information...");
+              return;
+            }
+            handleChooseFromGallery();
+          }}
           activeOpacity={0.9}
           disabled={!userID}
         >

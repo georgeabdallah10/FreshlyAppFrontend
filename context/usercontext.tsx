@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
-import { getCurrentUser } from "@/src/auth/auth";
-import { updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
-import { getMyprefrences } from "@/src/user/setPrefrences";
+import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
 import { listMyPantryItems } from "@/src/user/pantry";
+import { getMyprefrences } from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
+import React, { createContext, useContext, useEffect, useState } from "react";
 
 type PantryItem = {
   id: number;
@@ -58,7 +57,7 @@ const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
       setUser((prev) => ({ ...(prev ?? {}), ...updatedUser }));
       return updatedUser;
     } catch (err: any) {
-      console.error("Failed to update user:", err);
+      // Silently handle update errors - they will be caught by the caller
       throw err;
     }
   };
@@ -108,10 +107,15 @@ useEffect(() => {
   const refreshUser = async () => {
     try {
       const res = await getCurrentUser();
-      console.log(res)
-      if (res.ok) setUser(res.data);
+      if (res.ok && res.data) {
+        setUser(res.data as User);
+      } else {
+        // User not authenticated - clear user state
+        setUser(null);
+      }
     } catch (err) {
-      console.error("Failed to fetch user:", err);
+      // Silent failure - user will be redirected to login
+      setUser(null);
     }
   };
 

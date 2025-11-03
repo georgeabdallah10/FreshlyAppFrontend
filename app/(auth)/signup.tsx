@@ -76,14 +76,14 @@ export default function CreateAccountScreen(): React.JSX.Element {
     visible: false,
     type: "success",
     message: "",
-    duration: 5000,
+    duration: 3500,
     topOffset: 50,
   });
 
   const showToast = (
     type: ToastType,
     message: unknown,
-    duration: number = 5000,
+    duration: number = 3500,
     topOffset: number = 50
   ) => {
     const text = toErrorText(message);
@@ -175,8 +175,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
   async function onsubmit() {
     setIsCreatingAccount(true);
+    
     try {
       console.log("Starting account registration...");
+      
       const result = await registerUser({
         email: email,
         password: password,
@@ -190,6 +192,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
           calorie_target: 0,
         },
       });
+      
+      console.log("Registration result:", result);
       
       if (result.ok) {
         setUsername("");
@@ -224,19 +228,15 @@ export default function CreateAccountScreen(): React.JSX.Element {
         await Storage.setItem("access_token", login.data.access_token);
         showToast("success", "Account created successfully! Welcome to Freshly!");
 
-        // Send verification code before navigating
-        try {
-          const sent = await sendVerificationCode(email);
-          if (!sent.ok) {
-            console.warn("Failed to send verification code:", sent.message);
-          }
-        } catch (e) {
+        // Send verification code (non-blocking)
+        sendVerificationCode(email).catch((e) => {
           console.warn("Error sending verification code:", e);
-        }
+        });
 
-        // Small delay to show success state
+        // Small delay to show success state, then navigate
         setTimeout(() => {
           setIsCreatingAccount(false);
+          console.log("Navigating to setPfp screen...");
           router.replace("/(user)/setPfp");
         }, 800);
 
@@ -728,7 +728,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
-        duration={toast.duration ?? 5000}
+        duration={toast.duration ?? 3500}
         topOffset={toast.topOffset ?? 50}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
       />

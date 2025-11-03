@@ -30,7 +30,7 @@ async function getAuthToken(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem('access_token');
   } catch (error) {
-    console.error('Error retrieving auth token:', error);
+    console.log('ERROR [Chat] Error retrieving auth token:', error);
     return null;
   }
 }
@@ -88,12 +88,12 @@ export async function sendMessage({
     
     if (!resp.ok) {
       const errorText = await resp.text();
-      console.error('Error response:', errorText);
+      console.log('ERROR [Chat] Error response:', errorText);
       throw new Error(`HTTP ${resp.status}: ${errorText}`);
     }
     return await resp.json();
   } catch (error) {
-    console.error('Fetch error:', error);
+    console.log('ERROR [Chat] Fetch error:', error);
     throw error;
   }
 }

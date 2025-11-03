@@ -1,3 +1,4 @@
+import { apiClient } from "../client/apiClient";
 import { BASE_URL } from "../env/baseUrl";
 import { Storage } from "../utils/storage";
 
@@ -46,26 +47,47 @@ export async function registerUser(
   input: RegisterInput
 ): Promise<ApiResult<UserOut>> {
   try {
+    console.log("[REGISTER] Starting registration request...");
+    console.log("[REGISTER] Payload:", { ...input, password: "***" });
+    
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
     const res = await fetch(`${BASE_URL}/auth/register`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(input),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
+    console.log("[REGISTER] Response status:", res.status);
+
     const json = await res.json().catch(() => ({}));
-    console.log("[REGISTER] Payload:", input);
-    console.log("[REGISTER] Password length:", input.password.length);
+    
     if (!res.ok) {
       const message =
         (json && (json.detail || json.message)) ||
         `Request failed with status ${res.status}`;
+      console.log("[REGISTER] Registration failed:", message);
       return { ok: false, status: res.status, message };
     }
-    console.log("Registering with:", json as UserOut);
+    
+    console.log("[REGISTER] Registration successful");
     return { ok: true, data: json as UserOut };
   } catch (err: any) {
+    if (err.name === 'AbortError') {
+      console.log("ERROR [REGISTER] Request timed out after 30 seconds");
+      return {
+        ok: false,
+        status: -1,
+        message: "Request timed out. Please check your internet connection and try again.",
+      };
+    }
+    console.log("ERROR [REGISTER] Network error:", err?.message || err);
     return {
       ok: false,
       status: -1,
@@ -98,6 +120,10 @@ export async function loginUser(
     console.log('[LOGIN] Attempting login to:', `${BASE_URL}/auth/login`);
     console.log('[LOGIN] Request payload:', { email: input.email, password: '***' });
     
+    // Create AbortController for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
     const res = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: { 
@@ -105,13 +131,14 @@ export async function loginUser(
         "Accept": "application/json",
       },
       body: JSON.stringify(input),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeoutId);
     console.log('[LOGIN] Response status:', res.status);
-    console.log('[LOGIN] Response headers:', Object.fromEntries(res.headers.entries()));
 
     const json = await res.json().catch((e) => {
-      console.error('[LOGIN] Failed to parse JSON response:', e);
+      console.log('ERROR [LOGIN] Failed to parse JSON response:', e);
       return {};
     });
     
@@ -121,51 +148,65 @@ export async function loginUser(
       const message =
         (json && (json.detail || json.message)) ||
         `Request failed with status ${res.status}`;
-      console.error('[LOGIN] Login failed:', message);
+      console.log('[LOGIN] Login failed:', message);
       return { ok: false, status: res.status, message };
     }
     
     console.log('[LOGIN] Login successful');
     return { ok: true, data: json as LoginResponse };
   } catch (err: any) {
-    console.error('[LOGIN] Network error:', err);
+    if (err.name === 'AbortError') {
+      console.log('ERROR [LOGIN] Request timed out after 30 seconds');
+      return {
+        ok: false,
+        status: -1,
+        message: "Request timed out. Please check your internet connection and try again.",
+      };
+    }
+    console.log('ERROR [LOGIN] Network error:', err);
     return { ok: false, status: -1, message: err?.message || "Network Error" };
   }
 }
 
 export async function getCurrentUser() {
-  const token = await Storage.getItem("access_token");
-
   try {
-    console.log('[GET_USER] Fetching current user from:', `${BASE_URL}/auth/me`);
-    console.log('[GET_USER] Has token:', !!token);
-    
-    const res = await fetch(`${BASE_URL}/auth/me`, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    console.log('[GET_USER] Response status:', res.status);
-    
-    const json = await res.json().catch(() => ({}));
-    console.log('[GET_USER] Response body:', json);
-    
-    if (!res.ok) {
-      const message =
-        (json && (json.detail || json.message)) ||
-        `Request failed with status ${res.status}`;
-      console.error('[GET_USER] Failed:', message);
-      return { ok: false, status: res.status, message };
+    // Use apiClient which handles automatic token refresh on 401 errors
+    const data = await apiClient.get<UserOut>('/auth/me');
+    return { ok: true, data };
+  } catch (err: any) {
+    // Silently fail for 401 - user just needs to log in (expected behavior)
+    if (err?.status === 401) {
+      return { 
+        ok: false, 
+        status: 401, 
+        message: "Not authenticated" 
+      };
     }
     
-    console.log('[GET_USER] Success');
-    return { ok: true, data: json };
-  } catch (err: any) {
-    console.error('[GET_USER] Network error:', err);
-    return { ok: false, status: -1, message: err?.message || "Network Error" };
+    // Silently fail for expected auth errors - these are normal when user is not logged in
+    const errorMessage = err?.message || '';
+    if (
+      errorMessage.includes('Session refresh failed') || 
+      errorMessage.includes('Authentication expired') ||
+      errorMessage.includes('Auth session missing')
+    ) {
+      return { 
+        ok: false, 
+        status: 401, 
+        message: "Not authenticated" 
+      };
+    }
+    
+    // Only log truly unexpected errors (not auth-related)
+    if (err?.status !== 401) {
+      console.log('ERROR [GET_USER] Unexpected error:', err?.message || err);
+    }
+    
+    return { 
+      ok: false, 
+      status: err?.status || -1, 
+      message: err?.message || "Network Error" 
+    };
   }
 }
 
@@ -188,28 +229,14 @@ export const updateUserInfo = async (
     status: string;
   }>
 ): Promise<User> => {
-  const token = await Storage.getItem("access_token");
-  if (!token) throw new Error("Not authenticated");
-
-  const res = await fetch(`${BASE_URL}/users/me`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(patch),
-  });
-
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg =
-      (json && (json.detail || json.message)) ||
-      `Failed to update profile (${res.status})`;
+  try {
+    // Use apiClient which handles automatic token refresh
+    const user = await apiClient.patch<User>('/users/me', patch);
+    return user;
+  } catch (error: any) {
+    const msg = error?.message || `Failed to update profile`;
     throw new Error(msg);
   }
-
-  // json should be the updated user
-  return json as User;
 };
 
 export async function deleteAccount() {

@@ -99,7 +99,7 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
     return uri;
     
   } catch (error) {
-    console.error('[imageUriToBase64] Error:', error);
+    console.log('ERROR [imageUriToBase64] Error:', error);
     const errorMsg = error instanceof Error ? error.message : String(error);
     throw new Error(`Failed to convert image: ${errorMsg}`);
   }

@@ -6,20 +6,21 @@
  */
 
 import ToastBanner from '@/components/generalMessage';
+import { useUser } from '@/context/usercontext';
 import { useSendShareRequest } from '@/hooks/useMealShare';
 import { listFamilyMembers } from '@/src/user/family';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface FamilyMember {
@@ -48,6 +49,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { user } = useUser();
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [members, setMembers] = useState<FamilyMember[]>([]);
@@ -102,7 +104,15 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
     try {
       setLoading(true);
       const data = await listFamilyMembers(familyId);
-      setMembers(data || []);
+      
+      // Filter out the current user from the list
+      const currentUserId = user?.id;
+      const filteredMembers = (data || []).filter((member: FamilyMember) => {
+        const memberId = member.user_id || member.id;
+        return memberId !== currentUserId;
+      });
+      
+      setMembers(filteredMembers);
     } catch (error) {
       console.error('Failed to load family members:', error);
       setToast({
@@ -216,7 +226,10 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             ) : members.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="people-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyText}>No family members found</Text>
+                <Text style={styles.emptyText}>No other family members available</Text>
+                <Text style={styles.emptySubtext}>
+                  Invite more family members to share meals with them
+                </Text>
               </View>
             ) : (
               members.map((member) => (
@@ -380,8 +393,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     marginTop: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  emptySubtext: {
+    marginTop: 8,
     fontSize: 14,
     color: '#9CA3AF',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   memberCard: {
     flexDirection: 'row',

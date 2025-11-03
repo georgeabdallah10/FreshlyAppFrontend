@@ -1,17 +1,17 @@
-import React, { useMemo, useRef, useCallback, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Animated,
   Easing,
-  Platform,
   LayoutAnimation,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
   UIManager,
+  View,
 } from "react-native";
-import * as Haptics from "expo-haptics";
-import { Ionicons } from "@expo/vector-icons";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "dessert" | string;
 
@@ -21,7 +21,7 @@ type Props = {
   mealType: MealType;
   iconName?: keyof typeof Ionicons.glyphMap; // e.g. "restaurant", "pizza", etc.
   onPress?: () => void;                // when user taps the card
-  onSave?: () => void;                 // when user taps Save Meal
+  onSave?: () => Promise<void>;        // when user taps Save Meal - returns promise
   maxIngredientsInline?: number;       // default 3
   disabled?: boolean;
 };
@@ -53,10 +53,24 @@ const RecipeItem: React.FC<Props> = ({
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
 
+  // Pretty label for meal type with safety & fallback
+  const mealTypeLabel = useMemo(() => {
+    const mt = (mealType ?? "").toString();
+    if (!mt) return "Meal";
+    return mt.charAt(0).toUpperCase() + mt.slice(1);
+  }, [mealType]);
+
   // Expand / collapse state for ingredients panel
   const [expanded, setExpanded] = useState(false);
   const [contentHeight, setContentHeight] = useState(0);
   const expandAnim = useRef(new Animated.Value(0)).current; // 0 collapsed, 1 expanded
+
+  // Save state and animations
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const saveScale = useRef(new Animated.Value(1)).current;
+  const saveOpacity = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(0)).current;
+  const errorShake = useRef(new Animated.Value(0)).current;
 
   const toggleExpand = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
@@ -95,10 +109,95 @@ const RecipeItem: React.FC<Props> = ({
     onPress?.();
   }, [onPress]);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
+    if (saveState !== 'idle' || !onSave) return;
+
     Haptics.selectionAsync().catch(() => {});
-    onSave?.();
-  }, [onSave]);
+    setSaveState('saving');
+
+    // Pulse animation while saving
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(saveScale, {
+          toValue: 0.95,
+          duration: 400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(saveScale, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+
+    try {
+      await onSave();
+      
+      // Success animation
+      setSaveState('success');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      
+      // Stop pulse and show checkmark
+      saveScale.stopAnimation(() => {
+        Animated.parallel([
+          Animated.spring(saveScale, {
+            toValue: 1.1,
+            friction: 6,
+            tension: 100,
+            useNativeDriver: true,
+          }),
+          Animated.spring(checkmarkScale, {
+            toValue: 1,
+            friction: 6,
+            tension: 100,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          // Fade out after showing success
+          setTimeout(() => {
+            Animated.timing(saveOpacity, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              // Reset to idle after fade
+              setTimeout(() => {
+                setSaveState('idle');
+                saveOpacity.setValue(1);
+                checkmarkScale.setValue(0);
+                saveScale.setValue(1);
+              }, 500);
+            });
+          }, 1200);
+        });
+      });
+    } catch (error) {
+      // Error animation
+      setSaveState('error');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+      
+      // Stop pulse and shake
+      saveScale.stopAnimation(() => {
+        saveScale.setValue(1);
+        Animated.sequence([
+          Animated.timing(errorShake, { toValue: 10, duration: 50, useNativeDriver: true }),
+          Animated.timing(errorShake, { toValue: -10, duration: 50, useNativeDriver: true }),
+          Animated.timing(errorShake, { toValue: 10, duration: 50, useNativeDriver: true }),
+          Animated.timing(errorShake, { toValue: -10, duration: 50, useNativeDriver: true }),
+          Animated.timing(errorShake, { toValue: 0, duration: 50, useNativeDriver: true }),
+        ]).start(() => {
+          // Reset to idle after error animation
+          setTimeout(() => {
+            setSaveState('idle');
+            errorShake.setValue(0);
+          }, 1500);
+        });
+      });
+    }
+  }, [onSave, saveState, saveScale, saveOpacity, checkmarkScale, errorShake]);
 
   const ingredientsLine = useMemo(() => {
     const shown = ingredients.slice(0, maxIngredientsInline);
@@ -147,7 +246,7 @@ const RecipeItem: React.FC<Props> = ({
                 </Text>
                 <View style={styles.pill}>
                   <Text style={styles.pillText}>
-                    {mealType[0]?.toUpperCase() + mealType.slice(1)}
+                    {mealTypeLabel}
                   </Text>
                 </View>
               </View>
@@ -203,15 +302,57 @@ const RecipeItem: React.FC<Props> = ({
         </View>
       </Animated.View>
 
-      <TouchableOpacity
-        style={styles.saveBtn}
-        onPress={handleSave}
-        activeOpacity={0.9}
-        disabled={disabled}
+      <Animated.View
+        style={{
+          transform: [
+            { scale: saveScale },
+            { translateX: errorShake },
+          ],
+          opacity: saveOpacity,
+        }}
       >
-        <Ionicons name="bookmark" size={16} color="#fff" />
-        <Text style={styles.saveText}>Save Meal</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.saveBtn,
+            saveState === 'saving' && styles.saveBtnLoading,
+            saveState === 'success' && styles.saveBtnSuccess,
+            saveState === 'error' && styles.saveBtnError,
+          ]}
+          onPress={handleSave}
+          activeOpacity={0.9}
+          disabled={disabled || saveState !== 'idle'}
+        >
+          {saveState === 'idle' && (
+            <>
+              <Ionicons name="bookmark" size={16} color="#fff" />
+              <Text style={styles.saveText}>Save Meal</Text>
+            </>
+          )}
+          {saveState === 'saving' && (
+            <>
+              <Ionicons name="hourglass-outline" size={16} color="#fff" />
+              <Text style={styles.saveText}>Saving...</Text>
+            </>
+          )}
+          {saveState === 'success' && (
+            <Animated.View
+              style={[
+                styles.saveSuccessContent,
+                { transform: [{ scale: checkmarkScale }] },
+              ]}
+            >
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.saveText}>Saved!</Text>
+            </Animated.View>
+          )}
+          {saveState === 'error' && (
+            <>
+              <Ionicons name="close-circle" size={16} color="#fff" />
+              <Text style={styles.saveText}>Failed - Try Again</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -286,12 +427,28 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.accent,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 6,
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     elevation: 3,
+  },
+  saveBtnLoading: {
+    backgroundColor: "#FD8100",
+    opacity: 0.8,
+  },
+  saveBtnSuccess: {
+    backgroundColor: COLORS.primary,
+  },
+  saveBtnError: {
+    backgroundColor: "#EF4444",
+  },
+  saveSuccessContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   chevronBtn: {
     padding: 4,

@@ -15,22 +15,42 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  LayoutAnimation,
+  Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
+
+type CategoryFilter = 'all' | 'meal_requests' | 'updates' | 'messages';
+
+// Enable LayoutAnimation on Android
+if (
+  Platform.OS === 'android' &&
+  (UIManager as any).setLayoutAnimationEnabledExperimental
+) {
+  (UIManager as any).setLayoutAnimationEnabledExperimental(true);
+}
 
 const NotificationsScreen = () => {
   const router = useRouter();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [category, setCategory] = useState<CategoryFilter>('all');
   const [toast, setToast] = useState<{
     visible: boolean;
     type: 'success' | 'error';
     message: string;
   }>({ visible: false, type: 'success', message: '' });
+
+  const handleCategoryChange = (newCategory: CategoryFilter) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setCategory(newCategory);
+  };
 
   // Queries
   const { data: allNotifications = [], isLoading, refetch, isRefetching } = useNotifications();
@@ -42,9 +62,40 @@ const NotificationsScreen = () => {
   const deleteNotification = useDeleteNotification();
   const deleteAllRead = useDeleteAllRead();
   const handleNotificationClick = useHandleNotificationClick();
+  
+  // Filter by read/unread first
+  const baseNotifications = filter === 'unread' ? unreadNotifications : allNotifications;
+  
+  // Then filter by category
+  const getFilteredNotifications = () => {
+    switch (category) {
+      case 'meal_requests':
+        return baseNotifications.filter(n => 
+          n.type === 'meal_share_request' || 
+          n.type === 'meal_share_accepted' || 
+          n.type === 'meal_share_declined'
+        );
+      case 'updates':
+        return baseNotifications.filter(n => n.type === 'system');
+      case 'messages':
+        return baseNotifications.filter(n => n.type === 'family');
+      case 'all':
+      default:
+        return baseNotifications;
+    }
+  };
 
-  const notifications = filter === 'unread' ? unreadNotifications : allNotifications;
+  const notifications = getFilteredNotifications();
   const unreadCount = unreadNotifications.length;
+  
+  // Count by category
+  const mealRequestsCount = allNotifications.filter(n => 
+    n.type === 'meal_share_request' || 
+    n.type === 'meal_share_accepted' || 
+    n.type === 'meal_share_declined'
+  ).length;
+  const updatesCount = allNotifications.filter(n => n.type === 'system').length;
+  const messagesCount = allNotifications.filter(n => n.type === 'family').length;
 
   const handleMarkAsRead = async (id: number) => {
     try {
@@ -232,7 +283,7 @@ const NotificationsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={[styles.filterText, filter === 'all' && styles.filterTextActive]}>
-            All ({allNotifications.length})
+            All
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -241,10 +292,84 @@ const NotificationsScreen = () => {
           activeOpacity={0.7}
         >
           <Text style={[styles.filterText, filter === 'unread' && styles.filterTextActive]}>
-            Unread {unreadCount > 0 && `(${unreadCount})`}
+            Unread
           </Text>
         </TouchableOpacity>
       </View>
+
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryScroll}
+        contentContainerStyle={styles.categoryContainer}
+      >
+        <Pressable
+          onPress={() => handleCategoryChange('all')}
+          style={({ pressed }) => [
+            styles.categoryTab,
+            category === 'all' && styles.categoryTabActive,
+            pressed && styles.categoryTabPressed,
+          ]}
+        >
+          <Text style={[styles.categoryText, category === 'all' && styles.categoryTextActive]}>
+            All
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleCategoryChange('meal_requests')}
+          style={({ pressed }) => [
+            styles.categoryTab,
+            category === 'meal_requests' && styles.categoryTabActive,
+            pressed && styles.categoryTabPressed,
+          ]}
+        >
+          <Text style={[styles.categoryText, category === 'meal_requests' && styles.categoryTextActive]}>
+            Meal Requests
+          </Text>
+          {mealRequestsCount > 0 && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{mealRequestsCount}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleCategoryChange('updates')}
+          style={({ pressed }) => [
+            styles.categoryTab,
+            category === 'updates' && styles.categoryTabActive,
+            pressed && styles.categoryTabPressed,
+          ]}
+        >
+          <Text style={[styles.categoryText, category === 'updates' && styles.categoryTextActive]}>
+            Updates
+          </Text>
+          {updatesCount > 0 && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{updatesCount}</Text>
+            </View>
+          )}
+        </Pressable>
+
+        <Pressable
+          onPress={() => handleCategoryChange('messages')}
+          style={({ pressed }) => [
+            styles.categoryTab,
+            category === 'messages' && styles.categoryTabActive,
+            pressed && styles.categoryTabPressed,
+          ]}
+        >
+          <Text style={[styles.categoryText, category === 'messages' && styles.categoryTextActive]}>
+            Messages
+          </Text>
+          {messagesCount > 0 && (
+            <View style={styles.categoryBadge}>
+              <Text style={styles.categoryBadgeText}>{messagesCount}</Text>
+            </View>
+          )}
+        </Pressable>
+      </ScrollView>
 
       <View style={styles.actionBar}>
         <TouchableOpacity
@@ -394,6 +519,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  filterContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F7F8FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterButtonActive: {
+    backgroundColor: '#E8F5E9',
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  filterTextActive: {
+    color: '#00A86B',
+  },
   actionBar: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -415,29 +568,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     color: '#6B7280',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F7F8FA',
-  },
-  filterButtonActive: {
-    backgroundColor: '#00A86B',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  filterTextActive: {
-    color: '#FFFFFF',
   },
   scrollView: {
     flex: 1,
@@ -521,6 +651,69 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  categoryScroll: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    maxHeight: 60,
+    flexGrow: 0,
+  },
+  categoryContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+  },
+  categoryTab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 22,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E9ECF2',
+    marginRight: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  categoryTabActive: {
+    backgroundColor: '#00A86B',
+    borderColor: '#00A86B',
+    shadowColor: '#00A86B',
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 4,
+  },
+  categoryTabPressed: {
+    transform: [{ scale: 0.97 }],
+    opacity: 0.92,
+  },
+  categoryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  categoryTextActive: {
+    color: '#FFFFFF',
+  },
+  categoryBadge: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 4,
+    minWidth: 20,
+    alignItems: 'center',
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#00A86B',
   },
 });
 

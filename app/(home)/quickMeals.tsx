@@ -42,8 +42,8 @@ type CurrentMeal = {
   mealType: string;
   iconName: string;
   ingredients: string[];
-  onPress: () => void;
-  onSave: () => void;
+  onPress: () => void | Promise<void>;
+  onSave: () => Promise<void>;
 };
 
 const COLORS = {
@@ -218,7 +218,7 @@ const QuickMealsCreateScreen: React.FC = () => {
     iconName: "",
     ingredients: [],
     onPress: () => {},
-    onSave: () => {},
+    onSave: async () => {},
   });
   const [showMealComponent, setshowMealComponent] = useState(false);
   
@@ -226,6 +226,11 @@ const QuickMealsCreateScreen: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  
+  // Loading state for meal generation
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const spinnerRotation = useRef(new Animated.Value(0)).current;
 
   // Cooldown timer effect
   useEffect(() => {
@@ -238,6 +243,39 @@ const QuickMealsCreateScreen: React.FC = () => {
       setIsButtonDisabled(false);
     }
   }, [cooldownRemaining, isButtonDisabled]);
+  
+  // Spinner rotation animation
+  useEffect(() => {
+    if (isGenerating) {
+      spinnerRotation.setValue(0);
+      Animated.loop(
+        Animated.timing(spinnerRotation, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.linear,
+          useNativeDriver: true,
+        })
+      ).start();
+    } else {
+      spinnerRotation.setValue(0);
+    }
+  }, [isGenerating, spinnerRotation]);
+  
+  // Progress simulator for loading state
+  useEffect(() => {
+    if (isGenerating) {
+      setGenerationProgress(0);
+      const interval = setInterval(() => {
+        setGenerationProgress((prev) => {
+          if (prev >= 95) return 95; // Cap at 95% until real completion
+          return prev + Math.random() * 15;
+        });
+      }, 500);
+      return () => clearInterval(interval);
+    } else {
+      setGenerationProgress(0);
+    }
+  }, [isGenerating]);
 
   // Start cooldown function
   const startCooldown = (seconds: number = 30) => {
@@ -350,99 +388,52 @@ Rules:
   const next = useCallback(() => {
     Haptics.selectionAsync();
     setPhase((p) => Math.min(p + 1, TOTAL_PHASES - 1));
-  }, []);
+    // Hide meal component when navigating forward (in case user is going through phases again)
+    if (showMealComponent) {
+      setshowMealComponent(false);
+    }
+  }, [showMealComponent]);
 
   const back = useCallback(() => {
     Haptics.selectionAsync();
-    if (phase === 0) router.back();
-    else setPhase((p) => Math.max(p - 1, 0));
-  }, [phase, router]);
-
-  async function handleSaveMeal(mealInput: any) {
-    if (isSubmitting || isButtonDisabled) return;
-
-    const meal = {
-      id: Date.now(),
-      name: mealInput.trim(),
-      image: mealInput.selectedEmoji,
-      calories: parseInt(mealInput.calories),
-      prepTime: mealInput.prepTime ? parseInt(mealInput.prepTime) : undefined,
-      cookTime: mealInput.cookTime ? parseInt(mealInput.cookTime) : undefined,
-      totalTime: mealInput.totalTime || undefined,
-      mealType: mealInput.mealtType,
-      cuisine: mealInput.cuisine.trim() || undefined,
-      macros: {
-        protein: mealInput.protein ? parseInt(mealInput.protein) : 0,
-        fats: mealInput.fats ? parseInt(mealInput.fats) : 0,
-        carbs: mealInput.carbs ? parseInt(mealInput.carbs) : 0,
-      },
-      difficulty: mealInput?.difficulty,
-      servings: mealInput.servings ? parseInt(mealInput.servings) : undefined,
-      ingredients: mealInput.ingredients
-        .filter((i: any) => i.trim())
-        .map((item: any, index: any) => ({
-          id: index + 1,
-          name: item.trim(),
-          amount: 1,
-          unit: 'unit',
-        })),
-      instructions: mealInput.instructions.filter((i: any) => i.trim()),
-      notes: mealInput.notes.trim() || undefined,
-      isFavorite: false,
-    };
-
-    setIsSubmitting(true);
-    try {
-      const res = await createMealForSignleUser(meal);
-      console.log('Meal saved successfully:', res);
-    } catch (error: any) {
-      startCooldown(30);
-      console.error('Failed to save meal:', error);
-      
-      let errorMessage = "Unable to save meal. ";
-      const errorStr = error.message?.toLowerCase() || "";
-      
-      if (errorStr.includes("network") || errorStr.includes("fetch")) {
-        errorMessage = "No internet connection. Please check your network and try again.";
-      } else if (errorStr.includes("timeout")) {
-        errorMessage = "Request timed out. Please try again.";
-      } else if (errorStr.includes("401")) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (errorStr.includes("409")) {
-        errorMessage = "A meal with this name already exists. Please use a different name.";
-      } else if (errorStr.includes("422")) {
-        errorMessage = "Invalid meal data. Please check all required fields.";
-      } else if (errorStr.includes("429")) {
-        startCooldown(120);
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (errorStr.includes("500") || errorStr.includes("503")) {
-        errorMessage = "Server error. Please try again later.";
-      } else {
-        errorMessage = "Failed to save meal. Please try again.";
+    if (phase === 0) {
+      router.back();
+    } else {
+      setPhase((p) => Math.max(p - 1, 0));
+      // Hide meal component when navigating back through phases
+      if (showMealComponent) {
+        setshowMealComponent(false);
       }
-      
-      alert(errorMessage);
-    } finally {
-      setIsSubmitting(false);
     }
-  }
+  }, [phase, router, showMealComponent]);
 
   const finish = useCallback(async () => {
+    if (isGenerating || isButtonDisabled) {
+      if (cooldownRemaining > 0) {
+        alert(`Please wait ${cooldownRemaining} seconds before trying again.`);
+      }
+      return;
+    }
+
     Haptics.selectionAsync();
-    const payload = {
-      ingredientSource: form.ingredientSource,
-      budget: form.budget,
-      mealType: form.mealType,
-      goal: form.goal,
-      speed: form.speed,
-      difficulty: form.difficulty,
-      cookingMethods: form.cookingMethods,
-      includeIngredients: form.includeIngredients,
-      avoidIngredients: form.avoidIngredients,
-      servings: form.servings,
-    };
-    // Build a compact inputs block
-    const inputsBlock = `preferences_json:
+    setIsGenerating(true);
+    setshowMealComponent(false); // Hide previous meal if any
+    
+    try {
+      const payload = {
+        ingredientSource: form.ingredientSource,
+        budget: form.budget,
+        mealType: form.mealType,
+        goal: form.goal,
+        speed: form.speed,
+        difficulty: form.difficulty,
+        cookingMethods: form.cookingMethods,
+        includeIngredients: form.includeIngredients,
+        avoidIngredients: form.avoidIngredients,
+        servings: form.servings,
+      };
+      // Build a compact inputs block
+      const inputsBlock = `preferences_json:
 ${JSON.stringify(prefrences)}
 
 pantry_json:
@@ -452,8 +443,8 @@ choices_json:
 ${JSON.stringify(payload)}
 `;
 
-    // SYSTEM: only hard, timeless rules
-    const system_prompt = `
+      // SYSTEM: only hard, timeless rules
+      const system_prompt = `
 You are Freshly AI professional chef.Make sure to have a real meals that is eatable and delicious .Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods. No prose, no markdown, no comments. provide all the follwoing informaiton about the meal you are about to create,   
   name,
   icon,
@@ -471,29 +462,246 @@ You are Freshly AI professional chef.Make sure to have a real meals that is eata
   cookingTools,
   notes,
 `;
-    // USER: inputs + JSON schema directive
-    const user_prompt = `${inputsBlock}
+      // USER: inputs + JSON schema directive
+      const user_prompt = `${inputsBlock}
 ${JSON_DIRECTIVE}`;
 
-    // Call API
-    const res = await askAI({ system: system_prompt, prompt: user_prompt });
-    const test = JSON.parse(res);
-    console.log(test);
-    const ingredients: string[] = Array.isArray(test.ingredients)
-      ? test.ingredients.map((s: any) => String(s).trim()).filter(Boolean)
-      : [];
-    setCurrentMeal({
-      name: test.name,
-      mealType: test.mealType,
-      iconName: test.iconName,
-      ingredients: ingredients,
-      onPress: () => console.log("pressed"),
-      onSave: () => console.log("Leave"),
-    });
-    setshowMealComponent(true);
-    await handleSaveMeal(test)
+      // Call API with timeout
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT')), 45000)
+      );
+      
+      const apiPromise = askAI({ system: system_prompt, prompt: user_prompt });
+      
+      const res = await Promise.race([apiPromise, timeoutPromise]);
+
+      let parsed: any = null;
+      try {
+        parsed = typeof res === 'string' ? JSON.parse(res) : res;
+      } catch (e) {
+        console.log('[QuickMeals] Non-JSON AI response:', res);
+        alert('Sorry, the meal generator returned an unexpected format. Please try again.');
+        startCooldown(30);
+        return;
+      }
+
+      // Log the entire AI response for debugging
+      console.log('[QuickMeals] Full AI Response:', JSON.stringify(parsed, null, 2));
+      console.log('[QuickMeals] AI Response name:', parsed?.name);
+      console.log('[QuickMeals] AI Response ingredients:', parsed?.ingredients);
+
+      // The AI returns a RecipeCard structure, we need to extract the flat fields
+      // RecipeCard has: headerSummary, ingredients: IngredientSection[], instructions: string[][]
+      
+      // Extract name from headerSummary or fallback
+      const name = String(parsed?.name || parsed?.headerSummary || 'Untitled Meal');
+      const mt = String(parsed?.mealType || form.mealType || 'meal');
+      const iconName = String(parsed?.icon || parsed?.iconName || 'restaurant');
+
+      // Handle ingredients - RecipeCard format has ingredients as IngredientSection[]
+      let ingredients: string[] = [];
+      if (Array.isArray(parsed?.ingredients)) {
+        // RecipeCard format: ingredients is array of { title: string, items: string[] }
+        ingredients = parsed.ingredients.flatMap((section: any) => {
+          if (typeof section === 'object' && section !== null && Array.isArray(section.items)) {
+            // Extract items from each section
+            return section.items.map((item: any) => String(item).trim()).filter(Boolean);
+          } else if (typeof section === 'object' && section !== null) {
+            // Old format: array of objects with name property
+            return String(section.name || section.ingredient || '').trim();
+          } else {
+            // Simple string format
+            return String(section).trim();
+          }
+        }).filter(Boolean);
+      }
+      
+      // Handle instructions - RecipeCard format has instructions as string[][]
+      let instructions: string[] = [];
+      if (Array.isArray(parsed?.instructions)) {
+        instructions = parsed.instructions.flatMap((step: any) => {
+          if (Array.isArray(step)) {
+            // RecipeCard format: each step is an array of sentences
+            return step.map((s: any) => String(s).trim()).filter(Boolean).join(' ');
+          }
+          // Simple string format
+          return String(step).trim();
+        }).filter(Boolean);
+      }
+      
+      console.log('[QuickMeals] Processed name:', name);
+      console.log('[QuickMeals] Processed ingredients:', ingredients);
+      console.log('[QuickMeals] Processed instructions:', instructions);
+
+      // Prepare meal data for saving
+      const mealData = {
+        name,
+        selectedEmoji: iconName,
+        calories: parsed?.calories ?? 0,
+        prepTime: parsed?.prepTime,
+        cookTime: parsed?.cookTime,
+        totalTime: parsed?.totalTime,
+        mealtType: mt,
+        cuisine: parsed?.cuisine ?? '',
+        difficulty: parsed?.difficulty ?? form.difficulty ?? 'easy',
+        servings: parsed?.servings ?? form.servings ?? 1,
+        ingredients: ingredients,
+        instructions: instructions,
+        notes: parsed?.finalNote ?? parsed?.notes ?? '',
+        protein: parsed?.macros?.protein ?? 0,
+        fats: parsed?.macros?.fats ?? 0,
+        carbs: parsed?.carbs ?? parsed?.macros?.carbs ?? 0,
+      };
+
+      setCurrentMeal({
+        name,
+        mealType: mt,
+        iconName,
+        ingredients,
+        onPress: async () => { console.log('pressed'); },
+        onSave: async () => {
+          // This will be called when user taps "Save Meal"
+          await handleSaveMeal(mealData);
+        },
+      });
+      
+      setGenerationProgress(100);
+      setshowMealComponent(true);
+    } catch (error: any) {
+      console.error('[QuickMeals] Generation error:', error);
+      
+      let errorMessage = 'Unable to generate meal. ';
+      const errorStr = error.message?.toLowerCase() || '';
+      
+      if (errorStr.includes('timeout')) {
+        errorMessage = 'Request timed out. The AI is taking too long. Please try again with simpler preferences.';
+        startCooldown(60);
+      } else if (errorStr.includes('network') || errorStr.includes('fetch')) {
+        errorMessage = 'No internet connection. Please check your network and try again.';
+        startCooldown(30);
+      } else if (errorStr.includes('401')) {
+        errorMessage = 'Session expired. Please log in again.';
+        startCooldown(30);
+      } else if (errorStr.includes('429')) {
+        errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
+        startCooldown(120);
+      } else if (errorStr.includes('500') || errorStr.includes('503')) {
+        errorMessage = 'Server error. Please try again in a moment.';
+        startCooldown(45);
+      } else {
+        errorMessage = 'Something went wrong generating your meal. Please try again.';
+        startCooldown(30);
+      }
+      
+      alert(errorMessage);
+      setshowMealComponent(false);
+    } finally {
+      setIsGenerating(false);
+      setGenerationProgress(0);
+    }
     // eslint-disable-next-line no-console
-  }, [form]);
+  }, [form, prefrences, pantryItems, JSON_DIRECTIVE, isGenerating, isButtonDisabled, cooldownRemaining]);
+
+  async function handleSaveMeal(mealInput: any) {
+    if (isSubmitting || isButtonDisabled) {
+      throw new Error('Already saving or on cooldown');
+    }
+
+    const normalizeMealType = (mt?: string) => {
+      const s = String(mt || '').toLowerCase();
+      const map: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Dessert'> = {
+        breakfast: 'Breakfast',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        snack: 'Snack',
+        dessert: 'Dessert',
+      };
+      return map[s] || 'Dinner';
+    };
+
+    const normalizeDifficulty = (d?: string) => {
+      const s = String(d || '').toLowerCase();
+      const map: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
+        easy: 'Easy',
+        medium: 'Medium',
+        hard: 'Hard',
+      };
+      return map[s] || 'Easy';
+    };
+
+    const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
+
+    const meal = {
+      id: Date.now(),
+      name: safeName,
+      image: mealInput?.selectedEmoji ?? '🍽️',
+      calories: parseInt(String(mealInput?.calories ?? 0)),
+      prepTime: mealInput?.prepTime ? parseInt(String(mealInput.prepTime)) : undefined,
+      cookTime: mealInput?.cookTime ? parseInt(String(mealInput.cookTime)) : undefined,
+      totalTime: mealInput?.totalTime ?? undefined,
+      mealType: normalizeMealType(mealInput?.mealtType ?? mealInput?.mealType),
+      cuisine: typeof mealInput?.cuisine === 'string' ? mealInput.cuisine.trim() : undefined,
+      macros: {
+        protein: mealInput?.protein ? parseInt(String(mealInput.protein)) : 0,
+        fats: mealInput?.fats ? parseInt(String(mealInput.fats)) : 0,
+        carbs: mealInput?.carbs ? parseInt(String(mealInput.carbs)) : 0,
+      },
+      difficulty: normalizeDifficulty(mealInput?.difficulty),
+      servings: mealInput?.servings ? parseInt(String(mealInput.servings)) : undefined,
+      ingredients: Array.isArray(mealInput?.ingredients)
+        ? mealInput.ingredients
+            .map((item: any) => ({
+              name: String(item).trim(),
+              amount: '1',
+              inPantry: false,
+            }))
+            .filter((i: any) => i.name)
+        : [],
+      instructions: Array.isArray(mealInput?.instructions)
+        ? mealInput.instructions.map((i: any) => String(i)).filter(Boolean)
+        : [],
+      notes: typeof mealInput?.notes === 'string' ? mealInput.notes.trim() : undefined,
+      isFavorite: false,
+    };
+
+    setIsSubmitting(true);
+    try {
+      const res = await createMealForSignleUser(meal as any);
+      console.log('[QuickMeals] Meal saved successfully:', res);
+      // Success - no alert needed, animation handles it
+    } catch (error: any) {
+      startCooldown(30);
+      console.error('[QuickMeals] Failed to save meal:', error);
+      
+      let errorMessage = 'Unable to save meal. ';
+      const errorStr = error.message?.toLowerCase() || '';
+      
+      if (errorStr.includes('network') || errorStr.includes('fetch')) {
+        errorMessage = 'No internet connection. Please check your network and try again.';
+      } else if (errorStr.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (errorStr.includes('401')) {
+        errorMessage = 'Session expired. Please log in again.';
+      } else if (errorStr.includes('409')) {
+        errorMessage = 'A meal with this name already exists. Please use a different name.';
+      } else if (errorStr.includes('422')) {
+        errorMessage = 'Invalid meal data. Please check all required fields.';
+      } else if (errorStr.includes('429')) {
+        startCooldown(120);
+        errorMessage = 'Too many requests. Please wait before trying again.';
+      } else if (errorStr.includes('500') || errorStr.includes('503')) {
+        errorMessage = 'Server error. Please try again later.';
+      } else {
+        errorMessage = 'Failed to save meal. Please try again.';
+      }
+      
+      // Show alert and throw error for animation
+      alert(errorMessage);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   // ---- Phases ----
   const Phase0: React.FC<{ animateKey: number }> = useCallback(
@@ -752,8 +960,9 @@ ${JSON_DIRECTIVE}`;
         <TouchableOpacity
           onPress={back}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          disabled={isGenerating}
         >
-          <Ionicons name="arrow-back" size={22} color={COLORS.sub} />
+          <Ionicons name="arrow-back" size={22} color={isGenerating ? "#CCC" : COLORS.sub} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Quick Meals</Text>
         <View style={{ width: 22 }} />
@@ -768,6 +977,7 @@ ${JSON_DIRECTIVE}`;
         contentContainerStyle={styles.scrollInner}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!isGenerating}
       >
         <View style={{ width: "100%" }}>
           {phase === 4 ? (
@@ -806,16 +1016,22 @@ ${JSON_DIRECTIVE}`;
       <View style={styles.footer}>
         <TouchableOpacity
           onPress={back}
-          style={[styles.btnGhost, phase === 0 && styles.btnGhostDisabled]}
-          disabled={phase === 0}
+          style={[
+            styles.btnGhost, 
+            (phase === 0 || isGenerating) && styles.btnGhostDisabled
+          ]}
+          disabled={phase === 0 || isGenerating}
         >
           <Ionicons
             name="chevron-back"
             size={18}
-            color={phase === 0 ? "#B8C1C7" : COLORS.primary}
+            color={phase === 0 || isGenerating ? "#B8C1C7" : COLORS.primary}
           />
           <Text
-            style={[styles.btnGhostText, phase === 0 && { color: "#B8C1C7" }]}
+            style={[
+              styles.btnGhostText, 
+              (phase === 0 || isGenerating) && { color: "#B8C1C7" }
+            ]}
           >
             Back
           </Text>
@@ -823,14 +1039,63 @@ ${JSON_DIRECTIVE}`;
 
         <TouchableOpacity
           onPress={() => (phase === TOTAL_PHASES - 1 ? finish() : next())}
-          style={styles.btnSolid}
+          style={[
+            styles.btnSolid,
+            (isGenerating || isButtonDisabled) && { opacity: 0.6 }
+          ]}
+          disabled={isGenerating || isButtonDisabled}
         >
           <Text style={styles.btnSolidText}>
-            {phase === TOTAL_PHASES - 1 ? "Generate Meal" : "Next"}
+            {phase === TOTAL_PHASES - 1 
+              ? (isGenerating ? "Generating..." : "Generate Meal")
+              : "Next"}
           </Text>
           <Ionicons name="chevron-forward" size={18} color="#fff" />
         </TouchableOpacity>
       </View>
+      
+      {/* Loading Overlay */}
+      {isGenerating && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <View style={styles.loadingSpinnerContainer}>
+              <Animated.View 
+                style={[
+                  styles.loadingSpinner,
+                  {
+                    transform: [{
+                      rotate: spinnerRotation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '360deg'],
+                      }),
+                    }],
+                  },
+                ]} 
+              />
+            </View>
+            <Text style={styles.loadingTitle}>Creating Your Meal</Text>
+            <Text style={styles.loadingSubtitle}>
+              Our AI chef is crafting the perfect recipe...
+            </Text>
+            <View style={styles.progressBarContainer}>
+              <View style={styles.progressBarTrack}>
+                <View 
+                  style={[
+                    styles.progressBarFill, 
+                    { width: `${Math.min(generationProgress, 100)}%` }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {Math.round(Math.min(generationProgress, 100))}%
+              </Text>
+            </View>
+            <Text style={styles.loadingHint}>
+              This may take up to 45 seconds
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -1083,6 +1348,86 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#A7B0B5",
     letterSpacing: 1,
+  },
+  
+  // Loading overlay styles
+  loadingOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 9999,
+  },
+  loadingCard: {
+    backgroundColor: COLORS.bg,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center",
+    width: "85%",
+    maxWidth: 360,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  loadingSpinnerContainer: {
+    marginBottom: 24,
+  },
+  loadingSpinner: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 4,
+    borderColor: "#E8F5E9",
+    borderTopColor: COLORS.primary,
+  },
+  loadingTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: COLORS.text,
+    textAlign: "center",
+    marginBottom: 8,
+  },
+  loadingSubtitle: {
+    fontSize: 15,
+    color: COLORS.sub,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  progressBarContainer: {
+    width: "100%",
+    alignItems: "center",
+    gap: 8,
+  },
+  progressBarTrack: {
+    width: "100%",
+    height: 8,
+    backgroundColor: "#E8F5E9",
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: COLORS.primary,
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  loadingHint: {
+    fontSize: 12,
+    color: COLORS.sub,
+    textAlign: "center",
+    marginTop: 16,
+    opacity: 0.7,
   },
 });
 

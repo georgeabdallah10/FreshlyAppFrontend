@@ -5,6 +5,7 @@ import { useUser } from "@/context/usercontext";
 import { getCurrentUser } from "@/src/auth/auth";
 import { getAuthToken } from "@/src/client/apiClient";
 import { uploadAvatarViaProxy } from "@/src/user/uploadViaBackend";
+import { Storage } from "@/src/utils/storage";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -17,7 +18,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-import { Storage } from "@/src/utils/storage";
 
 
 
@@ -98,6 +98,15 @@ export const SetPfp = () => {
       console.log('[setPfp] Checking for auth token...');
       const token = await Storage.getItem("access_token")
       console.log('[setPfp] Token exists:', token);
+
+      // Ensure apiClient (which reads AsyncStorage) can see the token
+      try {
+        const clientToken = await getAuthToken();
+        if (!clientToken && token) {
+          await Storage.setItem("access_token", token);
+          console.log('[setPfp] Mirrored token to AsyncStorage for apiClient');
+        }
+      } catch {}
       
       // No token means user is not logged in - don't spam the backend
       if (!token) {
@@ -534,7 +543,7 @@ export const SetPfp = () => {
 
   const renderCapturedScreen = () => (
     <View style={styles.content}>
-      <Text style={styles.title}>Face ID Verification</Text>
+      <Text style={styles.title}>Profile Picture is set!</Text>
       <Text style={styles.subtitle}>
         Please put your phone in front{"\n"}of your face.
       </Text>

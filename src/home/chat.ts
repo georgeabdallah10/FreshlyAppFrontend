@@ -1,4 +1,3 @@
-
 // api/home/chat.ts  (React Native frontend)
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from "../env/baseUrl";
@@ -73,6 +72,10 @@ export async function sendMessage({
   console.log('Sending message to:', `${baseUrl}/chat`);
   console.log('Token exists:', !!token);
   
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
+  
   try {
     const resp = await fetch(`${baseUrl}/chat`, {
       method: "POST",
@@ -81,8 +84,10 @@ export async function sendMessage({
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify({ prompt, system, conversation_id: conversationId }),
+      signal: controller.signal,
     });
     
+    clearTimeout(timeoutId);
     console.log('Response status:', resp.status);
     console.log('Response headers:', resp.headers);
     
@@ -92,7 +97,14 @@ export async function sendMessage({
       throw new Error(`HTTP ${resp.status}: ${errorText}`);
     }
     return await resp.json();
-  } catch (error) {
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      console.log('ERROR [Chat] Request timed out after 50 seconds');
+      throw new Error('TIMEOUT');
+    }
+    
     console.log('ERROR [Chat] Fetch error:', error);
     throw error;
   }

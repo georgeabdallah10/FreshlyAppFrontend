@@ -70,12 +70,33 @@ const FamilyManagementScreen = () => {
       setFamilyData(normalizedFamily);
       const rawMembers = await listFamilyMembers(Number(fam.id));
       const normalizedMembers: FamilyMember[] = (rawMembers ?? []).map((m: any) => {
+        // Try multiple paths for user data
         const u = m.user ?? {};
+        
+        // Check if this is the owner
+        const isOwner = m.is_owner || m.role === "owner";
+        const userId = u.id ?? m.user_id ?? m.id ?? "";
+        
+        // For the owner, fallback to current user data if available
+        let name = u.display_name ?? u.full_name ?? u.name ?? "";
+        let email = u.email ?? "";
+        let phone = u.phone ?? u.phone_number ?? "";
+        
+        // If data is missing and this is the current user (owner), use context
+        if (isOwner && String(userId) === String(user?.id)) {
+          name = name || user?.name || "Owner";
+          email = email || user?.email || "";
+          phone = phone || user?.phone_number || "";
+        }
+        
+        // Final fallback
+        if (!name) name = "Unknown";
+        
         return {
-          id: String(u.id ?? m.user_id ?? m.id ?? ""),
-          name: u.display_name ?? u.full_name ?? u.name ?? "Unknown",
-          email: u.email ?? "",
-          phone: u.phone ?? "",
+          id: String(userId),
+          name,
+          email,
+          phone,
           status: (m.status ?? "active") as MemberStatus,
           role: (m.role ?? (m.is_owner ? "owner" : "member")) as UserRole,
           joinedAt: m.created_at ?? m.joined_at ?? "",
@@ -111,13 +132,29 @@ const FamilyManagementScreen = () => {
       const rawMembers = await listFamilyMembers(Number(familyData.id));
       const normalizedMembers: FamilyMember[] = (rawMembers ?? []).map((m: any) => {
         const u = m.user ?? {};
+        const isOwner = m.is_owner || m.role === "owner";
+        const userId = u.id ?? m.user_id ?? m.id ?? "";
+        
+        let name = u.display_name ?? u.full_name ?? u.name ?? "";
+        let email = u.email ?? "";
+        let phone = u.phone ?? u.phone_number ?? "";
+        
+        // If this is the current user (owner), use context data
+        if (isOwner && String(userId) === String(user?.id)) {
+          name = name || user?.name || "Owner";
+          email = email || user?.email || "";
+          phone = phone || user?.phone_number || "";
+        }
+        
+        if (!name) name = "Unknown";
+        
         return {
-          id: String(u.id ?? m.user_id ?? m.id ?? ""),
-          name: u.display_name ?? u.full_name ?? u.name ?? "Unknown",
-          email: u.email ?? "",
-          phone: u.phone ?? "",
+          id: String(userId),
+          name,
+          email,
+          phone,
           status: (m.status ?? "active") as MemberStatus,
-          role: (m.role ?? (m.is_owner ? "owner" : m.is_owner ?"member" : "user")) as UserRole,
+          role: (m.role ?? (m.is_owner ? "owner" : "member")) as UserRole,
           joinedAt: m.created_at ?? m.joined_at ?? "",
         };
       });

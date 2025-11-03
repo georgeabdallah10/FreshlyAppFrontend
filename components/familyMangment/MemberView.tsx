@@ -10,7 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -38,11 +38,49 @@ const MemberView: React.FC<MemberViewProps> = ({
   onLeaveFamily,
 }) => {
   const router = useRouter();
+  const {user} = useUser(); // Get user context first
   const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [localMembers, setLocalMembers] = useState<FamilyMember[]>(members ?? []);
+  
+  // Normalize members if provided - wrapped in useCallback to prevent infinite loops
+  const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
+    return (raw ?? []).map((m: any) => {
+      // Try multiple paths for user data
+      const u = m.user ?? {};
+      
+      // Check if this member is the owner
+      const isOwner = m.is_owner || m.role === "owner";
+      const userId = u.id ?? m.user_id ?? m.id ?? "";
+      
+      // Try to get name from multiple sources
+      let name = u.display_name ?? u.full_name ?? u.name ?? m.name ?? "";
+      let email = u.email ?? m.email ?? "";
+      let phone = u.phone ?? u.phone_number ?? m.phone ?? "";
+      
+      // If this is the owner and matches current user, use user context as fallback
+      if (isOwner && String(userId) === String(user?.id)) {
+        name = name || user?.name || (user as any)?.display_name || (user as any)?.full_name || "";
+        email = email || user?.email || "";
+        phone = phone || (user as any)?.phone_number || (user as any)?.phone || "";
+      }
+      
+      // Final fallback
+      if (!name) name = "Unknown User";
+      
+      return {
+        id: String(userId),
+        name,
+        email: email || "",
+        phone: phone || "",
+        status: (m.status ?? "active") as FamilyMember["status"],
+        role: (m.role ?? (m.is_owner ? "owner" : "member")) as FamilyMember["role"],
+        joinedAt: m.created_at ?? m.joined_at ?? "",
+      } as FamilyMember;
+    });
+  }, [user]);
+  
+  const [localMembers, setLocalMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(false);
   const [inviteCode, setInviteCode] = useState<string | null>(familyData?.inviteCode ?? (familyData as any)?.invite_code ?? null);
-  const {user} = useUser();
   
   // Get pending meal share request count
   const { data: pendingCount = 0 } = usePendingRequestCount();
@@ -85,7 +123,8 @@ const MemberView: React.FC<MemberViewProps> = ({
     try {
       setLoading(true);
       const data = await listFamilyMembers(Number(familyData.id));
-      setLocalMembers(data || []);
+      // Normalize backend shape -> UI shape
+      setLocalMembers(normalizeMembers(data || []));
     } catch (e) {
       console.warn("Failed to load members:", e);
     } finally {
@@ -104,6 +143,13 @@ const MemberView: React.FC<MemberViewProps> = ({
       console.warn("Failed to load invite code:", e);
     }
   };
+
+  // Initialize members from props on mount
+  useEffect(() => {
+    if (members && members.length > 0) {
+      setLocalMembers(normalizeMembers(members));
+    }
+  }, [members, normalizeMembers]);
 
   useEffect(() => {
     fetchMembers();
@@ -196,20 +242,6 @@ const MemberView: React.FC<MemberViewProps> = ({
           <Text style={styles.familyMemberCount}>
             {familyData.memberCount} Members
           </Text>
-
-          <TouchableOpacity
-            style={styles.requestsButton}
-            onPress={() => router.push("/(home)/mealShareRequests")}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="restaurant-outline" size={20} color="#007AFF" />
-            <Text style={styles.requestsButtonText}>Meal Requests</Text>
-            {pendingCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{pendingCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         {inviteCode ? (
@@ -245,7 +277,7 @@ const MemberView: React.FC<MemberViewProps> = ({
               <View style={styles.memberLeft}>
                 <View style={styles.memberAvatar}>
                   <Text style={styles.memberInitial}>
-                    {member.name}
+                    {member.name.charAt(0).toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.memberInfo}>
@@ -253,14 +285,14 @@ const MemberView: React.FC<MemberViewProps> = ({
                     <Text style={styles.memberName}>{member.name}</Text>
                     {member.role === "owner" && (
                       <View style={styles.ownerBadge}>
-                        <Ionicons name="create" size={12} color="#F59E0B" />
+                        <Ionicons name="star" size={12} color="#F59E0B" />
                         <Text style={styles.ownerBadgeText}>Owner</Text>
                       </View>
                     )}
                   </View>
                   <View style={styles.memberDetail}>
                     <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.email}</Text>
+                    <Text style={styles.detailText}>{member.email || "No email"}</Text>
                   </View>
                   <View style={styles.memberDetail}>
                     <Ionicons name="call-outline" size={14} color="#9CA3AF" />

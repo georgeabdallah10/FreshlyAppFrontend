@@ -1,20 +1,20 @@
 // ==================== screens/MealDetailScreen.tsx ====================
 import { useUser } from "@/context/usercontext";
 import {
-    deleteMealForSignleUser,
-    updateMealForSignleUser,
+  deleteMealForSignleUser,
+  updateMealForSignleUser,
 } from "@/src/user/meals";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
@@ -535,7 +535,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       </ScrollView>
 
       {/* Share Request Modal */}
-      {familyId && (
+      {familyId !== null && (
         <SendShareRequestModal
           visible={showShareModal}
           mealId={meal.id}

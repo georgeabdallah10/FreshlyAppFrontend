@@ -42,15 +42,59 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   onKickMember,
 }) => {
   const router = useRouter();
+  const {user} = useUser(); // Get user context first
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [localInviteCode, setLocalInviteCode] = useState(familyData.inviteCode);
+
+  // Normalize raw API members to the UI shape expected here
+  const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
+    return (raw ?? []).map((m: any) => {
+      // Try multiple paths for user data
+      const u = m.user ?? {};
+      
+      // If the user is the owner, they might be in the current user context
+      const isOwner = m.is_owner || m.role === "owner";
+      const userId = u.id ?? m.user_id ?? m.id ?? "";
+      
+      // For the owner, fallback to current user data if available
+      let name = u.display_name ?? u.full_name ?? u.name ?? "";
+      let email = u.email ?? "";
+      let phone = u.phone ?? u.phone_number ?? "";
+      
+      // If data is missing and this is the current user (owner), use context
+      if (isOwner && String(userId) === String(user?.id)) {
+        name = name || user?.name || "Owner";
+        email = email || user?.email || "";
+        phone = phone || user?.phone_number || "";
+      }
+      
+      // Final fallback
+      if (!name) name = "Unknown";
+      
+      return {
+        id: String(userId),
+        name,
+        email,
+        phone,
+        status: (m.status ?? "active") as FamilyMember["status"],
+        role: (m.role ?? (m.is_owner ? "owner" : "member")) as FamilyMember["role"],
+        joinedAt: m.created_at ?? m.joined_at ?? "",
+      } as FamilyMember;
+    });
+  }, [user]);
 
   const [localMembers, setLocalMembers] = useState<FamilyMember[]>(
     members ?? []
   );
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const {user} = useUser();
+  
+  // Keep local list in sync when parent provides normalized members
+  useEffect(() => {
+    if (members && members.length) {
+      setLocalMembers(members);
+    }
+  }, [members]);
   
   // Get pending meal share request count
   const { data: pendingCount = 0 } = usePendingRequestCount();
@@ -89,14 +133,15 @@ const OwnerView: React.FC<OwnerViewProps> = ({
     try {
       setLoadingMembers(true);
       const fetched = await listFamilyMembers(Number(familyData.id));
-      setLocalMembers(fetched);
+      // Normalize backend shape -> UI shape
+      setLocalMembers(normalizeMembers(fetched));
     } catch (e) {
       console.error("Failed to load members:", e);
       showToast("error", "Couldn't load members");
     } finally {
       setLoadingMembers(false);
     }
-  }, [familyData.id]);
+  }, [familyData.id, normalizeMembers]);
 
   useEffect(() => {
     // Load on mount and when family changes
@@ -282,20 +327,6 @@ const OwnerView: React.FC<OwnerViewProps> = ({
               <Ionicons name="share-outline" size={20} color="#10B981" />
               <Text style={styles.inviteButtonText}>Share Invite</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.requestsButton}
-              onPress={() => router.push("/(home)/mealShareRequests")}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="restaurant-outline" size={20} color="#007AFF" />
-              <Text style={styles.requestsButtonText}>Meal Requests</Text>
-              {pendingCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{pendingCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -309,12 +340,12 @@ const OwnerView: React.FC<OwnerViewProps> = ({
               <View style={styles.memberLeft}>
                 <View style={styles.memberAvatar}>
                   <Text style={styles.memberInitial}>
-                    {member.name}
+                    {(member.name?.trim?.()?.[0] ?? "?").toUpperCase()}
                   </Text>
                 </View>
                 <View style={styles.memberInfo}>
                   <View style={styles.memberNameRow}>
-                    <Text style={styles.memberName}>{member.name}</Text>
+                    <Text style={styles.memberName}>{member.name || "Unknown"}</Text>
                     {member.role === "owner" && (
                       <View style={styles.ownerBadge}>
                         <Ionicons name="create" size={12} color="#F59E0B" />
@@ -324,11 +355,11 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                   </View>
                   <View style={styles.memberDetail}>
                     <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.email}</Text>
+                    <Text style={styles.detailText}>{member.email || "—"}</Text>
                   </View>
                   <View style={styles.memberDetail}>
                     <Ionicons name="call-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.phone}</Text>
+                    <Text style={styles.detailText}>{member.phone || "—"}</Text>
                   </View>
                   <View style={styles.memberDetail}>
                     <View

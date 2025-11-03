@@ -37,13 +37,13 @@ const BottomNavigation = ({
   const inset = Math.max(0, safeBottom || 0);
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  const tabs = [ "+", "chat", "family", "profile"];
+  const tabs = ["+", "chat", "family", "profile"];
   const tabWidth = 48;
   const spacing = 24; // Approximate spacing between tabs
   const router = useRouter();
   const segmants = useSegments() as string[];
   const [quickAddModal, setQuickAddModal] = useState(false);
-  
+
   // Get pending meal share request count
   const { data: pendingCount = 0 } = usePendingRequestCount();
 
@@ -172,7 +172,7 @@ const BottomNavigation = ({
               {pendingCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationText}>
-                    {pendingCount > 9 ? '9+' : pendingCount}
+                    {pendingCount > 9 ? "9+" : pendingCount}
                   </Text>
                 </View>
               )}
@@ -260,25 +260,26 @@ const HomeDashboard = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton} 
+        <TouchableOpacity
+          style={styles.menuButton}
           activeOpacity={0.6}
           onPress={() => router.push("/(home)/faq")}
         >
           <View style={styles.menuIcon}>
-          <Image
-            source={require("../../assets/icons/q&a.png")}
-            style={styles.menuCardIcon}
-            resizeMode="contain"
-          />
+            <Image
+              source={require("../../assets/icons/q&a.png")}
+              style={styles.menuCardIcon}
+              resizeMode="contain"
+            />
           </View>
         </TouchableOpacity>
-
-        <NotificationBell
-          iconSize={24}
-          iconColor="#1F2937"
-          badgeColor="#FF3B30"
-        />
+        <TouchableOpacity style={styles.notificationButton} onPress={() =>  router.push("/(home)/notifications")}>
+          <NotificationBell
+            iconSize={24}
+            iconColor="#1F2937"
+            badgeColor="#FF3B30"
+          />
+        </TouchableOpacity> 
       </View>
 
       <ScrollView
@@ -288,7 +289,7 @@ const HomeDashboard = () => {
         {/* Welcome Text */}
         <Text style={styles.welcomeText}>
           <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text> {"\n"}
-          <Text style={{ color: "#FD8100" }}>Healthier Living.</Text> 
+          <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
         </Text>
 
         {/* Menu Grid */}

@@ -724,46 +724,34 @@ Rules:
       }
     };
 
-    if (Platform.OS === 'web') {
-      // For Web, use browser prompt
-      const newTitle = typeof window !== 'undefined' 
-        ? window.prompt('Enter new title for this conversation:', currentTitle)
-        : null;
-      
-      if (newTitle) {
-        await performRename(newTitle);
+    // For iOS/Android, use TextInput in an Alert-style modal
+    const newTitle = await new Promise<string | null>((resolve) => {
+      if (Platform.OS === 'ios') {
+        // iOS supports Alert.prompt
+        const Alert = require('react-native').Alert;
+        Alert.prompt(
+          'Rename Conversation',
+          'Enter new title:',
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
+            {
+              text: 'Save',
+              onPress: (text?: string) => resolve(text || null),
+            },
+          ],
+          'plain-text',
+          currentTitle
+        );
+      } else {
+        // Android doesn't support Alert.prompt, fallback to a basic approach
+        // In a production app, you'd create a custom modal with TextInput
+        showToast('info', 'Rename feature requires custom modal on Android');
+        resolve(null);
       }
-    } else {
-      // For iOS/Android, use TextInput in an Alert-style modal
-      // For now, use a simple prompt approach
-      const newTitle = await new Promise<string | null>((resolve) => {
-        if (Platform.OS === 'ios') {
-          // iOS supports Alert.prompt
-          const Alert = require('react-native').Alert;
-          Alert.prompt(
-            'Rename Conversation',
-            'Enter new title:',
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve(null) },
-              {
-                text: 'Save',
-                onPress: (text?: string) => resolve(text || null),
-              },
-            ],
-            'plain-text',
-            currentTitle
-          );
-        } else {
-          // Android doesn't support Alert.prompt, fallback to a basic approach
-          // In a production app, you'd create a custom modal with TextInput
-          showToast('info', 'Rename feature requires custom modal on Android');
-          resolve(null);
-        }
-      });
-      
-      if (newTitle) {
-        await performRename(newTitle);
-      }
+    });
+    
+    if (newTitle) {
+      await performRename(newTitle);
     }
   };
 

@@ -1,7 +1,6 @@
 
 // api/home/chat.ts  (React Native frontend)
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
 import { BASE_URL } from "../env/baseUrl";
 
 // Types for chat API
@@ -26,20 +25,10 @@ export type ChatResponse = {
   message_id: number;
 };
 
-// Get auth token from appropriate storage
+// Get auth token from AsyncStorage
 async function getAuthToken(): Promise<string | null> {
   try {
-    if (Platform.OS === 'web') {
-      // Web: Check sessionStorage first, then localStorage as fallback
-      const sessionToken = sessionStorage.getItem('access_token');
-      if (sessionToken) return sessionToken;
-      
-      const localToken = localStorage.getItem('access_token');
-      return localToken;
-    } else {
-      // Mobile: Use AsyncStorage
-      return await AsyncStorage.getItem('access_token');
-    }
+    return await AsyncStorage.getItem('access_token');
   } catch (error) {
     console.error('Error retrieving auth token:', error);
     return null;

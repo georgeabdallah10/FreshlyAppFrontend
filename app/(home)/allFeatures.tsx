@@ -1,25 +1,23 @@
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Platform,
-  Linking,
-  Button,
-  TouchableOpacity,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import Animated, {
-  FadeInUp,
-  FadeOut,
-  Layout,
-  Easing,
+    Easing,
+    FadeInUp,
+    FadeOut,
+    Layout,
 } from "react-native-reanimated";
-import { useRouter } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Feature = {
   id: string;
@@ -362,9 +360,7 @@ export default function FreshlyFeaturesScreen() {
           <CTAButton
             onPress={() => {
               // Example: open a marketing page or navigate to onboarding
-              if (Platform.OS !== "web") {
-                Linking.openURL("https://example.com/freshly"); // replace with your deep link or route
-              }
+              Linking.openURL("https://example.com/freshly"); // replace with your deep link or route
             }}
           />
         </View>

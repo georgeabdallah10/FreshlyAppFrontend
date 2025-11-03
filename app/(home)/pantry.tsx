@@ -289,13 +289,7 @@ const PantryDashboard = () => {
   };
 
   const openScanner = async () => {
-    // Web platform: barcode scanning not available
-    if (Platform.OS === 'web') {
-      showToast('info', 'Barcode scanning is not available on web browsers. Please use the mobile app.');
-      return;
-    }
-    
-    // Native: Request camera permission for expo-camera
+    // Request camera permission for expo-camera
     if (!perm) {
       const req = await requestPermission();
       if (!req?.granted) {

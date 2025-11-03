@@ -16,7 +16,6 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
-import { Platform } from 'react-native';
 import { BASE_URL } from '../env/baseUrl';
 import { supabase } from '../supabase/client';
 
@@ -43,14 +42,7 @@ export interface RetryConfig {
 
 async function getAuthToken(): Promise<string | null> {
   try {
-    if (Platform.OS === 'web') {
-      const sessionToken = sessionStorage.getItem('access_token');
-      if (sessionToken) return sessionToken;
-      const localToken = localStorage.getItem('access_token');
-      return localToken;
-    } else {
-      return await AsyncStorage.getItem('access_token');
-    }
+    return await AsyncStorage.getItem('access_token');
   } catch (error) {
     console.error('[API Client] Error retrieving auth token:', error);
     return null;
@@ -59,11 +51,7 @@ async function getAuthToken(): Promise<string | null> {
 
 async function setAuthToken(token: string): Promise<void> {
   try {
-    if (Platform.OS === 'web') {
-      sessionStorage.setItem('access_token', token);
-    } else {
-      await AsyncStorage.setItem('access_token', token);
-    }
+    await AsyncStorage.setItem('access_token', token);
   } catch (error) {
     console.error('[API Client] Error setting auth token:', error);
   }
@@ -71,12 +59,7 @@ async function setAuthToken(token: string): Promise<void> {
 
 async function clearAuthToken(): Promise<void> {
   try {
-    if (Platform.OS === 'web') {
-      sessionStorage.removeItem('access_token');
-      localStorage.removeItem('access_token');
-    } else {
-      await AsyncStorage.removeItem('access_token');
-    }
+    await AsyncStorage.removeItem('access_token');
   } catch (error) {
     console.error('[API Client] Error clearing auth token:', error);
   }

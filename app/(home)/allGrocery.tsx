@@ -138,86 +138,28 @@ const AllGroceryScanner = () => {
   // Open camera for image capture
   const openImageCapture = async (scanType: ScanType) => {
     try {
-      if (Platform.OS === 'web') {
-        // iOS Safari camera workaround: prefer camera for image capture
-        const isIOSSafari = () => {
-          const ua = navigator.userAgent;
-          return /iP(ad|hone|od)/.test(ua) && /Safari/.test(ua) && !/Chrome/.test(ua);
-        };
+      // Native app - use camera
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      
+      if (status !== "granted") {
+        showToast("error", "Camera permission is required");
+        setCurrentStep("selection");
+        return;
+      }
 
-        if (isIOSSafari()) {
-          const cameraResult = await ImagePicker.launchCameraAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            quality: 0.8,
-          });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.8,
+      });
 
-          if (!cameraResult.canceled && cameraResult.assets[0]) {
-            const asset = cameraResult.assets[0];
-            setCapturedImage(asset.uri);
-            setCurrentStep("processing");
-            
-            // Use File object if available, otherwise use URI
-            const fileObj = (asset as any).file;
-            if (fileObj) {
-              await processImage(fileObj, scanType);
-            } else {
-              await processImage(asset.uri, scanType);
-            }
-          } else {
-            setCurrentStep("selection");
-          }
-          return; // Skip rest of web logic
-        }
-        
-        // For other browsers, use library or camera
-        const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ['images'],
-          allowsEditing: true,
-          quality: 0.8,
-        });
-
-        if (!result.canceled && result.assets[0]) {
-          const asset = result.assets[0];
-          const assetUri = asset.uri;
-          
-          setCapturedImage(assetUri);
-          setCurrentStep("processing");
-          
-          // Prefer File object over URI for iOS Safari compatibility
-          const fileObj = (asset as any).file;
-          if (fileObj) {
-            await processImage(fileObj, scanType);
-          } else {
-            await processImage(assetUri, scanType);
-          }
-        } else {
-          setCurrentStep("selection");
-        }
+      if (!result.canceled && result.assets[0]) {
+        const imageUri = result.assets[0].uri;
+        setCapturedImage(imageUri);
+        setCurrentStep("processing");
+        await processImage(imageUri, scanType);
       } else {
-        // Native app - use camera
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        
-        if (status !== "granted") {
-          showToast("error", "Camera permission is required");
-          setCurrentStep("selection");
-          return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ['images'],
-          allowsEditing: true,
-          quality: 0.8,
-        });
-
-        if (!result.canceled && result.assets[0]) {
-          const imageUri = result.assets[0].uri;
-          setCapturedImage(imageUri);
-          setCurrentStep("processing");
-          await processImage(imageUri, scanType);
-        } else {
-          setCurrentStep("selection");
-        }
+        setCurrentStep("selection");
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -246,14 +188,14 @@ const AllGroceryScanner = () => {
   };
 
   // Process captured image with AI via backend proxy
-  const processImage = async (imageData: string | File, scanType: ScanType) => {
+  const processImage = async (imageData: string, scanType: ScanType) => {
     try {
       // Barcode scanning doesn't use image processing
       if (scanType === 'barcode') {
         throw new Error('Barcode scanning should not call processImage');
       }
       
-      // Call backend proxy API (handles all platforms including iOS Safari)
+      // Call backend proxy API (handles iOS and Android)
       const response = await scanImageViaProxy({
         uri: imageData,
         scanType: scanType,
@@ -432,9 +374,7 @@ const AllGroceryScanner = () => {
             </View>
             <Text style={styles.optionTitle}>Scan Groceries</Text>
             <Text style={styles.optionDescription}>
-              {Platform.OS === 'web' 
-                ? "Upload a photo of your groceries to automatically identify items"
-                : "Take a photo of your groceries to automatically identify items"}
+              Take a photo of your groceries to automatically identify items
             </Text>
           </TouchableOpacity>
 
@@ -448,31 +388,27 @@ const AllGroceryScanner = () => {
             </View>
             <Text style={styles.optionTitle}>Scan Receipt</Text>
             <Text style={styles.optionDescription}>
-              {Platform.OS === 'web'
-                ? "Upload a photo of your receipt to extract purchased items"
-                : "Take a photo of your receipt to extract purchased items"}
+              Take a photo of your receipt to extract purchased items
             </Text>
           </TouchableOpacity>
 
-          {Platform.OS !== 'web' && (
-            <TouchableOpacity
-              style={styles.optionCard}
-              onPress={() => handleScanTypeSelect("barcode")}
-              activeOpacity={0.8}
-            >
-              <View style={styles.optionIcon}>
-                <Image
-                  source={require("../../assets/icons/barcode.png")}
-                  style={styles.barcodeIcon}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text style={styles.optionTitle}>Scan Barcode</Text>
-              <Text style={styles.optionDescription}>
-                Scan individual barcodes to add specific products
-              </Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity
+            style={styles.optionCard}
+            onPress={() => handleScanTypeSelect("barcode")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.optionIcon}>
+              <Image
+                source={require("../../assets/icons/barcode.png")}
+                style={styles.barcodeIcon}
+                resizeMode="contain"
+              />
+            </View>
+            <Text style={styles.optionTitle}>Scan Barcode</Text>
+            <Text style={styles.optionDescription}>
+              Scan individual barcodes to add specific products
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </ScrollView>

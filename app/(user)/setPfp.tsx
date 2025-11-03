@@ -10,7 +10,6 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Image,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -183,40 +182,14 @@ export const SetPfp = () => {
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from camera.");
-      setSelectedImage(assetUri); // <-- Add this line
-
-      let finalUri: string | File = assetUri;
-      if (Platform.OS === "web") {
-        // Try to use File object if available (newer Expo SDKs)
-        const fileObj = result.assets?.[0]?.file;
-        if (fileObj) {
-          finalUri = fileObj;
-        } else if (assetUri.startsWith("data:")) {
-          // Convert data URI to Blob
-          const res = await fetch(assetUri);
-          const blob = await res.blob();
-          finalUri = new File([blob], "avatar.jpg", { type: blob.type });
-        } else if (assetUri.startsWith("blob:")) {
-          // Try to fetch blob URI (may fail on iOS Safari)
-          try {
-            const res = await fetch(assetUri);
-            const blob = await res.blob();
-            finalUri = new File([blob], "avatar.jpg", { type: blob.type });
-          } catch (e) {
-            showToast("error", "Failed to load image from camera. Try a different image.");
-            setUploading(false);
-            setCurrentStep("initial");
-            return;
-          }
-        }
-      }
+      setSelectedImage(assetUri);
 
       // Upload via backend proxy
       console.log('[UPLOAD] Uploading via backend proxy, userId:', userID);
       
       try {
         const uploadResult = await uploadAvatarViaProxy({
-          uri: finalUri,
+          uri: assetUri,
           appUserId: userID,
         });
 
@@ -301,40 +274,14 @@ export const SetPfp = () => {
 
       const assetUri = result.assets?.[0]?.uri;
       if (!assetUri) throw new Error("No image URI from gallery.");
-      setSelectedImage(assetUri); // <-- Add this line
-
-      let finalUri: string | File = assetUri;
-      if (Platform.OS === "web") {
-        // Try to use File object if available (newer Expo SDKs)
-        const fileObj = result.assets?.[0]?.file;
-        if (fileObj) {
-          finalUri = fileObj;
-        } else if (assetUri.startsWith("data:")) {
-          // Convert data URI to Blob
-          const res = await fetch(assetUri);
-          const blob = await res.blob();
-          finalUri = new File([blob], "avatar.jpg", { type: blob.type });
-        } else if (assetUri.startsWith("blob:")) {
-          // Try to fetch blob URI (may fail on iOS Safari)
-          try {
-            const res = await fetch(assetUri);
-            const blob = await res.blob();
-            finalUri = new File([blob], "avatar.jpg", { type: blob.type });
-          } catch (e) {
-            showToast("error", "Failed to load image from gallery. Try a different image.");
-            setUploading(false);
-            setCurrentStep("initial");
-            return;
-          }
-        }
-      }
+      setSelectedImage(assetUri);
 
       // Upload via backend proxy
       console.log('[UPLOAD] Uploading via backend proxy from gallery, userId:', userID);
       
       try {
         const uploadResult = await uploadAvatarViaProxy({
-          uri: finalUri,
+          uri: assetUri,
           appUserId: userID,
         });
 

@@ -50,27 +50,27 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   // Normalize raw API members to the UI shape expected here
   const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
     return (raw ?? []).map((m: any) => {
-      // Try multiple paths for user data
+      // Try multiple paths for user data (nested object or flat structure)
       const u = m.user ?? {};
       
       // If the user is the owner, they might be in the current user context
       const isOwner = m.is_owner || m.role === "owner";
       const userId = u.id ?? m.user_id ?? m.id ?? "";
       
-      // For the owner, fallback to current user data if available
-      let name = u.display_name ?? u.full_name ?? u.name ?? "";
-      let email = u.email ?? "";
-      let phone = u.phone ?? u.phone_number ?? "";
+      // Try nested user object first, then fall back to top-level fields
+      let name = u.display_name ?? u.full_name ?? u.name ?? m.display_name ?? m.full_name ?? m.name ?? "";
+      let email = u.email ?? m.email ?? "";
+      let phone = (u.phone ?? u.phone_number ?? m.phone ?? m.phone_number) ?? "";
       
-      // If data is missing and this is the current user (owner), use context
-      if (isOwner && String(userId) === String(user?.id)) {
+      // If data is missing and this is the current user, use context
+      if (String(userId) === String(user?.id)) {
         name = name || user?.name || "Owner";
         email = email || user?.email || "";
-        phone = phone || user?.phone_number || "";
+        phone = phone || (user as any)?.phone_number || (user as any)?.phone || "";
       }
       
-      // Final fallback
-      if (!name) name = "Unknown";
+      // Final fallback - use email or "Unknown Member"
+      if (!name || name.trim() === "") name = email || "Unknown Member";
       
       return {
         id: String(userId),

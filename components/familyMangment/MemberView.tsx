@@ -41,39 +41,26 @@ const MemberView: React.FC<MemberViewProps> = ({
   const {user} = useUser(); // Get user context first
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   
-  // Normalize members if provided - wrapped in useCallback to prevent infinite loops
+  // Normalize members - Backend now returns consistent nested user structure
   const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
     return (raw ?? []).map((m: any) => {
-      // Try multiple paths for user data
       const u = m.user ?? {};
+      const userId = String(m.user_id || u.id || m.id || "");
+      const isOwner = m.role === "owner" || m.is_owner === true;
       
-      // Check if this member is the owner
-      const isOwner = m.is_owner || m.role === "owner";
-      const userId = u.id ?? m.user_id ?? m.id ?? "";
-      
-      // Try to get name from multiple sources
-      let name = u.display_name ?? u.full_name ?? u.name ?? m.name ?? "";
-      let email = u.email ?? m.email ?? "";
-      let phone = u.phone ?? u.phone_number ?? m.phone ?? "";
-      
-      // If this is the owner and matches current user, use user context as fallback
-      if (isOwner && String(userId) === String(user?.id)) {
-        name = name || user?.name || (user as any)?.display_name || (user as any)?.full_name || "";
-        email = email || user?.email || "";
-        phone = phone || (user as any)?.phone_number || (user as any)?.phone || "";
-      }
-      
-      // Final fallback
-      if (!name) name = "Unknown User";
+      // Get user details from nested user object (backend now guarantees this)
+      const name = u.name || u.full_name || u.display_name || "Unknown Member";
+      const email = u.email || "";
+      const phone = u.phone_number || u.phone || "";
       
       return {
-        id: String(userId),
+        id: userId,
         name,
-        email: email || "",
-        phone: phone || "",
+        email: email || "No email",
+        phone: phone || "No phone",
         status: (m.status ?? "active") as FamilyMember["status"],
-        role: (m.role ?? (m.is_owner ? "owner" : "member")) as FamilyMember["role"],
-        joinedAt: m.created_at ?? m.joined_at ?? "",
+        role: isOwner ? "owner" : "member",
+        joinedAt: m.joined_at ?? m.created_at ?? "",
       } as FamilyMember;
     });
   }, [user]);
@@ -123,8 +110,9 @@ const MemberView: React.FC<MemberViewProps> = ({
     try {
       setLoading(true);
       const data = await listFamilyMembers(Number(familyData.id));
-      // Normalize backend shape -> UI shape
-      setLocalMembers(normalizeMembers(data || []));
+      console.log(data)
+      const normalized = normalizeMembers(data || []);
+      setLocalMembers(normalized);
     } catch (e) {
       console.warn("Failed to load members:", e);
     } finally {

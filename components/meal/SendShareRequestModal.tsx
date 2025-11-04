@@ -30,6 +30,14 @@ interface FamilyMember {
   display_name?: string;
   email?: string;
   avatar_path?: string;
+  user?: {
+    id?: number;
+    name?: string;
+    full_name?: string;
+    display_name?: string;
+    email?: string;
+    avatar_path?: string;
+  };
 }
 
 interface SendShareRequestModalProps {
@@ -99,26 +107,41 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   }, [visible]);
 
   const loadFamilyMembers = async () => {
-    if (!familyId) return;
+    if (!familyId) {
+      console.warn('[SendShareRequestModal] familyId is not set');
+      return;
+    }
     
     try {
       setLoading(true);
+      console.log('[SendShareRequestModal] Loading members for familyId:', familyId);
+      
       const data = await listFamilyMembers(familyId);
       
       // Filter out the current user from the list
       const currentUserId = user?.id;
+      
       const filteredMembers = (data || []).filter((member: FamilyMember) => {
         const memberId = member.user_id || member.id;
         return memberId !== currentUserId;
       });
       
+      console.log('[SendShareRequestModal] Loaded members:', filteredMembers.length);
       setMembers(filteredMembers);
-    } catch (error) {
-      console.error('Failed to load family members:', error);
+      
+      if (filteredMembers.length === 0) {
+        setToast({
+          visible: true,
+          type: 'error',
+          message: 'No other family members available to share with',
+        });
+      }
+    } catch (error: any) {
+      console.error('[SendShareRequestModal] Error loading members:', error);
       setToast({
         visible: true,
         type: 'error',
-        message: 'Failed to load family members',
+        message: error?.message || 'Failed to load family members',
       });
     } finally {
       setLoading(false);
@@ -153,22 +176,52 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         onSuccess?.();
       }, 1500);
     } catch (error: any) {
+      console.error('[SendShareRequestModal] Error sending request:', error);
+      const errorMessage = error?.message || 'Failed to send request';
+      
       setToast({
         visible: true,
         type: 'error',
-        message: error.message || 'Failed to send request',
+        message: errorMessage,
       });
     }
   };
 
-  const getMemberName = (member: FamilyMember) => {
-    return member.name || member.display_name || member.email || 'Family Member';
-  };
+  // Memoize member name extraction to prevent infinite logging
+  const getMemberName = React.useCallback((member: FamilyMember): string => {
+    // Try nested user object first (backend structure)
+    const nestedUser = member.user;
+    if (nestedUser) {
+      const name = nestedUser.name || nestedUser.full_name || nestedUser.display_name;
+      if (name) {
+        return String(name).trim();
+      }
+      
+      // Fallback to nested email
+      if (nestedUser.email) {
+        const emailName = nestedUser.email.split('@')[0];
+        return String(emailName).trim();
+      }
+    }
+    
+    // Try direct fields on member object
+    const name = member.name 
+      || member.display_name 
+      || member.email?.split('@')[0] // Extract username from email
+      || member.email;
+    
+    if (name) {
+      return String(name).trim();
+    }
+    
+    // Last resort fallback
+    return `User ${member.user_id || member.id}`;
+  }, []);
 
-  const getMemberInitial = (member: FamilyMember) => {
+  const getMemberInitial = React.useCallback((member: FamilyMember): string => {
     const name = getMemberName(member);
-    return name.charAt(0).toUpperCase();
-  };
+    return (name.charAt(0) || 'U').toUpperCase();
+  }, [getMemberName]);
 
   return (
     <Modal
@@ -252,8 +305,8 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
                     <Text style={styles.memberName}>
                       {getMemberName(member)}
                     </Text>
-                    {member.email && (
-                      <Text style={styles.memberEmail}>{member.email}</Text>
+                    {(member.user?.email || member.email) && (
+                      <Text style={styles.memberEmail}>{member.user?.email || member.email}</Text>
                     )}
                   </View>
                   {selectedMemberId === (member.user_id || member.id) && (

@@ -33,6 +33,8 @@ export type Meal = {
   cookingTools: string[];
   notes: string;
   isFavorite: boolean;
+  familyId?: number | null;  // If set, meal belongs to a family and can be shared
+  createdByUserId?: number;  // User who created the meal
 };
 
 export const mealsData: Meal[] = [

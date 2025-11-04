@@ -4,6 +4,7 @@ import {
   deleteMealForSignleUser,
   updateMealForSignleUser,
 } from "@/src/user/meals";
+import { canShareMeal, canAttachMeal } from "@/src/services/mealFamily.service";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -18,6 +19,7 @@ import {
 } from "react-native";
 import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
+import AttachToFamilyModal from "./AttachToFamilyModal";
 
 type Props = {
   meal: Meal;
@@ -55,20 +57,29 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [familyId, setFamilyId] = useState<number | null>(null);
+  const [showAttachModal, setShowAttachModal] = useState(false);
+  const [familyId, setFamilyId] = useState<number | null>(meal.familyId || null);
   const { user } = useUser();
 
   // Load family information
   React.useEffect(() => {
     const loadFamily = async () => {
       try {
+        console.log('[MealDetailScreen] Loading family information...');
         const { listMyFamilies } = await import("@/src/user/family");
         const families = await listMyFamilies();
+        
+        console.log('[MealDetailScreen] Families loaded:', JSON.stringify(families, null, 2));
+        
         if (families && families.length > 0) {
-          setFamilyId(families[0].id);
+          const fid = families[0].id;
+          console.log('[MealDetailScreen] Setting familyId to:', fid);
+          setFamilyId(fid);
+        } else {
+          console.warn('[MealDetailScreen] No families found for user');
         }
-      } catch (error) {
-        console.error("Failed to load family:", error);
+      } catch (error: any) {
+        console.error("[MealDetailScreen] Failed to load family:", error);
       }
     };
     loadFamily();
@@ -145,9 +156,33 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               {editedMeal.isFavorite ? "❤️" : "🤍"}
             </Text>
           </TouchableOpacity>
-          {familyId && (
+          
+          {/* Show "Attach to Family" button if meal has no familyId and user owns it */}
+          {!canShareMeal(editedMeal) && canAttachMeal(editedMeal, user?.id) && (
             <TouchableOpacity
-              onPress={() => setShowShareModal(true)}
+              onPress={() => {
+                console.log('[MealDetailScreen] Attach to Family button pressed');
+                setShowAttachModal(true);
+              }}
+              style={[styles.editButton, { backgroundColor: "#3B82F6" }]}
+              activeOpacity={0.9}
+              disabled={isEditing}
+            >
+              <Text style={styles.editButtonText}>Attach to Family</Text>
+            </TouchableOpacity>
+          )}
+          
+          {/* Show "Share" button if meal has familyId */}
+          {canShareMeal(editedMeal) && familyId && (
+            <TouchableOpacity
+              onPress={() => {
+                console.log('[MealDetailScreen] Share button pressed', {
+                  mealId: meal.id,
+                  mealName: meal.name,
+                  familyId: familyId,
+                });
+                setShowShareModal(true);
+              }}
               style={[styles.editButton, { backgroundColor: "#00A86B" }]}
               activeOpacity={0.9}
               disabled={isEditing}
@@ -155,6 +190,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               <Text style={styles.editButtonText}>Share</Text>
             </TouchableOpacity>
           )}
+          
           <TouchableOpacity
             onPress={handleDelete}
             style={[styles.editButton, { backgroundColor: "#FF3B30" }]}
@@ -533,6 +569,20 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Attach to Family Modal */}
+      <AttachToFamilyModal
+        visible={showAttachModal}
+        mealId={meal.id}
+        mealName={meal.name}
+        onClose={() => setShowAttachModal(false)}
+        onSuccess={(newFamilyId, familyName) => {
+          setShowAttachModal(false);
+          setFamilyId(newFamilyId);
+          setEditedMeal({ ...editedMeal, familyId: newFamilyId });
+          Alert.alert("Success", `Meal attached to ${familyName}. You can now share it with family members!`);
+        }}
+      />
 
       {/* Share Request Modal */}
       {familyId !== null && (

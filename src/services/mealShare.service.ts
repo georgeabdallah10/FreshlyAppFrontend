@@ -49,7 +49,7 @@ export interface MealShareRequest {
 
 export interface SendShareRequestInput {
   meal_id: number;
-  receiver_id: number;
+  receiver_id: number;  // Backend uses receiver_id not recipientUserId
   message?: string;
 }
 
@@ -84,18 +84,55 @@ export async function sendMealShareRequest(
   const headers = await getAuthHeader();
 
   try {
+    console.log('[mealShareService] Sending share request:', {
+      url: `${API_URL}/meal-share-requests`,
+      input,
+    });
+
     const res = await fetch(`${API_URL}/meal-share-requests`, {
       method: "POST",
       headers,
       body: JSON.stringify(input),
     });
 
+    console.log('[mealShareService] Response status:', res.status);
+
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
       let errorMessage = "Failed to send meal share request";
 
-      if (res.status === 400) {
-        errorMessage = "You cannot send a share request to yourself.";
+      // Try to parse error from response first
+      if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText);
+          // Backend returns error in 'error' field
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch {
+          // If JSON parsing fails, use status-based messages
+          if (res.status === 400) {
+            errorMessage = "Invalid request. Please check your selection.";
+          } else if (res.status === 401) {
+            errorMessage = "Session expired. Please log in again.";
+          } else if (res.status === 403) {
+            errorMessage = "You can only share meals with family members.";
+          } else if (res.status === 404) {
+            errorMessage = "Meal or family member not found.";
+          } else if (res.status === 409) {
+            errorMessage = "You already have a pending request for this meal with this member.";
+          } else if (res.status === 429) {
+            errorMessage = "Too many requests. Please wait before trying again.";
+          } else if (res.status >= 500) {
+            errorMessage = "Server error. Please try again later.";
+          } else {
+            errorMessage = errorText.substring(0, 100);
+          }
+        }
+      } else if (res.status === 400) {
+        errorMessage = "Invalid request. Please check your selection.";
       } else if (res.status === 401) {
         errorMessage = "Session expired. Please log in again.";
       } else if (res.status === 403) {
@@ -108,20 +145,17 @@ export async function sendMealShareRequest(
         errorMessage = "Too many requests. Please wait before trying again.";
       } else if (res.status >= 500) {
         errorMessage = "Server error. Please try again later.";
-      } else if (errorText) {
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorData.detail || errorMessage;
-        } catch {
-          errorMessage = errorText.substring(0, 100);
-        }
       }
 
+      console.error('[mealShareService] Error response:', { status: res.status, errorMessage, errorText });
       throw new Error(errorMessage);
     }
 
-    return await res.json();
+    const result = await res.json();
+    console.log('[mealShareService] Success response:', result);
+    return result;
   } catch (error: any) {
+    console.error('[mealShareService] Exception:', error);
     if (error.message?.toLowerCase().includes("fetch")) {
       throw new Error("Network error. Please check your internet connection.");
     }

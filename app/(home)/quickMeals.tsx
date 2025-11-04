@@ -6,22 +6,22 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  Easing,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View
+    Animated,
+    Easing,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from "react-native";
 
 type FormState = {
@@ -36,6 +36,7 @@ type FormState = {
   avoidIngredients: string[];
   servings: number;
   additionalInstructions: string;
+  selectedFamilyId: number | null; // Family to attach meal to (enables sharing)
 };
 
 type CurrentMeal = {
@@ -136,9 +137,12 @@ type Phase4Props = {
   additionalInstructions: string;
   includeIngredients: string[];
   avoidIngredients: string[];
+  families: Array<{ id: number; name: string }>;
+  selectedFamilyId: number | null;
   onChangeIncludeInput: (t: string) => void;
   onChangeAvoidInput: (t: string) => void;
   onChangeAdditionalInstructions: (t: string) => void;
+  onSelectFamily: (id: number | null) => void;
   addInclude: () => void;
   removeInclude: (idx: number) => void;
   addAvoid: () => void;
@@ -323,6 +327,19 @@ Return ONLY a valid, minified JSON object matching this exact TypeScript shape:
 type IngredientSection = { title: string; items: string[] };
 
 type RecipeCard = {
+  name: string;                          // meal name
+  icon: string;                          // emoji or icon identifier
+  calories: number;                      // ACCURATE total calories for all servings
+  prepTime: number;                      // minutes to prep
+  cookTime: number;                      // minutes to cook
+  totalTime: number;                     // total minutes (prep + cook)
+  mealType: "Breakfast" | "Lunch" | "Dinner" | "Snack" | "Dessert";
+  cuisine: string;                       // e.g. "Italian", "Asian", "Mexican"
+  difficulty: "Easy" | "Medium" | "Hard";
+  servings: number;                      // number of servings
+  protein: number;                       // grams per full recipe
+  fats: number;                          // grams per full recipe
+  carbs: number;                         // grams per full recipe
   headerSummary: string;                 // mention servings and dish type
   ingredients: IngredientSection[];      // group if useful, else one section with title: ""
   instructions: string[][];              // array of steps; each step is an array of 1–2 short sentences
@@ -334,11 +351,13 @@ type RecipeCard = {
 
 Rules:
 - No markdown, no code fences, no comments, no trailing commas.
+- NUTRITIONAL DATA: Provide accurate macros and calories based on real recipes. Calculate from actual ingredient quantities.
 - Use concise, realistic quantities scaled to choices_json.servings.
 - Do not include allergens, disliked items, or avoidIngredients.
 - Respect cookingMethods strictly if provided.
 - Prefer items actually present in pantry_json (by name).
 - If something is not applicable, use [] or "".
+- Ensure all numeric nutritional fields are present and realistic.
 `;
 
   // wizard state
@@ -346,6 +365,7 @@ Rules:
   const [includeInput, setIncludeInput] = useState("");
   const [avoidInput, setAvoidInput] = useState("");
   const [additionalInstructions, setAdditionalInstructions] = useState("");
+  const [families, setFamilies] = useState<Array<{ id: number; name: string }>>([]);
   const [form, setForm] = useState<FormState>({
     ingredientSource: "pantry",
     budget: null,
@@ -358,6 +378,7 @@ Rules:
     avoidIngredients: [],
     servings: 2,
     additionalInstructions: "",
+    selectedFamilyId: null,
   });
   // Stable handlers for Phase 4 so TextInput keeps focus (no remounts)
   const addInclude = useCallback(() => {
@@ -411,6 +432,31 @@ Rules:
   useEffect(() => {
     animateProgress((phase + 1) / TOTAL_PHASES);
   }, [phase, animateProgress]);
+
+  // Load user's families
+  useEffect(() => {
+    const loadFamilies = async () => {
+      try {
+        const { listMyFamilies } = await import('@/src/user/family');
+        const res = await listMyFamilies();
+        if (res?.ok) {
+          const data = await res.json();
+          const familyList = Array.isArray(data) ? data.map((f: any) => ({
+            id: f.id,
+            name: f.name || 'Family'
+          })) : [];
+          setFamilies(familyList);
+          // Auto-select first family if available
+          if (familyList.length > 0) {
+            setForm(f => ({ ...f, selectedFamilyId: familyList[0].id }));
+          }
+        }
+      } catch (error) {
+        console.error('[QuickMeals] Failed to load families:', error);
+      }
+    };
+    loadFamilies();
+  }, []);
 
   // utils - wrapped in useCallback to maintain referential stability
   const setSingle = useCallback(
@@ -481,22 +527,14 @@ ${JSON.stringify(payload)}
 
       // SYSTEM: only hard, timeless rules
       const system_prompt = `
-You are Freshly AI professional chef. Make sure to create real meals that are eatable and delicious. Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods and any additional instructions provided by the user. No prose, no markdown, no comments. Provide all the following information about the meal you are about to create:
-  name,
-  icon,
-  calories,
-  prepTime,
-  cookTime,
-  totalTime,
-  mealType,
-  cuisine,
-  difficulty,
-  servings,
-  goalFit,
-  ingredients,
-  instructions,
-  cookingTools,
-  notes,
+You are Freshly AI professional chef. Make sure to create real meals that are eatable and delicious. Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods and any additional instructions provided by the user. No prose, no markdown, no comments.
+
+NUTRITIONAL ACCURACY IS CRITICAL:
+- Calculate calories, protein, fats, and carbs from actual ingredient quantities in the recipe
+- Provide realistic, scientifically-based nutritional data
+- Scale all nutritional values to the total recipe servings
+- Do not estimate or invent nutritional data
+- Ensure macros align with the calorie total (1g protein/carbs = 4cal, 1g fat = 9cal)
 
 CRITICAL: If the user provides additionalInstructions in choices_json, follow them EXACTLY. Incorporate them into the recipe generation.
 `;
@@ -531,10 +569,33 @@ ${JSON_DIRECTIVE}`;
       // The AI returns a RecipeCard structure, we need to extract the flat fields
       // RecipeCard has: headerSummary, ingredients: IngredientSection[], instructions: string[][]
       
-      // Extract name from headerSummary or fallback
+      // Extract name from response or fallback
       const name = String(parsed?.name || parsed?.headerSummary || 'Untitled Meal');
       const mt = String(parsed?.mealType || form.mealType || 'meal');
       const iconName = String(parsed?.icon || parsed?.iconName || 'restaurant');
+
+      // Extract nutritional data with safe defaults
+      const extractNumeric = (value: any, defaultVal: number = 0): number => {
+        const num = parseInt(String(value), 10);
+        return isNaN(num) || num < 0 ? defaultVal : num;
+      };
+
+      const calories = extractNumeric(parsed?.calories, 500);
+      const prepTime = extractNumeric(parsed?.prepTime, 10);
+      const cookTime = extractNumeric(parsed?.cookTime, 15);
+      const totalTime = extractNumeric(parsed?.totalTime, prepTime + cookTime);
+      const protein = extractNumeric(parsed?.protein, 20);
+      const fats = extractNumeric(parsed?.fats, 15);
+      const carbs = extractNumeric(parsed?.carbs, 50);
+      const servings = extractNumeric(parsed?.servings, form.servings || 2);
+
+      // Extract cuisine
+      const cuisine = String(parsed?.cuisine || '').trim();
+
+      // Extract difficulty
+      const difficulty = (['Easy', 'Medium', 'Hard'].includes(parsed?.difficulty) 
+        ? parsed.difficulty 
+        : form.difficulty || 'Easy');
 
       // Handle ingredients - RecipeCard format has ingredients as IngredientSection[]
       let ingredients: string[] = [];
@@ -568,27 +629,29 @@ ${JSON_DIRECTIVE}`;
       }
       
       console.log('[QuickMeals] Processed name:', name);
+      console.log('[QuickMeals] Processed calories:', calories);
+      console.log('[QuickMeals] Processed macros:', { protein, fats, carbs });
+      console.log('[QuickMeals] Processed servings:', servings);
       console.log('[QuickMeals] Processed ingredients:', ingredients);
-      console.log('[QuickMeals] Processed instructions:', instructions);
 
-      // Prepare meal data for saving
+      // Prepare meal data for saving (includes full nutritional data)
       const mealData = {
         name,
         selectedEmoji: iconName,
-        calories: parsed?.calories ?? 0,
-        prepTime: parsed?.prepTime,
-        cookTime: parsed?.cookTime,
-        totalTime: parsed?.totalTime,
+        calories,
+        prepTime,
+        cookTime,
+        totalTime,
         mealtType: mt,
-        cuisine: parsed?.cuisine ?? '',
-        difficulty: parsed?.difficulty ?? form.difficulty ?? 'easy',
-        servings: parsed?.servings ?? form.servings ?? 1,
+        cuisine,
+        difficulty,
+        servings,
         ingredients: ingredients,
         instructions: instructions,
         notes: parsed?.finalNote ?? parsed?.notes ?? '',
-        protein: parsed?.macros?.protein ?? 0,
-        fats: parsed?.macros?.fats ?? 0,
-        carbs: parsed?.carbs ?? parsed?.macros?.carbs ?? 0,
+        protein,
+        fats,
+        carbs,
       };
 
       setCurrentMeal({
@@ -669,6 +732,14 @@ ${JSON_DIRECTIVE}`;
 
     const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
 
+    // Use selected family from form (enables sharing)
+    const familyId = form.selectedFamilyId || undefined;
+    if (familyId) {
+      console.log('[QuickMeals] Associated meal with family ID:', familyId);
+    } else {
+      console.log('[QuickMeals] No family selected - meal will be personal (not shareable)');
+    }
+
     const meal = {
       id: Date.now(),
       name: safeName,
@@ -700,6 +771,7 @@ ${JSON_DIRECTIVE}`;
         : [],
       notes: typeof mealInput?.notes === 'string' ? mealInput.notes.trim() : undefined,
       isFavorite: false,
+      family_id: familyId, // Include family_id to enable sharing
     };
 
     setIsSubmitting(true);

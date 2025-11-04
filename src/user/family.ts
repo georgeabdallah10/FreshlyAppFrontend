@@ -61,7 +61,11 @@ export async function listMyFamilies() {
   const headers = await getAuthHeader();
   
   try {
+    console.log('[family.ts] Fetching user families...');
+    
     const res = await fetch(`${API_URL}/families`, { headers });
+
+    console.log('[family.ts] Response status:', res.status);
     
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
@@ -82,11 +86,15 @@ export async function listMyFamilies() {
         }
       }
       
+      console.error('[family.ts] Error response:', { status: res.status, errorMessage });
       throw new Error(errorMessage);
     }
     
-    return await res.json();
+    const data = await res.json();
+    console.log('[family.ts] Families fetched successfully:', JSON.stringify(data, null, 2));
+    return data;
   } catch (error: any) {
+    console.error('[family.ts] Exception:', error);
     if (error.message?.toLowerCase().includes("fetch")) {
       throw new Error("Network error. Please check your internet connection.");
     }
@@ -245,10 +253,14 @@ export async function listFamilyMembers(familyId: number) {
   const headers = await getAuthHeader();
   
   try {
+    console.log('[family.ts] Fetching members for familyId:', familyId);
+    
     const res = await fetch(`${API_URL}/families/${familyId}/members`, {
       method: "GET",
       headers,
     });
+
+    console.log('[family.ts] Response status:', res.status);
     
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
@@ -273,11 +285,15 @@ export async function listFamilyMembers(familyId: number) {
         }
       }
       
+      console.error('[family.ts] Error response:', { status: res.status, errorMessage });
       throw new Error(errorMessage);
     }
     
-    return await res.json(); // Returns list of MembershipOut
+    const data = await res.json();
+    console.log('[family.ts] Members fetched successfully:', JSON.stringify(data, null, 2));
+    return data; // Returns list of MembershipOut
   } catch (error: any) {
+    console.error('[family.ts] Exception:', error);
     if (error.message?.toLowerCase().includes("fetch")) {
       throw new Error("Network error. Please check your internet connection.");
     }

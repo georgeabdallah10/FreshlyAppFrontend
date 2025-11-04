@@ -60,6 +60,7 @@ export type CreateMealInput = {
   cookingTools?: string[];
   notes?: string;
   isFavorite: boolean;
+  family_id?: number; // Optional: if provided, meal belongs to family and can be shared
 };
 
 export async function createMealForSignleUser(input: CreateMealInput) {
@@ -106,6 +107,9 @@ function toApiMeal(meal: CreateMealInput) {
     servings: meal.servings ?? 1,
     diet_compatibility: meal.dietCompatibility ?? [],   // string[]
     goal_fit: meal.goalFit ?? [],                       // string[]
+
+    // Optional: if meal belongs to a family, it can be shared
+    ...(meal.family_id && { family_id: meal.family_id }),
 
     // 👇 map camelCase → snake_case inside items
     ingredients: (meal.ingredients ?? []).map(it => ({

@@ -1,7 +1,7 @@
 // ==================== screens/MealListScreen.tsx ====================
 import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -40,21 +40,73 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   hasError: parentError = false 
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
-  const [meals, setMeals] = useState<any[]>([]); // Placeholder for backend meals
+  const [meals, setMeals] = useState<any[]>([]); // normalized meals
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    console.log("PRETEST");
-    const test = async () => {
+  // Helper: map backend meal to UI shape with safe defaults
+  const mapMealType = (mt?: string): Category | "All" => {
+    const s = String(mt || "").toLowerCase();
+    if (s === "breakfast") return "Breakfast";
+    if (s === "lunch") return "Lunch";
+    if (s === "dinner") return "Dinner";
+    if (s === "snack") return "Snack";
+    if (s === "dessert") return "Dessert";
+    return "Dinner"; // sensible default
+  };
+
+  const normalizeMeal = (m: any) => ({
+    id: m.id,
+    name: m.name ?? "Untitled Meal",
+    image: m.image ?? "🍽️",
+    calories: Number(m.calories ?? 0),
+    prepTime: Number(m.prep_time ?? m.prepTime ?? 0),
+    cookTime: Number(m.cook_time ?? m.cookTime ?? 0),
+    totalTime: Number(m.total_time ?? m.totalTime ?? 0),
+    mealType: mapMealType(m.meal_type ?? m.mealType),
+    cuisine: m.cuisine ?? "",
+    tags: Array.isArray(m.tags) ? m.tags : [],
+    macros: m.macros ?? { protein: 0, fats: 0, carbs: 0 },
+    difficulty: (m.difficulty ?? "Easy") as "Easy" | "Medium" | "Hard",
+    servings: Number(m.servings ?? 1),
+    dietCompatibility: Array.isArray(m.diet_compatibility ?? m.dietCompatibility) 
+      ? (m.diet_compatibility ?? m.dietCompatibility) 
+      : [],
+    goalFit: Array.isArray(m.goal_fit ?? m.goalFit) 
+      ? (m.goal_fit ?? m.goalFit) 
+      : [],
+    ingredients: Array.isArray(m.ingredients) 
+      ? m.ingredients.map((ing: any) => ({
+          name: ing.name ?? "",
+          amount: String(ing.amount ?? ""),
+          inPantry: Boolean(ing.in_pantry ?? ing.inPantry ?? false),
+        }))
+      : [],
+    instructions: Array.isArray(m.instructions) ? m.instructions : [],
+    cookingTools: Array.isArray(m.cooking_tools ?? m.cookingTools) 
+      ? (m.cooking_tools ?? m.cookingTools) 
+      : [],
+    notes: m.notes ?? "",
+    isFavorite: Boolean(m.is_favorite ?? m.isFavorite ?? false),
+    familyId: m.family_id ?? m.familyId ?? null,
+    createdByUserId: m.created_by_user_id ?? m.createdByUserId,
+  });
+
+  const reloadMeals = async () => {
+    try {
       const res = await getAllmealsforSignelUser();
       const data = await res?.json();
-      console.log(data);
-      setMeals(data);
-    };
-    test();
+      const list = Array.isArray(data) ? data.map(normalizeMeal) : [];
+      setMeals(list);
+    } catch (e) {
+      console.log("Failed to load meals:", e);
+    }
+  };
+
+  useEffect(() => {
+    reloadMeals();
   }, []);
 
   // Enable LayoutAnimation on Android
@@ -83,8 +135,8 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       // Call your API
       const response = await createMealForSignleUser(meal);
 
-      // Add the meal to local state (use the response from API if it returns the created meal)
-      setMeals([...meals, response || meal]);
+      // Add the meal to local state (normalize to ensure filtering works)
+      setMeals([...meals, normalizeMeal(response || meal)]);
 
       // Close modal
       setShowAddMealModal(false);
@@ -103,12 +155,23 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     console.log("Add Category button pressed");
   };
 
-  // Since meals are empty, filteredMeals is empty for now
-  // Filtering logic will be added once backend data is integrated
-  const filteredMeals = meals.filter((meal) => {
-    // Placeholder filter by search query and category if needed in future
-    return true;
-  });
+  // Derived filtered list using category + search
+  const filteredMeals = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    let list = meals;
+
+    if (selectedCategory === "Favourites") {
+      list = list.filter((m) => m.isFavorite);
+    } else if (selectedCategory !== "All") {
+      list = list.filter((m) => m.mealType === selectedCategory);
+    }
+
+    if (q) {
+      list = list.filter((m) => String(m.name).toLowerCase().includes(q));
+    }
+
+    return list;
+  }, [meals, selectedCategory, searchQuery]);
 
   return (
     <View style={styles.container}>
@@ -206,7 +269,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           </Text>
           <TouchableOpacity 
             style={styles.retryButton}
-            onPress={() => window.location.reload()}
+            onPress={reloadMeals}
             activeOpacity={0.8}
           >
             <Text style={styles.retryButtonText}>Try Again</Text>
@@ -262,7 +325,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                 </View>
 
                 <View style={styles.macrosRow}>
-                  {meal.macros.protein !== 0 ? (
+                  {meal.macros?.protein !== 0 ? (
                     <View style={styles.macroItem}>
                       <View style={styles.macroCircle}>
                         <View style={[styles.macroProgress, { width: "70%" }]} />
@@ -276,7 +339,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                       </View>
                     </View>
                   ) : null}
-                  {meal.macros.fats !== 0 ? (
+                  {meal.macros?.fats !== 0 ? (
                     <View style={styles.macroItem}>
                       <View style={styles.macroCircle}>
                         <View style={[styles.macroProgress, { width: "40%" }]} />
@@ -287,7 +350,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                       </View>
                     </View>
                   ) : null}
-                  {meal.macros.carbs !== 0 ? (
+                  {meal.macros?.carbs !== 0 ? (
                     <View style={styles.macroItem}>
                       <View style={styles.macroCircle}>
                         <View style={[styles.macroProgress, { width: "60%" }]} />

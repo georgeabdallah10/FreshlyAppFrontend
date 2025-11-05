@@ -1,5 +1,3 @@
-
-
 import { BASE_URL } from "@/src/env/baseUrl";
 import { Storage } from "@/src/utils/storage";
 import { supabase } from "../supabase/client";
@@ -16,9 +14,9 @@ import { supabase } from "../supabase/client";
 
 const BUCKET_NAME = "meals";
 
-// In-memory cache: { mealName: imageUrl }
+// In-memory cache: { mealName: { url: string|null, failedAt?: number } }
 // This prevents repeated calls within the same app session
-const imageCache = new Map<string, string>();
+const imageCache = new Map<string, { url: string | null, failedAt?: number }>();
 
 // Track in-flight requests to prevent duplicate simultaneous calls
 const pendingRequests = new Map<string, Promise<string | null>>();
@@ -201,11 +199,22 @@ export async function getMealImage(
   const sanitizedName = sanitizeMealName(mealName);
   const filename = `${sanitizedName}.png`;
   const cacheKey = sanitizedName;
+  const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes cooldown for retry after failure
 
   // 1. Check in-memory cache (instant, free)
   if (imageCache.has(cacheKey)) {
-    console.log(`[MealImageService] 💾 Cache hit: ${mealName}`);
-    return imageCache.get(cacheKey)!;
+    const cached = imageCache.get(cacheKey)!;
+    if (cached.url) {
+      console.log(`[MealImageService] 💾 Cache hit: ${mealName}`);
+      return cached.url;
+    } else if (cached.failedAt) {
+      const now = Date.now();
+      if (now - cached.failedAt < COOLDOWN_MS) {
+        console.warn(`[MealImageService] ⏳ Skipping retry for failed meal image: ${mealName}`);
+        return null;
+      }
+      // else, allow retry (fall through)
+    }
   }
 
   // 2. Check if already being fetched (prevent duplicate calls)
@@ -220,7 +229,7 @@ export async function getMealImage(
       // Check Supabase bucket (fast, free)
       const existingUrl = await checkImageInBucket(filename);
       if (existingUrl) {
-        imageCache.set(cacheKey, existingUrl);
+        imageCache.set(cacheKey, { url: existingUrl });
         return existingUrl;
       }
 
@@ -230,6 +239,7 @@ export async function getMealImage(
       
       if (!generatedUrl) {
         console.error(`[MealImageService] Failed to generate image for: ${mealName}`);
+        imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
         return null;
       }
 
@@ -238,15 +248,16 @@ export async function getMealImage(
       
       if (bucketUrl) {
         // Cache the bucket URL (more permanent than generated URL)
-        imageCache.set(cacheKey, bucketUrl);
+        imageCache.set(cacheKey, { url: bucketUrl });
         return bucketUrl;
       } else {
         // If upload failed, still cache the generated URL
-        imageCache.set(cacheKey, generatedUrl);
+        imageCache.set(cacheKey, { url: generatedUrl });
         return generatedUrl;
       }
     } catch (error) {
       console.error(`[MealImageService] Error in getMealImage:`, error);
+      imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
       return null;
     } finally {
       // Clean up pending request

@@ -16,8 +16,9 @@ import { Storage } from '../utils/storage';
 // Bucket configuration
 const BUCKET_NAME = "pantryItems";
 
-// In-memory cache for image URLs (survives app session)
-const imageCache = new Map<string, string>();
+// In-memory cache for image URLs (instant, free)
+// Now supports caching null (failure) with optional cooldown
+const imageCache = new Map<string, { url: string | null, failedAt?: number }>();
 
 // Track pending requests to avoid duplicate API calls
 const pendingRequests = new Map<string, Promise<string | null>>();
@@ -154,11 +155,23 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
   }
 
   const cacheKey = sanitizeItemName(itemName);
+  const COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes cooldown for retry after failure
 
   // 1. Check in-memory cache
   if (imageCache.has(cacheKey)) {
-    console.log(`💾 Cache hit for pantry item: ${itemName}`);
-    return imageCache.get(cacheKey)!;
+    const cached = imageCache.get(cacheKey)!;
+    if (cached.url) {
+      console.log(`💾 Cache hit for pantry item: ${itemName}`);
+      return cached.url;
+    } else if (cached.failedAt) {
+      // If last failure was recent, skip retry
+      const now = Date.now();
+      if (now - cached.failedAt < COOLDOWN_MS) {
+        console.warn(`⏳ Skipping retry for failed pantry image: ${itemName}`);
+        return null;
+      }
+      // else, allow retry (fall through)
+    }
   }
 
   // 2. Check if request is already pending (avoid duplicates)
@@ -180,7 +193,9 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
 
       // Cache the result (even if null to avoid repeated failures)
       if (imageUrl) {
-        imageCache.set(cacheKey, imageUrl);
+        imageCache.set(cacheKey, { url: imageUrl });
+      } else {
+        imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
       }
 
       return imageUrl;

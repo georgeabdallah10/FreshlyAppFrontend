@@ -18,7 +18,7 @@ const BUCKET_NAME = "pantryItems";
 
 // In-memory cache for image URLs (instant, free)
 // Now supports caching null (failure) with optional cooldown
-const imageCache = new Map<string, { url: string | null, failedAt?: number }>();
+const imageCache = new Map<string, { url: string | null, failedAt?: number, lastWarnedAt?: number }>();
 
 // Track pending requests to avoid duplicate API calls
 const pendingRequests = new Map<string, Promise<string | null>>();
@@ -167,7 +167,11 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
       // If last failure was recent, skip retry
       const now = Date.now();
       if (now - cached.failedAt < COOLDOWN_MS) {
-        console.warn(`⏳ Skipping retry for failed pantry image: ${itemName}`);
+        // Only log once per cooldown period
+        if (!cached.lastWarnedAt || now - cached.lastWarnedAt > COOLDOWN_MS / 2) {
+          console.warn(`⏳ Skipping retry for failed pantry image: ${itemName}`);
+          imageCache.set(cacheKey, { ...cached, lastWarnedAt: now });
+        }
         return null;
       }
       // else, allow retry (fall through)
@@ -232,9 +236,6 @@ export async function preloadPantryImages(itemNames: string[]): Promise<void> {
   });
 }
 
-/**
- * Clear the in-memory cache (useful for testing or memory management)
- */
 export function clearPantryImageCache(): void {
   imageCache.clear();
   console.log('🗑️ Cleared pantry image cache');

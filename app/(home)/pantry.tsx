@@ -316,9 +316,12 @@ const PantryDashboard = () => {
     setScanned(false);
     setShowQRScanner(true);
   };
+  // Only log when currentScannedProduct.ingredient_name changes, to avoid infinite/duplicate logs
   useEffect(() => {
-    console.log(currentScannedProduct);
-  }, [currentScannedProduct]);
+    if (currentScannedProduct && currentScannedProduct.ingredient_name) {
+      console.log("⏳ Waiting for pending request:", currentScannedProduct.ingredient_name);
+    }
+  }, [currentScannedProduct?.ingredient_name]);
   useEffect(() => {
     if (!showQRScanner) {
       if (scanCooldownRef.current) {
@@ -660,6 +663,7 @@ const PantryDashboard = () => {
         } else {
           setPendingProduct(product);
           setConfirmVisible(true);
+          // Only log these details, not the "Waiting for pending request" message
           console.log("Name:", product.name);
           console.log("Health:", product.health);
           console.log("Nutrients:", product.nutrients);
@@ -1237,9 +1241,9 @@ const PantryDashboard = () => {
                 );
                 setNewProductCategory(payload.category || "");
 
-                // Open the Add Product modal
+                // Open the Add Product modal and set scanned product for effect logging
                 setCurrentScannedProduct(payload);
-                console.log(currentScannedProduct);
+                // Removed duplicate logging here to prevent repeated logs
                 await createMyPantryItem({
                   ingredient_name: payload.ingredient_name,
                   quantity: payload.quantity,

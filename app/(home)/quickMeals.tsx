@@ -36,7 +36,6 @@ type FormState = {
   avoidIngredients: string[];
   servings: number;
   additionalInstructions: string;
-  selectedFamilyId: number | null; // Family to attach meal to (enables sharing)
 };
 
 type CurrentMeal = {
@@ -137,12 +136,9 @@ type Phase4Props = {
   additionalInstructions: string;
   includeIngredients: string[];
   avoidIngredients: string[];
-  families: Array<{ id: number; name: string }>;
-  selectedFamilyId: number | null;
   onChangeIncludeInput: (t: string) => void;
   onChangeAvoidInput: (t: string) => void;
   onChangeAdditionalInstructions: (t: string) => void;
-  onSelectFamily: (id: number | null) => void;
   addInclude: () => void;
   removeInclude: (idx: number) => void;
   addAvoid: () => void;
@@ -378,7 +374,6 @@ Rules:
     avoidIngredients: [],
     servings: 2,
     additionalInstructions: "",
-    selectedFamilyId: null,
   });
   // Stable handlers for Phase 4 so TextInput keeps focus (no remounts)
   const addInclude = useCallback(() => {
@@ -433,24 +428,19 @@ Rules:
     animateProgress((phase + 1) / TOTAL_PHASES);
   }, [phase, animateProgress]);
 
-  // Load user's families
+  // Load user's families (for auto-attaching meals)
   useEffect(() => {
     const loadFamilies = async () => {
       try {
         const { listMyFamilies } = await import('@/src/user/family');
-        const res = await listMyFamilies();
-        if (res?.ok) {
-          const data = await res.json();
-          const familyList = Array.isArray(data) ? data.map((f: any) => ({
-            id: f.id,
-            name: f.name || 'Family'
-          })) : [];
-          setFamilies(familyList);
-          // Auto-select first family if available
-          if (familyList.length > 0) {
-            setForm(f => ({ ...f, selectedFamilyId: familyList[0].id }));
-          }
-        }
+        const data = await listMyFamilies();
+        console.log('[QuickMeals] Raw family data from API:', data);
+        const familyList = Array.isArray(data) ? data.map((f: any) => ({
+          id: f.id,
+          name: f.display_name || f.name || 'Family'
+        })) : [];
+        console.log('[QuickMeals] Families loaded:', familyList);
+        setFamilies(familyList);
       } catch (error) {
         console.error('[QuickMeals] Failed to load families:', error);
       }
@@ -732,12 +722,15 @@ ${JSON_DIRECTIVE}`;
 
     const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
 
-    // Use selected family from form (enables sharing)
-    const familyId = form.selectedFamilyId || undefined;
-    if (familyId) {
-      console.log('[QuickMeals] Associated meal with family ID:', familyId);
+    // Auto-attach to user's first family (enables sharing)
+    // If user is in a family, ALL meals should be shareable automatically
+    let familyId: number | undefined;
+    console.log('[QuickMeals] Families available:', families);
+    if (families.length > 0) {
+      familyId = families[0].id;
+      console.log('[QuickMeals] ✅ Auto-attaching meal to family ID:', familyId);
     } else {
-      console.log('[QuickMeals] No family selected - meal will be personal (not shareable)');
+      console.log('[QuickMeals] ⚠️ User has no families - meal will be personal');
     }
 
     const meal = {
@@ -1335,6 +1328,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: COLORS.text,
     marginBottom: 10,
+  },
+  helperText: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 12,
+    lineHeight: 20,
   },
   option: {
     flexDirection: "row",

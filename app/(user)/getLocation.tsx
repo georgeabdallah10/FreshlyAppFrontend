@@ -1,17 +1,17 @@
-import React, { useState, useRef, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  FlatList,
-} from "react-native";
-import * as Location from "expo-location";
-import type { LocationObject } from "expo-location";
-import { useRouter } from "expo-router";
+import { GooglePlacesAutocomplete } from "@/components/GooglePlacesAutocomplete";
 import { useUser } from "@/context/usercontext";
+import type { ParsedAddress } from "@/hooks/useGooglePlaces";
+import type { LocationObject } from "expo-location";
+import * as Location from "expo-location";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
 
 type LocationResult = {
   id: string;
@@ -157,6 +157,34 @@ const LocationScreens = () => {
     console.log("Selected location:", location);
   };
 
+  const handleGooglePlacesSelect = async (address: ParsedAddress) => {
+    console.log("Selected Google Places address:", address);
+    
+    // Format the full address
+    const fullAddress = [
+      address.streetNumber,
+      address.street,
+      address.city,
+      address.state,
+      address.zipCode,
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    try {
+      // Update user location
+      await updateUserInfo({
+        location: fullAddress || address.formattedAddress,
+      });
+      await refreshUser();
+      alert("Location was successfully set");
+      router.replace("/(home)/main");
+    } catch (error) {
+      console.error("Error updating location:", error);
+      alert("Failed to update location. Please try again.");
+    }
+  };
+
   if (currentScreen === "permission") {
     return (
       <View style={styles.container}>
@@ -216,26 +244,13 @@ const LocationScreens = () => {
           <Text style={styles.searchTitle}>Enter Your Location</Text>
         </View>
 
-        {/* Search Input */}
-        <View style={styles.searchContainer}>
-          <View style={styles.searchIcon}>
-            <Text style={styles.searchIconText}>🔍</Text>
-          </View>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Golden Avenue"
-            placeholderTextColor="#888888"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
+        {/* Google Places Autocomplete */}
+        <View style={styles.autocompleteWrapper}>
+          <GooglePlacesAutocomplete
+            onSelectAddress={handleGooglePlacesSelect}
+            placeholder="123 Main St, City, State..."
+            autoFocus={true}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={handleClearSearch} activeOpacity={0.6}>
-              <View style={styles.clearButton}>
-                <Text style={styles.clearIcon}>✕</Text>
-              </View>
-            </TouchableOpacity>
-          )}
         </View>
 
         {/* Use Current Location */}
@@ -252,31 +267,7 @@ const LocationScreens = () => {
           </Text>
         </TouchableOpacity>
 
-        {/* Search Results */}
-        {showResults && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsHeader}>SEARCH RESULT</Text>
-            <FlatList
-              data={searchResults}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.resultItem}
-                  onPress={() => handleSelectLocation(item)}
-                  activeOpacity={0.6}
-                >
-                  <View style={styles.resultIconContainer}>
-                    <Text style={styles.resultIcon}>📍</Text>
-                  </View>
-                  <View style={styles.resultTextContainer}>
-                    <Text style={styles.resultName}>{item.name}</Text>
-                    <Text style={styles.resultAddress}>{item.address}</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        )}
+
       </Animated.View>
     </View>
   );
@@ -376,6 +367,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     marginBottom: 30,
+  },
+  autocompleteWrapper: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   backButton: {
     width: 40,

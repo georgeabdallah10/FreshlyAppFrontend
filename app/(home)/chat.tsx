@@ -433,8 +433,9 @@ RECIPE FORMAT (ALWAYS USE THIS EXACT ORDER)
    - Group by parts if relevant (e.g., For the Pasta, For the Sauce).
    - Give exact measurements (grams, cups, tbsp, etc.) and include salt/pepper/seasonings explicitly.
 3) Instructions
-   - Numbered steps.
-   - Each step 1–2 sentences describing actions and reasoning.
+   - Numbered steps with clear headers for each step (e.g., "Step 1: Prepare the ingredients", "Step 2: Cook the pasta").
+   - Each step should have a descriptive header followed by 1–2 sentences describing actions and reasoning.
+   - Make headers action-oriented and clear so users can easily scan through the recipe.
 4) Optional Additions
    - 2–4 ideas for variations or diet-compliant add-ins.
 5) Final Note
@@ -561,18 +562,68 @@ Rules:
     try {
       const { conversation, messages: apiMessages } = await getConversation(conversationId);
       
-      // Convert API messages to UI messages
-      const uiMessages: ChatMessage[] = apiMessages.map(msg => {
-        const recipe = tryParseRecipe(msg.content);
-        if (recipe && msg.role === 'assistant') {
-          return { id: uid(), kind: "ai_recipe", recipe };
-        }
-        return {
-          id: uid(),
-          kind: msg.role === 'user' ? 'user' : 'ai_text',
-          text: msg.content,
-        } as ChatMessage;
-      });
+      // Convert API messages to UI messages, filtering out system messages
+      const uiMessages: ChatMessage[] = apiMessages
+        .filter(msg => {
+          const content = msg.content || '';
+          const contentLower = content.toLowerCase();
+          
+          // Filter out system prompts (messages with 3+ system markers)
+          const systemMarkers = [
+            'you are freshly',
+            'output format (required)',
+            'inputs you will receive',
+            'global rules (never violate)',
+            'recipe format (always use this exact order)',
+            'formatting guidelines',
+            'calorie / goal guidance',
+            'pantry policy'
+          ];
+          
+          const markerCount = systemMarkers.filter(marker => contentLower.includes(marker)).length;
+          if (markerCount >= 3) {
+            return false;
+          }
+          
+          // Filter out very long system-like messages
+          if (content.length > 1000 && (
+            contentLower.startsWith('you are freshly') ||
+            contentLower.includes('user prefrences:') ||
+            contentLower.includes('user preferences:') ||
+            contentLower.includes('user\'s pantry items:')
+          )) {
+            return false;
+          }
+          
+          return true;
+        })
+        .map(msg => {
+          let content = msg.content;
+          
+          // If it's a user message, clean up the prompt formatting
+          if (msg.role === 'user') {
+            // Remove "USER:\n" prefix if present
+            content = content.replace(/^\n*USER:\n*/i, '');
+            
+            // Remove JSON_DIRECTIVE if present (everything after the user's actual text)
+            const jsonDirectiveStart = content.indexOf('\n\nOUTPUT FORMAT (REQUIRED)');
+            if (jsonDirectiveStart > 0) {
+              content = content.substring(0, jsonDirectiveStart).trim();
+            }
+          }
+          
+          // Try to parse as recipe
+          const recipe = tryParseRecipe(content);
+          if (recipe && msg.role === 'assistant') {
+            return { id: uid(), kind: "ai_recipe", recipe };
+          }
+          
+          return {
+            id: uid(),
+            kind: msg.role === 'user' ? 'user' : 'ai_text',
+            text: content,
+          } as ChatMessage;
+        });
       
       setMessages(uiMessages);
       setCurrentConversationId(conversationId);

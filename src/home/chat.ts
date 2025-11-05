@@ -174,13 +174,11 @@ export async function updateConversationTitle(id: number, title: string): Promis
   }
 
   const baseUrl = getBaseUrl();
-  const resp = await fetch(`${baseUrl}/chat/conversations/${id}/title`, {
+  const resp = await fetch(`${baseUrl}/chat/conversations/${id}/title?title=${encodeURIComponent(title)}`, {
     method: "PUT",
     headers: { 
-      "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`
     },
-    body: JSON.stringify({ title }),
   });
   
   if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);

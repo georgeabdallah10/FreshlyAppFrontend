@@ -49,7 +49,7 @@ export interface MealShareRequest {
 
 export interface SendShareRequestInput {
   meal_id: number;
-  receiver_id: number;  // Backend uses receiver_id not recipientUserId
+  recipientUserId: number;  // Backend expects recipientUserId
   message?: string;
 }
 

@@ -161,7 +161,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
     try {
       await sendRequest.mutateAsync({
         meal_id: mealId,
-        receiver_id: selectedMemberId,
+        recipientUserId: selectedMemberId,
         message: message.trim() || undefined,
       });
 

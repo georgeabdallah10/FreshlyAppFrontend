@@ -85,7 +85,9 @@ if (!res.ok) {
   return res.json(); // server returns MealOut
 }
 function toApiMeal(meal: CreateMealInput) {
-  return {
+  console.log('[meals.ts] toApiMeal input family_id:', meal.family_id);
+  
+  const apiMeal = {
     // do NOT send id
     name: meal.name,
     image: meal.image ?? "", // must be <= 16 chars in DB
@@ -123,6 +125,9 @@ function toApiMeal(meal: CreateMealInput) {
     notes: meal.notes ?? "",
     is_favorite: meal.isFavorite ?? false,
   };
+  
+  console.log('[meals.ts] toApiMeal output family_id:', apiMeal.family_id);
+  return apiMeal;
 }
 
 export async function updateMealForSignleUser(mealId: number, input: CreateMealInput) {

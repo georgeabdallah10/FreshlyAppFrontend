@@ -94,7 +94,7 @@ export function usePendingRequestCount() {
  * const sendRequest = useSendShareRequest();
  * await sendRequest.mutateAsync({
  *   meal_id: 123,
- *   receiver_id: 456,
+ *   recipientUserId: 456,
  *   message: 'Check out this recipe!'
  * });
  */

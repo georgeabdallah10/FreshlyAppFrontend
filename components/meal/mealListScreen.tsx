@@ -1,4 +1,5 @@
 // ==================== screens/MealListScreen.tsx ====================
+import { preloadMealImages } from "@/src/services/mealImageService";
 import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -16,6 +17,7 @@ import {
   View,
 } from "react-native";
 import { AddMealModal } from "./addMealModal";
+import { MealImage } from "./MealImage";
 
 interface MealListScreenProps {
   onMealSelect: (meal: any) => void;
@@ -108,6 +110,14 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   useEffect(() => {
     reloadMeals();
   }, []);
+
+  // Preload images for all meals when meals are loaded
+  useEffect(() => {
+    if (meals.length > 0) {
+      const mealNames = meals.map(m => m.name);
+      preloadMealImages(mealNames);
+    }
+  }, [meals]);
 
   // Enable LayoutAnimation on Android
   if (
@@ -304,9 +314,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
               onPress={() => onMealSelect(meal)}
               activeOpacity={0.9}
             >
-              <View style={styles.mealImageContainer}>
-                <Text style={styles.mealImageEmoji}>{meal.image}</Text>
-              </View>
+              <MealImage 
+                mealName={meal.name}
+                imageUrl={meal.image?.startsWith('http') ? meal.image : null}
+                size={240}
+                style={styles.mealImageContainer}
+                showLoading={true}
+              />
 
               <View style={styles.mealOverlay}>
                 <Text style={styles.mealName}>{meal.name}</Text>
@@ -527,15 +541,13 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
 
-  /* Image placeholder (you’ll swap this when real images are in) */
+  /* Meal image container */
   mealImageContainer: {
+    position: "absolute",
     width: "100%",
     height: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F0F2F5",
+    borderRadius: 0,
   },
-  mealImageEmoji: { fontSize: 84 },
 
   /* Dark overlay like Figma (photo remains vibrant) */
   mealOverlay: {
@@ -641,7 +653,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   emptyStateSubtitle: {
-    fontSize: 16,
+    fontSize: 16, 
     color: "#6B7280",
     textAlign: "center",
     marginBottom: 20,

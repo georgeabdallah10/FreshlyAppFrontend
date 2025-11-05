@@ -11,6 +11,9 @@
     "splash": {
       "backgroundColor": "#ffffff"
     },
+    "extra": {
+      "googlePlacesApiKey": "YOUR_API_KEY_HERE"
+    },
     "ios": {
       "supportsTablet": true,
       "splash": {

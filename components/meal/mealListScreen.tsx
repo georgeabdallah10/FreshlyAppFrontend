@@ -23,6 +23,7 @@ interface MealListScreenProps {
   onMealSelect: (meal: any) => void;
   isLoading?: boolean;
   hasError?: boolean;
+  onImageError?: (message: string) => void; // Optional callback for image errors
 }
 const CATEGORIES = [
   "All",
@@ -39,7 +40,8 @@ type Category = (typeof CATEGORIES)[number];
 const MealListScreen: React.FC<MealListScreenProps> = ({ 
   onMealSelect,
   isLoading: parentLoading = false,
-  hasError: parentError = false 
+  hasError: parentError = false,
+  onImageError 
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [meals, setMeals] = useState<any[]>([]); // normalized meals
@@ -320,6 +322,8 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                 size={240}
                 style={styles.mealImageContainer}
                 showLoading={true}
+                onError={onImageError}
+                silent={!onImageError}
               />
 
               <View style={styles.mealOverlay}>

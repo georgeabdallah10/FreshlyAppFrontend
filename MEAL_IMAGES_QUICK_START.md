@@ -84,7 +84,7 @@ You'll know it's working when you see:
 ## 🐛 Quick Troubleshooting
 
 ### Problem: No bucket error
-**Fix**: Create `pantryItems` bucket in Supabase (see Step 1)
+**Fix**: Create `meals` bucket in Supabase (see Step 1)
 
 ### Problem: "Failed to generate image"
 **Fix**: Check backend endpoint is accessible (see Step 2)

@@ -63,7 +63,7 @@ Complete documentation:
 ┌─────────────────────────────────────────────────────────┐
 │ Tier 2: Supabase Bucket (Fast, ~Free)                 │
 ├─────────────────────────────────────────────────────────┤
-│ • Checks pantryItems bucket                            │
+│ • Checks meals bucket                            │
 │ • Permanent storage                                     │
 │ • ~100ms retrieval                                      │
 │ • Cost: ~$0.0001/request                               │
@@ -226,7 +226,7 @@ Complete documentation:
 **Solution:**
 1. Go to Supabase Dashboard
 2. Navigate to Storage
-3. Create new bucket: `pantryItems`
+3. Create new bucket: `meals`
 4. Make it **public**
 5. Restart app
 

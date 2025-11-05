@@ -14,8 +14,7 @@ import { supabase } from "../supabase/client";
  * - Cost optimization through caching and deduplication
  */
 
-const BUCKET_NAME = "pantryItems";
-const IMAGE_FOLDER = "meal-images"; // Subfolder in bucket for organization
+const BUCKET_NAME = "meals";
 
 // In-memory cache: { mealName: imageUrl }
 // This prevents repeated calls within the same app session
@@ -45,12 +44,10 @@ function sanitizeMealName(mealName: string): string {
  */
 async function checkImageInBucket(filename: string): Promise<string | null> {
   try {
-    const path = `${IMAGE_FOLDER}/${filename}`;
-    
-    // List files in the folder
+    // List files in the bucket root
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
-      .list(IMAGE_FOLDER, {
+      .list('', {
         search: filename,
       });
 
@@ -66,7 +63,7 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
       // Get public URL
       const { data: urlData } = supabase.storage
         .from(BUCKET_NAME)
-        .getPublicUrl(path);
+        .getPublicUrl(filename);
       
       console.log(`[MealImageService] ✅ Found existing image: ${filename}`);
       return urlData.publicUrl;
@@ -151,12 +148,10 @@ async function uploadImageToBucket(
     const arrayBuffer = await blob.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
-    const path = `${IMAGE_FOLDER}/${filename}`;
-
-    // Upload to Supabase
+    // Upload to Supabase bucket root
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(path, uint8Array, {
+      .upload(filename, uint8Array, {
         contentType: "image/png",
         upsert: true, // Overwrite if exists
       });
@@ -169,7 +164,7 @@ async function uploadImageToBucket(
     // Get public URL
     const { data: urlData } = supabase.storage
       .from(BUCKET_NAME)
-      .getPublicUrl(path);
+      .getPublicUrl(filename);
 
     console.log(`[MealImageService] ✅ Image uploaded successfully`);
     return urlData.publicUrl;

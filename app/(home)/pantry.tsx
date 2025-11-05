@@ -1,7 +1,9 @@
 import ToastBanner from "@/components/generalMessage";
+import PantryItemImage from "@/components/pantry/PantryItemImage";
 import ScanConfirmModal from "@/components/scanConfirmModal";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
+import { preloadPantryImages } from "@/src/services/pantryImageService";
 import {
   createMyPantryItem,
   deletePantryItem,
@@ -384,6 +386,12 @@ const PantryDashboard = () => {
         { id: "all", name: "All" },
         ...mergedNames.map((n) => ({ id: categoryIdFromName(n), name: n })),
       ]);
+
+      // Preload pantry item images in background
+      const itemNames = mapped.map(item => item.name).filter(Boolean);
+      if (itemNames.length > 0) {
+        preloadPantryImages(itemNames);
+      }
     } catch (err: any) {
       console.log("listMyPantryItems error", err);
       showToast("error", "Failed to load pantry items.",);
@@ -795,20 +803,16 @@ const PantryDashboard = () => {
               ]}
             >
               <View style={styles.itemLeft}>
-                <View
-                  style={[
-                    styles.itemImageContainer,
-                    {
-                      borderColor: getExpirationColor(item.expires_at),
-                      borderWidth: 2,
-                    },
-                  ]}
-                >{/*
-                  <Text style={styles.itemImage} accessibilityLabel={`${item.category || 'item'} icon`}>
-                    {item.image}
-                  </Text>*/}
-                </View>
-                <View>
+                <PantryItemImage
+                  itemName={item.name}
+                  imageUrl={item.image?.startsWith('http') ? item.image : undefined}
+                  size={56}
+                  borderColor={getExpirationColor(item.expires_at)}
+                  borderWidth={2}
+                  onError={(msg) => showToast("error", msg, 4000)}
+                  silent={false}
+                />
+                <View style={{ marginLeft: 12 }}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <Text style={styles.itemQuantity}>
                     {item.quantity} {item.unit}

@@ -98,6 +98,7 @@ const MealsDashboard: React.FC = () => {
           onMealSelect={handleMealSelect}
           isLoading={isLoading}
           hasError={hasError}
+          onImageError={(msg) => showToast("error", msg, 4000)}
         />
       ) : (
         selectedMeal && <MealDetailScreen meal={selectedMeal} onBack={handleBack} />

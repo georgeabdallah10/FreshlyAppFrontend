@@ -23,6 +23,9 @@ const imageCache = new Map<string, { url: string | null, failedAt?: number, last
 // Track pending requests to avoid duplicate API calls
 const pendingRequests = new Map<string, Promise<string | null>>();
 
+// Track which items have already logged 'waiting for pending request' for the current pending promise
+const pendingRequestLogged = new Set<string>();
+
 /**
  * Sanitize item name for use as filename
  * Example: "Fresh Tomatoes!" → "fresh-tomatoes"
@@ -96,13 +99,13 @@ async function generateAndUploadImage(itemName: string): Promise<string | null> 
     });
 
     if (!response.ok) {
-      throw new Error(`Image generation failed: ${response.status}`);
+      console.log(` ERROR, Image generation failed: ${response.status}`);
     }
 
     const { imageUrl } = await response.json();
 
     if (!imageUrl) {
-      throw new Error('No image URL returned from backend');
+      console.log(` ERROR,  No image URL returned from backend`);
     }
 
     // Download the generated image
@@ -121,7 +124,7 @@ async function generateAndUploadImage(itemName: string): Promise<string | null> 
       });
 
     if (error) {
-      throw error;
+      console.log("Another Error")
     }
 
     // Get public URL
@@ -180,7 +183,10 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
 
   // 2. Check if request is already pending (avoid duplicates)
   if (pendingRequests.has(cacheKey)) {
-    console.log(`⏳ Waiting for pending request: ${itemName}`);
+    if (!pendingRequestLogged.has(cacheKey)) {
+      console.log(`⏳ Waiting for pending request: ${itemName}`);
+      pendingRequestLogged.add(cacheKey);
+    }
     return pendingRequests.get(cacheKey)!;
   }
 
@@ -204,8 +210,9 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
 
       return imageUrl;
     } finally {
-      // Clean up pending request
+      // Clean up pending request and log tracker
       pendingRequests.delete(cacheKey);
+      pendingRequestLogged.delete(cacheKey);
     }
   })();
 
@@ -219,16 +226,20 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
  */
 export async function preloadPantryImages(itemNames: string[]): Promise<void> {
   const uniqueNames = [...new Set(itemNames.filter(Boolean))];
-  
   console.log(`🔄 Preloading ${uniqueNames.length} pantry item images...`);
 
-  // Load in parallel but don't wait for all to complete
-  const promises = uniqueNames.map(name => 
-    getPantryItemImage(name).catch(err => {
+  // Only call getPantryItemImage if not already pending
+  const promises = uniqueNames.map(name => {
+    const cacheKey = sanitizeItemName(name);
+    if (pendingRequests.has(cacheKey)) {
+      // Already pending, skip
+      return null;
+    }
+    return getPantryItemImage(name).catch(err => {
       console.warn(`Failed to preload image for ${name}:`, err);
       return null;
-    })
-  );
+    });
+  }).filter(Boolean) as Promise<any>[];
 
   // Fire and forget (don't block UI)
   Promise.all(promises).then(() => {

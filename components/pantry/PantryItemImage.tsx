@@ -15,6 +15,9 @@ import { getPantryItemImage, getPantryItemInitials } from '@/src/services/pantry
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
+// Track which items have already shown an error toast this session
+const shownErrorToasts = new Set<string>();
+
 interface PantryItemImageProps {
   itemName: string;
   imageUrl?: string; // Optional: if item already has image URL from backend
@@ -37,7 +40,7 @@ export default function PantryItemImage({
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [errorNotified, setErrorNotified] = useState(false);
+  // Removed errorNotified state
 
   // Determine which image to use
   const finalImageUrl = imageUrl || generatedUrl;
@@ -49,7 +52,7 @@ export default function PantryItemImage({
     let isMounted = true;
     setLoading(true);
     setError(false);
-    setErrorNotified(false);
+    // Removed setErrorNotified(false);
 
     getPantryItemImage(itemName)
       .then((url) => {
@@ -59,10 +62,10 @@ export default function PantryItemImage({
             setError(false);
           } else {
             setError(true);
-            // Notify parent of error
-            if (!silent && onError && !errorNotified) {
+            // Notify parent of error only once per item per session
+            if (!silent && onError && !shownErrorToasts.has(itemName)) {
               onError(`Unable to load image for "${itemName}". Showing initials instead.`);
-              setErrorNotified(true);
+              shownErrorToasts.add(itemName);
             }
           }
         }
@@ -71,9 +74,7 @@ export default function PantryItemImage({
         console.warn(`Failed to load pantry image for ${itemName}:`, err);
         if (isMounted) {
           setError(true);
-          // Determine error message
           let errorMsg = `Unable to generate image for "${itemName}". Showing initials instead.`;
-          
           if (err?.message?.includes('network') || err?.message?.includes('fetch')) {
             errorMsg = `Network error loading image for "${itemName}". Check your connection.`;
           } else if (err?.message?.includes('timeout')) {
@@ -81,11 +82,9 @@ export default function PantryItemImage({
           } else if (err?.message?.includes('401') || err?.message?.includes('403')) {
             errorMsg = `Authentication error loading image for "${itemName}".`;
           }
-
-          // Notify parent of error
-          if (!silent && onError && !errorNotified) {
+          if (!silent && onError && !shownErrorToasts.has(itemName)) {
             onError(errorMsg);
-            setErrorNotified(true);
+            shownErrorToasts.add(itemName);
           }
         }
       })

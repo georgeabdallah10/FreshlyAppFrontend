@@ -1,24 +1,27 @@
 /**
  * Pantry Item Image Service
- * 
+ *
  * Three-tier caching system for pantry item images:
  * 1. In-memory cache (instant, free)
  * 2. Supabase bucket check (fast, ~free)
  * 3. AI generation via backend (one-time cost: ~$0.02)
- * 
+ *
  * Cost savings: ~99% (generate once per item, cached forever)
  */
 
-import { BASE_URL } from '../env/baseUrl';
-import { supabase } from '../supabase/client';
-import { Storage } from '../utils/storage';
+import { BASE_URL } from "../env/baseUrl";
+import { supabase } from "../supabase/client";
+import { Storage } from "../utils/storage";
 
 // Bucket configuration
 const BUCKET_NAME = "pantryItems";
 
 // In-memory cache for image URLs (instant, free)
 // Now supports caching null (failure) with optional cooldown
-const imageCache = new Map<string, { url: string | null, failedAt?: number, lastWarnedAt?: number }>();
+const imageCache = new Map<
+  string,
+  { url: string | null; failedAt?: number; lastWarnedAt?: number }
+>();
 
 // Track pending requests to avoid duplicate API calls
 const pendingRequests = new Map<string, Promise<string | null>>();
@@ -34,10 +37,10 @@ function sanitizeItemName(name: string): string {
   return name
     .toLowerCase()
     .trim()
-    .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-    .replace(/\s+/g, '-')          // Spaces to hyphens
-    .replace(/-+/g, '-')           // Multiple hyphens to single
-    .replace(/^-|-$/g, '');        // Trim hyphens
+    .replace(/[^a-z0-9\s-]/g, "") // Remove special chars
+    .replace(/\s+/g, "-") // Spaces to hyphens
+    .replace(/-+/g, "-") // Multiple hyphens to single
+    .replace(/^-|-$/g, ""); // Trim hyphens
 }
 
 /**
@@ -49,9 +52,7 @@ async function checkSupabaseImage(itemName: string): Promise<string | null> {
     const filename = `${sanitized}.png`;
 
     // Try to get public URL
-    const { data } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(filename);
+    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filename);
 
     if (data?.publicUrl) {
       // Verify the file actually exists by checking if we can get it
@@ -67,7 +68,10 @@ async function checkSupabaseImage(itemName: string): Promise<string | null> {
 
     return null;
   } catch (error) {
-    console.warn(`Could not check Supabase for pantry image: ${itemName}`, error);
+    console.warn(
+      `Could not check Supabase for pantry image: ${itemName}`,
+      error
+    );
     return null;
   }
 }
@@ -75,23 +79,25 @@ async function checkSupabaseImage(itemName: string): Promise<string | null> {
 /**
  * Generate AI image via backend and upload to Supabase
  */
-async function generateAndUploadImage(itemName: string): Promise<string | null> {
+async function generateAndUploadImage(
+  itemName: string
+): Promise<string | null> {
   try {
     console.log(`🎨 Generating AI image for pantry item: ${itemName}`);
 
     // Get auth token
     const token = await Storage.getItem("access_token");
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     };
-    
+
     if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+      headers["Authorization"] = `Bearer ${token}`;
     }
 
     // Call backend to generate image
     const response = await fetch(`${BASE_URL}/chat/generate-image`, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: JSON.stringify({
         prompt: `A professional photograph of ${itemName}, grocery store quality, clean white background, well-lit, high quality product photography`,
@@ -102,16 +108,38 @@ async function generateAndUploadImage(itemName: string): Promise<string | null> 
       console.log(` ERROR, Image generation failed: ${response.status}`);
     }
 
-    const { imageUrl } = await response.json();
-
+    const result = await response.json();
+    const imageUrl = result.image_url || result.imageUrl;
     if (!imageUrl) {
-      console.log(` ERROR,  No image URL returned from backend`);
+      console.error(`❌ No valid image URL returned from backend:`, result);
+      return null;
     }
 
     // Download the generated image
     const imageResponse = await fetch(imageUrl);
-    const imageBlob = await imageResponse.blob();
-
+    let imageBlob: Uint8Array;
+    try {
+      if (typeof imageResponse.arrayBuffer === "function") {
+        const arrayBuffer = await imageResponse.arrayBuffer();
+        imageBlob = new Uint8Array(arrayBuffer);
+      } else {
+        console.warn("⚠️ arrayBuffer() not supported in this environment, using base64 fallback.");
+        const base64Data = await imageResponse.text();
+        const binary = atob(base64Data);
+        imageBlob = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          imageBlob[i] = binary.charCodeAt(i);
+        }
+      }
+    } catch (e) {
+      console.error("⚠️ Failed to read image response data; using safe fallback.", e);
+      const base64Data = await imageResponse.text();
+      const binary = atob(base64Data);
+      imageBlob = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        imageBlob[i] = binary.charCodeAt(i);
+      }
+    }
     // Upload to Supabase bucket root
     const sanitized = sanitizeItemName(itemName);
     const filename = `${sanitized}.png`;
@@ -119,12 +147,12 @@ async function generateAndUploadImage(itemName: string): Promise<string | null> 
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
       .upload(filename, imageBlob, {
-        contentType: 'image/png',
+        contentType: "image/png",
         upsert: true, // Overwrite if exists
       });
 
     if (error) {
-      console.log("Another Error")
+      console.log("Another Error");
     }
 
     // Get public URL
@@ -148,11 +176,13 @@ async function generateAndUploadImage(itemName: string): Promise<string | null> 
 
 /**
  * Get pantry item image URL (with 3-tier caching)
- * 
+ *
  * @param itemName - Name of the pantry item
  * @returns Image URL or null if generation fails
  */
-export async function getPantryItemImage(itemName: string): Promise<string | null> {
+export async function getPantryItemImage(
+  itemName: string
+): Promise<string | null> {
   if (!itemName?.trim()) {
     return null;
   }
@@ -164,15 +194,23 @@ export async function getPantryItemImage(itemName: string): Promise<string | nul
   if (imageCache.has(cacheKey)) {
     const cached = imageCache.get(cacheKey)!;
     if (cached.url) {
-      console.log(`💾 Cache hit for pantry item: ${itemName}`);
+      if (!cached.lastWarnedAt) {
+        console.log(`💾 Cache hit for pantry item: ${itemName}`);
+        imageCache.set(cacheKey, { ...cached, lastWarnedAt: Date.now() });
+      }
       return cached.url;
     } else if (cached.failedAt) {
       // If last failure was recent, skip retry
       const now = Date.now();
       if (now - cached.failedAt < COOLDOWN_MS) {
         // Only log once per cooldown period
-        if (!cached.lastWarnedAt || now - cached.lastWarnedAt > COOLDOWN_MS / 2) {
-          console.warn(`⏳ Skipping retry for failed pantry image: ${itemName}`);
+        if (
+          !cached.lastWarnedAt ||
+          now - cached.lastWarnedAt > COOLDOWN_MS / 2
+        ) {
+          console.warn(
+            `⏳ Skipping retry for failed pantry image: ${itemName}`
+          );
           imageCache.set(cacheKey, { ...cached, lastWarnedAt: now });
         }
         return null;
@@ -229,17 +267,19 @@ export async function preloadPantryImages(itemNames: string[]): Promise<void> {
   console.log(`🔄 Preloading ${uniqueNames.length} pantry item images...`);
 
   // Only call getPantryItemImage if not already pending
-  const promises = uniqueNames.map(name => {
-    const cacheKey = sanitizeItemName(name);
-    if (pendingRequests.has(cacheKey)) {
-      // Already pending, skip
-      return null;
-    }
-    return getPantryItemImage(name).catch(err => {
-      console.warn(`Failed to preload image for ${name}:`, err);
-      return null;
-    });
-  }).filter(Boolean) as Promise<any>[];
+  const promises = uniqueNames
+    .map((name) => {
+      const cacheKey = sanitizeItemName(name);
+      if (pendingRequests.has(cacheKey)) {
+        // Already pending, skip
+        return null;
+      }
+      return getPantryItemImage(name).catch((err) => {
+        console.warn(`Failed to preload image for ${name}:`, err);
+        return null;
+      });
+    })
+    .filter(Boolean) as Promise<any>[];
 
   // Fire and forget (don't block UI)
   Promise.all(promises).then(() => {
@@ -249,7 +289,16 @@ export async function preloadPantryImages(itemNames: string[]): Promise<void> {
 
 export function clearPantryImageCache(): void {
   imageCache.clear();
-  console.log('🗑️ Cleared pantry image cache');
+  console.log("🗑️ Cleared pantry image cache");
+}
+
+/**
+ * Mark a pantry item image as failed (e.g., if the image URL is broken)
+ * This will cache a failure for the item for the cooldown period
+ */
+export function markPantryImageAsFailed(itemName: string) {
+  const cacheKey = sanitizeItemName(itemName);
+  imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
 }
 
 /**
@@ -258,16 +307,13 @@ export function clearPantryImageCache(): void {
  */
 export function getPantryItemInitials(itemName: string): string {
   if (!itemName?.trim()) {
-    return '??';
+    return "??";
   }
 
-  const words = itemName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const words = itemName.trim().split(/\s+/).filter(Boolean);
 
   if (words.length === 0) {
-    return '??';
+    return "??";
   }
 
   if (words.length === 1) {

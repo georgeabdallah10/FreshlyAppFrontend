@@ -259,6 +259,10 @@ const HomeDashboard = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
+            <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.menuButton}
@@ -273,25 +277,32 @@ const HomeDashboard = () => {
             />
           </View>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.notificationButton} onPress={() =>  router.push("/(home)/notifications")}>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("../../assets/images/logo.png")} // Update with your image path
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={() => router.push("/(home)/notifications")}
+        >
           <NotificationBell
             iconSize={24}
             iconColor="#1F2937"
             badgeColor="#FF3B30"
           />
-        </TouchableOpacity> 
+        </TouchableOpacity>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
         {/* Welcome Text */}
-        <Text style={styles.welcomeText}>
-          <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text> {"\n"}
-          <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
-        </Text>
-
+        <View>
+          <Text style={styles.welcomeText}>
+            <Text style={{ color: "#00A86B" }}> Smarter Shopping.</Text> {"\n"}
+            <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+          </Text>
+        </View>
         {/* Menu Grid */}
         <View style={styles.menuGrid}>
           {menuItems.map((item) => (
@@ -355,15 +366,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 20,
+    paddingTop: 50,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 10,
+    marginTop: -30,
+    marginBottom: -25,
   },
   menuButton: {
     width: 48,
@@ -404,12 +415,14 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 110,
+  },
+  logoContainer: {
+    alignItems: "center",
   },
   welcomeText: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#111111",
+    color: "#4C4D59",
     textAlign: "center",
     lineHeight: 32,
     marginTop: 10,
@@ -567,8 +580,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   logoImage: {
-    width: 24,
-    height: 24,
+    width: 150,
+    height: 150,
   },
   logoImageInactive: {
     opacity: 0.6,

@@ -11,7 +11,7 @@
  * <PantryItemImage itemName="Fresh Tomatoes" size={56} onError={(msg) => showToast('error', msg)} />
  */
 
-import { getPantryItemImage, getPantryItemInitials } from '@/src/services/pantryImageService';
+import { getPantryItemImage, getPantryItemInitials, markPantryImageAsFailed } from '@/src/services/pantryImageService';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 
@@ -137,6 +137,7 @@ export default function PantryItemImage({
         resizeMode="cover"
         onError={() => {
           console.warn(`Failed to load image from URL: ${finalImageUrl}`);
+          markPantryImageAsFailed(itemName);
           setError(true);
         }}
       />

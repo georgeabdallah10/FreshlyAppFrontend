@@ -12,7 +12,10 @@ import { supabase } from "../supabase/client";
  * - Cost optimization through caching and deduplication
  */
 
-const BUCKET_NAME = "meals";
+const BUCKET_NAME = "Meals";
+const DEBUG_LOGS = false;
+const lastLogTimes = new Map<string, number>();
+const cacheHitLastLog = new Map<string, number>();
 
 // In-memory cache: { mealName: { url: string|null, failedAt?: number } }
 // This prevents repeated calls within the same app session
@@ -20,6 +23,9 @@ const imageCache = new Map<string, { url: string | null, failedAt?: number }>();
 
 // Track in-flight requests to prevent duplicate simultaneous calls
 const pendingRequests = new Map<string, Promise<string | null>>();
+
+// Track which cacheKeys have already logged the waiting message
+const waitingLogShown = new Set<string>();
 
 /**
  * Sanitize meal name for use as filename
@@ -138,12 +144,9 @@ async function uploadImageToBucket(
   try {
     console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${filename}`);
 
-    // Download the image
+    // Download the image (React Native compatible)
     const response = await fetch(imageUrl);
-    const blob = await response.blob();
-    
-    // Convert blob to ArrayBuffer for Supabase
-    const arrayBuffer = await blob.arrayBuffer();
+    const arrayBuffer = await response.arrayBuffer();
     const uint8Array = new Uint8Array(arrayBuffer);
 
     // Upload to Supabase bucket root
@@ -205,7 +208,14 @@ export async function getMealImage(
   if (imageCache.has(cacheKey)) {
     const cached = imageCache.get(cacheKey)!;
     if (cached.url) {
-      console.log(`[MealImageService] 💾 Cache hit: ${mealName}`);
+      if (DEBUG_LOGS) {
+        const now = Date.now();
+        const last = cacheHitLastLog.get(cacheKey) || 0;
+        if (now - last > 30000) { // at most once every 30s per cached meal
+          console.log(`[MealImageService] 💾 Cache hit: ${mealName}`);
+          cacheHitLastLog.set(cacheKey, now);
+        }
+      }
       return cached.url;
     } else if (cached.failedAt) {
       const now = Date.now();
@@ -219,7 +229,14 @@ export async function getMealImage(
 
   // 2. Check if already being fetched (prevent duplicate calls)
   if (pendingRequests.has(cacheKey)) {
-    console.log(`[MealImageService] ⏳ Waiting for pending request: ${mealName}`);
+    if (DEBUG_LOGS) {
+      const now = Date.now();
+      const lastLog = lastLogTimes.get(cacheKey) || 0;
+      if (now - lastLog > 10000) { // log at most once every 10s per meal
+        console.log(`[MealImageService] ⏳ Waiting for pending request: ${mealName}`);
+        lastLogTimes.set(cacheKey, now);
+      }
+    }
     return await pendingRequests.get(cacheKey)!;
   }
 
@@ -260,8 +277,11 @@ export async function getMealImage(
       imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
       return null;
     } finally {
-      // Clean up pending request
+      // Clean up pending request and waiting log
       pendingRequests.delete(cacheKey);
+      waitingLogShown.delete(cacheKey);
+      lastLogTimes.delete(cacheKey);
+      cacheHitLastLog.delete(cacheKey);
     }
   })();
 

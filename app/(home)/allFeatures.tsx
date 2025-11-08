@@ -3,19 +3,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
-    Linking,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import Animated, {
-    Easing,
-    FadeInUp,
-    FadeOut,
-    Layout,
+  Easing,
+  FadeInUp,
+  FadeOut,
+  Layout,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -74,7 +74,7 @@ const features: Feature[] = [
     icon: "restaurant",
     title: "Smart Recipe Suggestions",
     blurb:
-      "Get meal ideas that use what’s already in your pantry to cut waste.",
+      "Get meal ideas that use what's already in your pantry to cut waste.",
     proTip: "Pro tip: Scan barcodes when you restock for better suggestions.",
   },
   {
@@ -90,14 +90,14 @@ const features: Feature[] = [
     title: "Smart Pantry Tracking",
     blurb:
       "Track inventory via scans, manual add, or smart-fridge integrations.",
-    proTip: "Pro tip: Mark items as “staples” for quick add to future lists.",
+    proTip: "Pro tip: Mark items as \"staples\" for quick add to future lists.",
   },
   {
     id: "alerts",
     icon: "notifications",
     title: "Expiration & Restock Alerts",
     blurb: "Use ingredients before they expire; never run out of essentials.",
-    proTip: "Pro tip: Turn on weekly summaries to plan “use-it-up” meals.",
+    proTip: "Pro tip: Turn on weekly summaries to plan \"use-it-up\" meals.",
   },
   {
     id: "budget",
@@ -138,7 +138,7 @@ const features: Feature[] = [
 
 const steps = [
   "Set preferences (goals, allergies, diet).",
-  "Scan/add what’s in your pantry.",
+  "Scan/add what's in your pantry.",
   "Get your weekly plan with recipes & portions.",
   "Shop smarter (auto list + price compare).",
   "Cook & track progress and waste savings.",
@@ -169,18 +169,26 @@ const Hero = () => {
     >
       <Animated.View
         entering={FadeInUp.duration(600).easing(Easing.out(Easing.cubic))}
+        style={styles.heroHeader}
       >
         <TouchableOpacity
           onPress={() => router.back()}
           style={[styles.headerButton]}
         >
-          <Text style={styles.headerIcon}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
         </TouchableOpacity>
+      </Animated.View>
+      
+      <Animated.View 
+        entering={FadeInUp.delay(100).duration(600).easing(Easing.out(Easing.cubic))}
+        style={styles.titleContainer}
+      >
         <Text style={styles.h1}>
-          Freshly <Text style={{ color: theme.colors.primary }}>Features</Text>
+          Freshly <Text style={styles.h1Accent}>Features</Text>
         </Text>
       </Animated.View>
-      <Animated.View entering={FadeInUp.delay(90).duration(600)}>
+
+      <Animated.View entering={FadeInUp.delay(200).duration(600)}>
         <Text style={styles.subtitle}>
           Your AI-powered meal planning and grocery assistant. Freshly learns
           your tastes, plans your week, builds a smart shopping list, and helps
@@ -188,15 +196,27 @@ const Hero = () => {
           waste.
         </Text>
       </Animated.View>
-      <View style={styles.kpiRow}>
-        {KPI.map((k) => (
-          <View key={k.label} style={styles.kpiChip}>
-            <Ionicons name={k.icon} size={16} color={theme.colors.primary} />
-            <Text style={styles.kpiLabel}>{k.label}</Text>
-            <Text style={styles.kpiValue}>{k.value}</Text>
-          </View>
+      
+      <Animated.View 
+        entering={FadeInUp.delay(300).duration(600)}
+        style={styles.kpiContainer}
+      >
+        {KPI.map((k, index) => (
+          <Animated.View
+            key={k.label}
+            entering={FadeInUp.delay(350 + index * 50).duration(500)}
+            style={styles.kpiChip}
+          >
+            <View style={styles.kpiIconWrap}>
+              <Ionicons name={k.icon} size={18} color={theme.colors.primary} />
+            </View>
+            <View style={styles.kpiContent}>
+              <Text style={styles.kpiLabel}>{k.label}</Text>
+              <Text style={styles.kpiValue}>{k.value}</Text>
+            </View>
+          </Animated.View>
         ))}
-      </View>
+      </Animated.View>
     </LinearGradient>
   );
 };
@@ -207,10 +227,11 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
   return (
     <Animated.View
       layout={Layout.duration(180).easing(Easing.out(Easing.cubic))}
+      entering={FadeInUp.delay(index * 60).duration(500)}
       style={[
         styles.card,
         {
-          borderLeftWidth: 3,
+          borderLeftWidth: 4,
           borderLeftColor:
             index % 2 ? theme.colors.accent : theme.colors.primary,
         },
@@ -222,18 +243,25 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
         accessibilityLabel={`${item.title}. ${
           expanded ? "Collapse" : "Expand"
         } for details.`}
-        android_ripple={{ color: "rgba(0,0,0,0.04)" }}
+        android_ripple={{ color: "rgba(0,168,107,0.08)" }}
         style={styles.cardInner}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.iconWrap}>
-            <Ionicons name={item.icon} size={20} color={theme.colors.primary} />
+          <View style={[
+            styles.iconWrap,
+            { backgroundColor: index % 2 ? theme.colors.accentTint : theme.colors.primaryTint }
+          ]}>
+            <Ionicons 
+              name={item.icon} 
+              size={22} 
+              color={index % 2 ? theme.colors.accent : theme.colors.primary} 
+            />
           </View>
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Ionicons
             name={expanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={theme.colors.primary}
+            size={20}
+            color={theme.colors.textMut}
           />
         </View>
 
@@ -247,8 +275,10 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
             style={styles.proTipBox}
           >
             <View style={styles.proTipBar} />
-            <Ionicons name="sparkles" size={16} color={theme.colors.accent} />
-            <Text style={styles.proTipText}>{item.proTip}</Text>
+            <View style={styles.proTipContent}>
+              <Ionicons name="sparkles" size={16} color={theme.colors.accent} />
+              <Text style={styles.proTipText}>{item.proTip}</Text>
+            </View>
           </Animated.View>
         )}
       </Pressable>
@@ -258,45 +288,60 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
 
 const StepItem = ({ text, index }: { text: string; index: number }) => {
   return (
-    <Animated.View layout={Layout.springify()} style={styles.stepItem}>
-      <View style={styles.stepBadge}>
+    <Animated.View 
+      layout={Layout.springify()} 
+      entering={FadeInUp.delay(index * 80).duration(500)}
+      style={styles.stepItem}
+    >
+      <LinearGradient
+        colors={[theme.colors.primary, theme.colors.primaryDark]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.stepBadge}
+      >
         <Text style={styles.stepBadgeText}>{index + 1}</Text>
-      </View>
+      </LinearGradient>
       <Text style={styles.stepText}>{text}</Text>
     </Animated.View>
   );
 };
 
-const TipPill = ({ text }: { text: string }) => {
+const TipPill = ({ text, index }: { text: string; index: number }) => {
   return (
-    <View style={styles.tipPill}>
-      <Ionicons name="bulb" size={14} color={theme.colors.text} />
+    <Animated.View 
+      entering={FadeInUp.delay(index * 60).duration(400)}
+      style={styles.tipPill}
+    >
+      <Ionicons name="bulb" size={15} color={theme.colors.accent} />
       <Text style={styles.tipText}>{text}</Text>
-    </View>
+    </Animated.View>
   );
 };
 
 const CTAButton = ({ onPress }: { onPress: () => void }) => {
   const [pressed, setPressed] = useState(false);
   return (
-    <Pressable
-      onPress={onPress}
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setPressed(false)}
-      accessibilityRole="button"
-      accessibilityLabel="Start planning"
-      style={[styles.ctaWrap, pressed && { transform: [{ scale: 0.98 }] }]}
-    >
-      <LinearGradient
-        colors={[theme.colors.accent, theme.colors.primary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.ctaBtn}
+    <Animated.View entering={FadeInUp.delay(100).duration(600)}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setPressed(false)}
+        accessibilityRole="button"
+        accessibilityLabel="Start planning"
+        style={[styles.ctaWrap, pressed && { transform: [{ scale: 0.97 }] }]}
       >
-        <Ionicons name="sparkles" size={18} color="#FFFFFF" />
-        <Text style={styles.ctaText}>Start planning</Text>
-      </LinearGradient>
-    </Pressable>
+        <LinearGradient
+          colors={[theme.colors.accent, theme.colors.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.ctaBtn}
+        >
+          <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+          <Text style={styles.ctaText}>Start Planning</Text>
+          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
   );
 };
 
@@ -313,7 +358,7 @@ export default function FreshlyFeaturesScreen() {
 
         {/* Core Features */}
         <View style={styles.section}>
-          <Text style={styles.h2}>Core features</Text>
+          <Text style={styles.h2}>Core Features</Text>
           <Text style={styles.sectionBlurb}>
             Explore the building blocks of a calmer kitchen—each card expands
             with a quick pro tip.
@@ -328,7 +373,7 @@ export default function FreshlyFeaturesScreen() {
 
         {/* How to Use */}
         <View style={styles.section}>
-          <Text style={styles.h2}>How to use Freshly</Text>
+          <Text style={styles.h2}>How to Use Freshly</Text>
           <Text style={styles.sectionBlurb}>
             Get set up in minutes—Freshly handles the planning so you can focus
             on living.
@@ -342,17 +387,17 @@ export default function FreshlyFeaturesScreen() {
 
         {/* Tips */}
         <View style={styles.section}>
-          <Text style={styles.h2}>Tips to get the most out of it</Text>
+          <Text style={styles.h2}>Tips to Get the Most Out of It</Text>
           <View style={styles.tipsRow}>
-            {tips.map((t) => (
-              <TipPill key={t} text={t} />
+            {tips.map((t, i) => (
+              <TipPill key={t} text={t} index={i} />
             ))}
           </View>
         </View>
 
         {/* Closing + CTA */}
         <View style={[styles.section, styles.closing]}>
-          <Text style={styles.h2}>Why people love Freshly</Text>
+          <Text style={styles.h2}>Why People Love Freshly</Text>
           <Text style={styles.sectionBlurb}>
             A simpler way to plan, shop, and eat—personal to you, powered by AI.
             Less stress, less waste, more time back every week.
@@ -375,7 +420,6 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
     backgroundColor: theme.colors.bg,
-    paddingTop: 40,
   },
   container: {
     paddingBottom: theme.space.xxl,
@@ -383,69 +427,108 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: theme.colors.bg,
     paddingHorizontal: theme.space.lg,
-    paddingBottom: theme.space.sm,
+    paddingTop: theme.space.md,
+    paddingBottom: theme.space.xl,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.colors.border,
   },
-  h1: {
+  heroHeader: {
     flexDirection: "row",
-    alignContent: "center",
+    alignItems: "center",
+    marginBottom: theme.space.lg,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.primaryTint,
     justifyContent: "center",
-    gap: 20,
-    width: 300,
-    fontSize: 30,
-    fontWeight: "700",
+    alignItems: "center",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(0,168,107,0.3)",
+  },
+  titleContainer: {
+    alignItems: "center",
+    marginBottom: theme.space.md,
+  },
+  h1: {
+    fontSize: 34,
+    fontWeight: "800",
     color: theme.colors.text,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
+    textAlign: "center",
+  },
+  h1Accent: {
+    color: theme.colors.primary,
   },
   subtitle: {
     marginTop: theme.space.md,
     fontSize: 15.5,
-    lineHeight: 22,
+    lineHeight: 23,
     color: theme.colors.textMut,
+    textAlign: "center",
   },
-  kpiRow: {
-    flexDirection: "row",
-    gap: theme.space.sm,
-    marginTop: theme.space.lg,
-    flexWrap: "wrap",
+  kpiContainer: {
+    marginTop: theme.space.xl,
+    gap: theme.space.md,
   },
   kpiChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: theme.space.md,
+    backgroundColor: theme.colors.card,
+    paddingVertical: theme.space.md,
+    paddingHorizontal: theme.space.lg,
+    borderRadius: theme.radius.lg,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primaryTint,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  kpiIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     backgroundColor: theme.colors.primaryTint,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: theme.radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,168,107,0.25)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kpiContent: {
+    flex: 1,
   },
   kpiLabel: {
     color: theme.colors.text,
-    fontSize: 12.5,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 2,
   },
   kpiValue: {
     color: theme.colors.primary,
-    fontSize: 12,
+    fontSize: 15,
+    fontWeight: "700",
   },
 
   section: {
     paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.xl,
+    paddingTop: theme.space.xxl,
   },
   h2: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: "700",
     color: theme.colors.text,
     marginBottom: theme.space.sm,
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
+    textAlign: "center",
   },
   sectionBlurb: {
     fontSize: 14.5,
-    lineHeight: 21,
+    lineHeight: 22,
     color: theme.colors.textMut,
-    marginBottom: theme.space.lg,
+    marginBottom: theme.space.xl,
+    textAlign: "center",
   },
 
   cardGrid: {
@@ -457,156 +540,162 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
     shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
     overflow: "hidden",
   },
   cardInner: {
     padding: theme.space.lg,
-    gap: theme.space.sm,
+    gap: theme.space.md,
   },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.space.sm,
+    gap: theme.space.md,
   },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primaryTint,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,168,107,0.22)",
+    borderColor: "rgba(0,168,107,0.25)",
   },
   cardTitle: {
     flex: 1,
     color: theme.colors.text,
-    fontSize: 16.5,
-    fontWeight: "600",
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   cardBlurb: {
     color: theme.colors.textMut,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 14.5,
+    lineHeight: 21,
   },
   proTipBox: {
     marginTop: theme.space.sm,
     padding: theme.space.md,
     borderRadius: theme.radius.md,
     backgroundColor: theme.colors.accentTint,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(253,129,0,0.25)",
+    borderWidth: 1,
+    borderColor: "rgba(253,129,0,0.3)",
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingLeft: theme.space.md,
+    alignItems: "flex-start",
+    gap: theme.space.sm,
   },
-
   proTipBar: {
     width: 3,
     height: "100%",
     backgroundColor: theme.colors.accent,
     borderRadius: 2,
-    marginRight: 10,
+  },
+  proTipContent: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
   },
   proTipText: {
     color: theme.colors.text,
     fontSize: 13.5,
     flex: 1,
+    lineHeight: 19,
   },
 
   stepsWrap: {
-    gap: theme.space.sm,
+    gap: theme.space.md,
   },
   stepItem: {
     backgroundColor: theme.colors.card,
     borderRadius: theme.radius.lg,
-    padding: theme.space.md,
+    padding: theme.space.lg,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.space.md,
+    gap: theme.space.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   stepBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: theme.colors.cardAlt,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
   },
   stepBadgeText: {
-    color: theme.colors.text,
-    fontWeight: "700",
-    fontSize: 13,
+    color: "#FFFFFF",
+    fontWeight: "800",
+    fontSize: 16,
   },
   stepText: {
     color: theme.colors.text,
     fontSize: 14.5,
     flex: 1,
-    lineHeight: 20,
+    lineHeight: 21,
+    fontWeight: "500",
   },
 
   tipsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: theme.space.sm,
+    justifyContent: "center",
   },
   tipPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: theme.colors.chipBg,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: theme.colors.card,
     borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1.5,
     borderColor: theme.colors.border,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
   tipText: {
     color: theme.colors.text,
     fontSize: 13.5,
+    fontWeight: "600",
   },
 
   closing: {
     paddingBottom: theme.space.xl,
   },
   ctaWrap: {
-    marginTop: theme.space.lg,
+    marginTop: theme.space.xl,
   },
   ctaBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 14,
+    gap: 12,
+    paddingVertical: 16,
+    paddingHorizontal: theme.space.xl,
     justifyContent: "center",
     borderRadius: theme.radius.xl,
-    // backgroundColor: "#00A86B",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
   ctaText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "700",
     color: "#FFFFFF",
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
-  headerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.primaryTint,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,168,107,0.25)",
-    marginBottom: 10,
-    marginLeft:-8,
-  },
-  headerIcon: { fontSize: 20, color: theme.colors.primary },
 });

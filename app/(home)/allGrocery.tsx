@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +25,8 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import IconButton from "@/components/iconComponent";
 
 type ScanType = "groceries" | "receipt" | "barcode";
 
@@ -131,14 +134,13 @@ const AllGroceryScanner = () => {
     if (type === "barcode") {
       openBarcodeScanner();
     } else {
-      openImageCapture(type); // Pass type directly
+      openImageCapture(type);
     }
   };
 
   // Open camera for image capture
   const openImageCapture = async (scanType: ScanType) => {
     try {
-      // Native app - use camera
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       
       if (status !== "granted") {
@@ -190,24 +192,21 @@ const AllGroceryScanner = () => {
   // Process captured image with AI via backend proxy
   const processImage = async (imageData: string, scanType: ScanType) => {
     try {
-      // Barcode scanning doesn't use image processing
       if (scanType === 'barcode') {
         throw new Error('Barcode scanning should not call processImage');
       }
       
-      // Call backend proxy API (handles iOS and Android)
       const response = await scanImageViaProxy({
         uri: imageData,
         scanType: scanType,
       });
       
-      // Convert API response to ScannedItem format
       const items: ScannedItem[] = response.items.map((item) => ({
         id: generateId(),
         name: item.name,
-        quantity: item.quantity.split(' ')[0], // Extract number from "3 pieces"
-        unit: item.quantity.split(' ')[1] || 'ea', // Extract unit or default to 'ea'
-        category: item.category.charAt(0).toUpperCase() + item.category.slice(1), // Capitalize
+        quantity: item.quantity.split(' ')[0],
+        unit: item.quantity.split(' ')[1] || 'ea',
+        category: item.category.charAt(0).toUpperCase() + item.category.slice(1),
         confidence: item.confidence,
       }));
       
@@ -345,78 +344,96 @@ const AllGroceryScanner = () => {
 
   // Render selection screen
   const renderSelectionScreen = () => (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Scan Groceries</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.title}>How would you like to scan?</Text>
-        <Text style={styles.subtitle}>
-          Choose your preferred scanning method
-        </Text>
-
-        <View style={styles.optionsContainer}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.optionCard}
-            onPress={() => handleScanTypeSelect("groceries")}
-            activeOpacity={0.8}
+            style={styles.backButton}
+            onPress={() => router.back()}
           >
-            <View style={styles.optionIcon}>
-              <Ionicons name="camera" size={40} color="#00A86B" />
-            </View>
-            <Text style={styles.optionTitle}>Scan Groceries</Text>
-            <Text style={styles.optionDescription}>
-              Take a photo of your groceries to automatically identify items
-            </Text>
+            <Ionicons name="arrow-back" size={24} color="#00A86B" />
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.optionCard}
-            onPress={() => handleScanTypeSelect("receipt")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.optionIcon}>
-              <Ionicons name="receipt" size={40} color="#FF8C00" />
-            </View>
-            <Text style={styles.optionTitle}>Scan Receipt</Text>
-            <Text style={styles.optionDescription}>
-              Take a photo of your receipt to extract purchased items
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.optionCard}
-            onPress={() => handleScanTypeSelect("barcode")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.optionIcon}>
-              <Image
-                source={require("../../assets/icons/barcode.png")}
-                style={styles.barcodeIcon}
-                resizeMode="contain"
-              />
-            </View>
-            <Text style={styles.optionTitle}>Scan Barcode</Text>
-            <Text style={styles.optionDescription}>
-              Scan individual barcodes to add specific products
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Scan Groceries</Text>
+          <View style={styles.backButton} />
         </View>
-      </View>
-    </ScrollView>
+
+        <View style={styles.content}>
+          <Text style={styles.title}>How would you like to scan?</Text>
+          <Text style={styles.subtitle}>
+            Choose your preferred scanning method
+          </Text>
+
+          <View style={styles.optionsContainer}>
+            <TouchableOpacity
+              style={styles.optionCard}
+              onPress={() => handleScanTypeSelect("groceries")}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#E8F8F1", "#FFFFFF"]}
+                style={styles.optionGradient}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "#E8F8F1" }]}>
+                  <Ionicons name="camera" size={40} color="#00A86B" />
+                </View>
+                <Text style={styles.optionTitle}>Scan Groceries</Text>
+                <Text style={styles.optionDescription}>
+                  Take a photo of your groceries to automatically identify items
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.optionCard}
+              onPress={() => handleScanTypeSelect("receipt")}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#FFF3E6", "#FFFFFF"]}
+                style={styles.optionGradient}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "#FFF3E6" }]}>
+                  <Ionicons name="receipt" size={40} color="#FD8100" />
+                </View>
+                <Text style={styles.optionTitle}>Scan Receipt</Text>
+                <Text style={styles.optionDescription}>
+                  Take a photo of your receipt to extract purchased items
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.optionCard}
+              onPress={() => handleScanTypeSelect("barcode")}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={["#F0F0F2", "#FFFFFF"]}
+                style={styles.optionGradient}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: "#F0F0F2" }]}>
+                  <IconButton iconName='barcode-outline' iconSize={45} style={{marginRight:5, marginBottom: 5}} ></IconButton>
+                </View>
+                <Text style={styles.optionTitle}>Scan Barcode</Text>
+                <Text style={styles.optionDescription}>
+                  Scan individual barcodes to add specific products
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 
   // Render processing screen
   const renderProcessingScreen = () => (
-    <View style={styles.processingContainer}>
+    <SafeAreaView style={styles.processingContainer} edges={['top', 'bottom']}>
       <Animated.View
         style={[
           styles.processingContent,
@@ -443,93 +460,112 @@ const AllGroceryScanner = () => {
           {selectedScanType === "barcode" && "Looking up product details"}
         </Text>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 
   // Render confirmation screen
   const renderConfirmationScreen = () => (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={resetScanner}
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView 
+        style={styles.flexContainer}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={resetScanner}
+          >
+            <Ionicons name="arrow-back" size={24} color="#00A86B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Confirm Items</Text>
+          <View style={styles.backButton} />
+        </View>
+
+        <ScrollView 
+          style={styles.confirmationContent}
+          contentContainerStyle={styles.confirmationScrollContent}
+          showsVerticalScrollIndicator={false}
+          bounces={true}
         >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Confirm Items</Text>
-        <View style={styles.backButton} />
-      </View>
-
-      <ScrollView style={styles.confirmationContent}>
-        <Text style={styles.confirmationTitle}>
-          Found {scannedItems.length} items
-        </Text>
-        <Text style={styles.confirmationSubtitle}>
-          Review and edit before adding to pantry
-        </Text>
-
-        <FlatList
-          data={scannedItems}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-          renderItem={({ item }) => (
-            <View style={styles.itemCard}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemDetails}>
-                  {item.quantity} {item.unit} • {item.category}
-                </Text>
-                {item.confidence && (
-                  <Text 
-                    style={[
-                      styles.itemConfidence,
-                      { color: getConfidenceColor(item.confidence) }
-                    ]}
-                  >
-                    {Math.round(item.confidence * 100)}% confidence
-                  </Text>
-                )}
-              </View>
-              <View style={styles.itemActions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => handleEditItem(item)}
-                >
-                  <Ionicons name="pencil" size={20} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveItem(item.id)}
-                >
-                  <Ionicons name="trash" size={20} color="#FF3B30" />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-        />
-      </ScrollView>
-
-      <View style={styles.confirmationFooter}>
-        <TouchableOpacity
-          style={styles.addToPantryButton}
-          onPress={handleAddAllToPantry}
-          disabled={scannedItems.length === 0}
-        >
-          <Ionicons name="add-circle" size={24} color="#FFF" />
-          <Text style={styles.addToPantryText}>
-            Add {scannedItems.length} Items to Pantry
+          <Text style={styles.confirmationTitle}>
+            Found {scannedItems.length} items
           </Text>
-        </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+          <Text style={styles.confirmationSubtitle}>
+            Review and edit before adding to pantry
+          </Text>
+
+          <FlatList
+            data={scannedItems}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            renderItem={({ item, index }) => {
+              const colors = ["#00A86B", "#FD8100", "#4C4D59"];
+              const color = colors[index % 3];
+              
+              return (
+                <View style={[styles.itemCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemDetails}>
+                      {item.quantity} {item.unit} • {item.category}
+                    </Text>
+                    {item.confidence && (
+                      <Text 
+                        style={[
+                          styles.itemConfidence,
+                          { color: getConfidenceColor(item.confidence) }
+                        ]}
+                      >
+                        {Math.round(item.confidence * 100)}% confidence
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditItem(item)}
+                    >
+                      <Ionicons name="pencil" size={20} color="#666" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.removeButton}
+                      onPress={() => handleRemoveItem(item.id)}
+                    >
+                      <Ionicons name="trash" size={20} color="#FF3B30" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            }}
+          />
+        </ScrollView>
+
+        <View style={styles.confirmationFooter}>
+          <TouchableOpacity
+            style={[styles.addToPantryButton, scannedItems.length === 0 && styles.disabledButton]}
+            onPress={handleAddAllToPantry}
+            disabled={scannedItems.length === 0}
+          >
+            <LinearGradient
+              colors={["#00A86B", "#008F5C"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            >
+              <Ionicons name="add-circle" size={24} color="#FFF" />
+              <Text style={styles.addToPantryText}>
+                Add {scannedItems.length} Items to Pantry
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 
   // Render success screen
   const renderSuccessScreen = () => (
-    <View style={styles.successContainer}>
+    <SafeAreaView style={styles.successContainer} edges={['top', 'bottom']}>
       <Animated.View
         style={[
           styles.successContent,
@@ -553,7 +589,12 @@ const AllGroceryScanner = () => {
           style={styles.doneButton}
           onPress={() => router.back()}
         >
-          <Text style={styles.doneButtonText}>Done</Text>
+          <LinearGradient
+            colors={["#00A86B", "#008F5C"]}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.doneButtonText}>Done</Text>
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.scanAgainButton}
@@ -562,7 +603,7 @@ const AllGroceryScanner = () => {
           <Text style={styles.scanAgainButtonText}>Scan Again</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </SafeAreaView>
   );
 
   return (
@@ -685,7 +726,12 @@ const AllGroceryScanner = () => {
                   style={styles.saveButton}
                   onPress={handleSaveEdit}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <LinearGradient
+                    colors={["#00A86B", "#008F5C"]}
+                    style={styles.buttonGradient}
+                  >
+                    <Text style={styles.saveButtonText}>Save</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
@@ -697,10 +743,19 @@ const AllGroceryScanner = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingTop: 90,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 30,
+  },
+  flexContainer: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -710,24 +765,25 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
+    backgroundColor: "#FFFFFF",
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E8F8F1",
     justifyContent: "center",
     alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 20,
   },
   title: {
     fontSize: 28,
@@ -740,32 +796,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginBottom: 40,
+    marginBottom: 30,
   },
   optionsContainer: {
-    gap: 20,
+    gap: 16,
   },
   optionCard: {
-    backgroundColor: "#F8F9FA",
-    borderRadius: 16,
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  optionGradient: {
     padding: 24,
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E9ECEF",
   },
   optionIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   barcodeIcon: {
     width: 40,
@@ -773,7 +828,7 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
     marginBottom: 8,
   },
@@ -797,7 +852,7 @@ const styles = StyleSheet.create({
   },
   processingTitle: {
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
     marginBottom: 8,
   },
@@ -808,35 +863,45 @@ const styles = StyleSheet.create({
   },
   confirmationContent: {
     flex: 1,
+  },
+  confirmationScrollContent: {
     paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   confirmationTitle: {
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
     marginBottom: 8,
+    textAlign: "center",
   },
   confirmationSubtitle: {
     fontSize: 16,
     color: "#666",
     marginBottom: 24,
+    textAlign: "center",
   },
   itemCard: {
     flexDirection: "row",
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
     padding: 16,
     marginBottom: 12,
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E9ECEF",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   itemInfo: {
     flex: 1,
   },
   itemName: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
     marginBottom: 4,
   },
@@ -847,8 +912,7 @@ const styles = StyleSheet.create({
   },
   itemConfidence: {
     fontSize: 12,
-    color: "#00A86B",
-    fontWeight: "500",
+    fontWeight: "600",
   },
   itemActions: {
     flexDirection: "row",
@@ -858,31 +922,38 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FFF",
+    backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
   },
   removeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#FFF",
+    backgroundColor: "#FFE5E5",
     justifyContent: "center",
     alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#FFE5E5",
   },
   confirmationFooter: {
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
+    backgroundColor: "#FFFFFF",
   },
   addToPantryButton: {
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#00A86B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  buttonGradient: {
     flexDirection: "row",
-    backgroundColor: "#00A86B",
-    borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 24,
     alignItems: "center",
@@ -891,7 +962,7 @@ const styles = StyleSheet.create({
   addToPantryText: {
     color: "#FFF",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     marginLeft: 8,
   },
   successContainer: {
@@ -925,28 +996,30 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   doneButton: {
-    backgroundColor: "#00A86B",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
+    borderRadius: 14,
+    overflow: "hidden",
+    shadowColor: "#00A86B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   doneButtonText: {
     color: "#FFF",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   scanAgainButton: {
     backgroundColor: "#F5F5F5",
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
   },
   scanAgainButtonText: {
-    color: "#000",
+    color: "#4C4D59",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
-  // Scanner Modal Styles
   scannerOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.9)",
@@ -964,7 +1037,7 @@ const styles = StyleSheet.create({
   },
   scannerTitle: {
     fontSize: 24,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#FFF",
     textAlign: "center",
     marginBottom: 40,
@@ -987,7 +1060,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: "#00A86B",
     borderRadius: 12,
   },
@@ -998,7 +1071,6 @@ const styles = StyleSheet.create({
     marginTop: 40,
     opacity: 0.8,
   },
-  // Edit Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
@@ -1021,7 +1093,7 @@ const styles = StyleSheet.create({
   },
   editModalTitle: {
     fontSize: 20,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#000",
     textAlign: "center",
     marginBottom: 24,
@@ -1034,8 +1106,8 @@ const styles = StyleSheet.create({
   },
   editLabel: {
     fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
+    fontWeight: "600",
+    color: "#4C4D59",
     marginBottom: 8,
   },
   editInput: {
@@ -1061,21 +1133,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   cancelButtonText: {
-    color: "#666",
+    color: "#4C4D59",
     fontSize: 16,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   saveButton: {
     flex: 1,
-    backgroundColor: "#00A86B",
     borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
+    overflow: "hidden",
   },
   saveButtonText: {
     color: "#FFF",
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
   },
 });
 

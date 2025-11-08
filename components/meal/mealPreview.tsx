@@ -12,6 +12,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "dessert" | string;
 
@@ -52,7 +53,7 @@ const RecipeItem: React.FC<Props> = ({
   disabled = false,
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
-
+  const router = useRouter();
   // Pretty label for meal type with safety & fallback
   const mealTypeLabel = useMemo(() => {
     const mt = (mealType ?? "").toString();
@@ -139,6 +140,7 @@ const RecipeItem: React.FC<Props> = ({
       // Success animation
       setSaveState('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      router.replace("/(home)/meals")
       
       // Stop pulse and show checkmark
       saveScale.stopAnimation(() => {

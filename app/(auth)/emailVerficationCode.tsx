@@ -48,6 +48,7 @@ const VerificationScreen = () => {
     const test = async () => {
       const res = await getCurrentUser();
       console.log(res)
+      if (!res.data) return;
       setEmail(res.data.email)
       console.log("something")
     }

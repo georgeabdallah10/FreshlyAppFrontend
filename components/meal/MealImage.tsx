@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Image,
+    StyleProp,
     StyleSheet,
     Text,
     View,
@@ -14,7 +15,7 @@ interface MealImageProps {
   mealName: string;
   imageUrl?: string | null; // If provided, use this instead of fetching
   size?: number;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   showLoading?: boolean;
   conversationId?: number;
   onError?: (message: string) => void; // Optional callback for error handling
@@ -43,6 +44,16 @@ export const MealImage: React.FC<MealImageProps> = ({
   onError,
   silent = false,
 }) => {
+  const flattenedStyle = StyleSheet.flatten(style) || {};
+  const resolvedWidth = flattenedStyle?.width ?? size;
+  const resolvedHeight = flattenedStyle?.height ?? size;
+  const resolvedBorderRadius =
+    flattenedStyle?.borderRadius ?? size / 6;
+
+  const numericWidth =
+    typeof resolvedWidth === "number" ? resolvedWidth : size;
+  const numericHeight =
+    typeof resolvedHeight === "number" ? resolvedHeight : size;
   const [imageUrl, setImageUrl] = useState<string | null>(providedImageUrl || null);
   const [isLoading, setIsLoading] = useState(!providedImageUrl);
   const [hasError, setHasError] = useState(false);
@@ -116,12 +127,23 @@ export const MealImage: React.FC<MealImageProps> = ({
     };
   }, [mealName, providedImageUrl, conversationId, onError, silent]);
 
-  const containerSize = { width: size, height: size, borderRadius: size / 6 };
+  const containerSize = {
+    width: resolvedWidth,
+    height: resolvedHeight,
+    borderRadius: resolvedBorderRadius,
+  };
 
   // Loading state
   if (isLoading && showLoading) {
     return (
-      <View style={[styles.container, containerSize, styles.loadingContainer, style]}>
+      <View
+        style={[
+          styles.container,
+          containerSize,
+          styles.loadingContainer,
+          style,
+        ]}
+      >
         <ActivityIndicator size="small" color="#00C853" />
       </View>
     );
@@ -133,7 +155,8 @@ export const MealImage: React.FC<MealImageProps> = ({
       <View style={[styles.container, containerSize, style]}>
         <Image
           source={{ uri: imageUrl }}
-          style={[styles.image, containerSize]}
+          style={[styles.image, { borderRadius: resolvedBorderRadius }]}
+          resizeMode="cover"
           onError={() => {
             console.warn(`[MealImage] Failed to load image for: ${mealName}`);
             setHasError(true);
@@ -145,8 +168,20 @@ export const MealImage: React.FC<MealImageProps> = ({
 
   // Fallback to initials
   return (
-    <View style={[styles.container, containerSize, styles.initialsContainer, style]}>
-      <Text style={[styles.initials, { fontSize: size * 0.35 }]}>
+    <View
+      style={[
+        styles.container,
+        containerSize,
+        styles.initialsContainer,
+        style,
+      ]}
+    >
+      <Text
+        style={[
+          styles.initials,
+          { fontSize: Math.min(numericWidth, numericHeight) * 0.35 },
+        ]}
+      >
         {initials}
       </Text>
     </View>

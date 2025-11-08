@@ -14,6 +14,10 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from '@expo/vector-icons';
+import IconButton from "@/components/iconComponent";
+import Icon from "@/components/profileSection/components/icon";
+
 
 type MenuItem = {
   id: string;
@@ -112,13 +116,7 @@ const BottomNavigation = ({
                     : styles.navIconInactive
                 }
               >
-                <Image
-                  source={require("../../assets/icons/add.png")}
-                  style={{
-                    width: 30,
-                    height: 30,
-                  }}
-                />
+                <IconButton iconName="add" iconSize={35} iconColor="black" />
               </Text>
             </View>
           </TouchableOpacity>
@@ -136,13 +134,7 @@ const BottomNavigation = ({
                     : styles.navIconInactive
                 }
               >
-                <Image
-                  source={require("../../assets/icons/chatIcon.png")}
-                  style={{
-                    width: 30,
-                    height: 30,
-                  }}
-                />
+                <IconButton iconName="chatbox-ellipses-outline"  iconSize={35} />
               </Text>
             </View>
           </TouchableOpacity>
@@ -160,13 +152,7 @@ const BottomNavigation = ({
                     : styles.navIconInactive
                 }
               >
-                <Image
-                  source={require("../../assets/icons/people.png")}
-                  style={{
-                    width: 30,
-                    height: 30,
-                  }}
-                />
+              <IconButton iconName='people-circle-outline' iconColor="#000000" iconSize={40} />
               </Text>
               {/* Notification badge for pending meal share requests */}
               {pendingCount > 0 && (
@@ -185,13 +171,7 @@ const BottomNavigation = ({
             activeOpacity={0.8}
           >
             <View style={styles.navIconContainer}>
-              <Image
-                source={require("../../assets/icons/setting.png")}
-                style={{
-                  width: 30,
-                  height: 30,
-                }}
-              />
+              <IconButton  iconName="settings-outline" iconSize={35} />
             </View>
           </TouchableOpacity>
         </View>
@@ -217,7 +197,7 @@ const HomeDashboard = () => {
     {
       id: "mealPlans",
       title: "Meal Plans",
-      subtitle: "Your favourite meals",
+      subtitle: "Your favorite meals",
       iconSource: require("../../assets/icons/mealPlans.png"),
       bgColor: "#F5E6FF",
       onPress: () => router.push("/(home)/meals"),
@@ -233,7 +213,7 @@ const HomeDashboard = () => {
     {
       id: "Mealplanner",
       title: "Quick Meals",
-      subtitle: "Create Fast",
+      subtitle: "Whip it up!",
       iconSource: require("../../assets/icons/qm2.png"),
       bgColor: "#D3F0E3",
       onPress: () => router.push("/(home)/quickMeals"),
@@ -288,11 +268,7 @@ const HomeDashboard = () => {
           style={styles.notificationButton}
           onPress={() => router.push("/(home)/notifications")}
         >
-          <NotificationBell
-            iconSize={24}
-            iconColor="#1F2937"
-            badgeColor="#FF3B30"
-          />
+          <IconButton iconName="notifications-outline" iconSize={24} iconColor="#1F2937" badgeColor="#FF3B30"/>
         </TouchableOpacity>
       </View>
 

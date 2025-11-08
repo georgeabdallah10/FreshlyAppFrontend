@@ -161,7 +161,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
     if (cooldownRemaining > 0) {
       const timer = setTimeout(() => {
         setCooldownRemaining(cooldownRemaining - 1);
-      }, 1000);
+      }, 400);
       return () => clearTimeout(timer);
     } else if (cooldownRemaining === 0 && isButtonDisabled) {
       setIsButtonDisabled(false);
@@ -584,7 +584,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
               </View>
               <TextInput
                 style={styles.input}
-                placeholder="Enter confirm password"
+                placeholder="confirm password"
                 placeholderTextColor="#B0B0B0"
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}

@@ -174,7 +174,7 @@ const OnboardingPreferences = () => {
           if (fromProfile === "true") {
             router.replace("/(home)/profile");
           } else {
-            router.replace("/(home)/main");
+            router.replace("/(user)/getLocation");
           }
         } else {
           alert(`Error: ${result.message}`);

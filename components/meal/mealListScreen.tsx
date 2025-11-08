@@ -1,6 +1,7 @@
 // ==================== screens/MealListScreen.tsx ====================
 import { preloadMealImages } from "@/src/services/mealImageService";
 import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -16,6 +17,7 @@ import {
   UIManager,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { AddMealModal } from "./addMealModal";
 import { MealImage } from "./MealImage";
 
@@ -23,8 +25,23 @@ interface MealListScreenProps {
   onMealSelect: (meal: any) => void;
   isLoading?: boolean;
   hasError?: boolean;
-  onImageError?: (message: string) => void; // Optional callback for image errors
+  onImageError?: (message: string) => void;
 }
+
+const COLORS = {
+  primary: "#00A86B",
+  primaryLight: "#E8F8F1",
+  accent: "#FD8100",
+  accentLight: "#FFF3E6",
+  charcoal: "#4C4D59",
+  charcoalLight: "#F0F0F2",
+  white: "#FFFFFF",
+  background: "#F7F8FB",
+  text: "#0A0A0A",
+  textMuted: "#6B7280",
+  border: "#E9ECF2",
+};
+
 const CATEGORIES = [
   "All",
   "Breakfast",
@@ -44,13 +61,12 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   onImageError 
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
-  const [meals, setMeals] = useState<any[]>([]); // normalized meals
+  const [meals, setMeals] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
 
-  // Helper: map backend meal to UI shape with safe defaults
   const mapMealType = (mt?: string): Category | "All" => {
     const s = String(mt || "").toLowerCase();
     if (s === "breakfast") return "Breakfast";
@@ -58,7 +74,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     if (s === "dinner") return "Dinner";
     if (s === "snack") return "Snack";
     if (s === "dessert") return "Dessert";
-    return "Dinner"; // sensible default
+    return "Dinner";
   };
 
   const normalizeMeal = (m: any) => ({
@@ -113,7 +129,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     reloadMeals();
   }, []);
 
-  // Preload images for all meals when meals are loaded
   useEffect(() => {
     if (meals.length > 0) {
       const mealNames = meals.map(m => m.name);
@@ -121,7 +136,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     }
   }, [meals]);
 
-  // Enable LayoutAnimation on Android
   if (
     Platform.OS === "android" &&
     (UIManager as any).setLayoutAnimationEnabledExperimental
@@ -135,7 +149,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   };
 
   const onAddMeal = async () => {
-    // Placeholder for add meal handler (e.g., navigation or backend call)
     console.log("Add Meal button pressed");
     setShowAddMealModal(true);
   };
@@ -143,16 +156,9 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const handleMealSubmit = async (meal: any) => {
     try {
       setIsSubmitting(true);
-
-      // Call your API
       const response = await createMealForSignleUser(meal);
-
-      // Add the meal to local state (normalize to ensure filtering works)
       setMeals([...meals, normalizeMeal(response || meal)]);
-
-      // Close modal
       setShowAddMealModal(false);
-
       alert("Meal added successfully!");
     } catch (error) {
       console.error("Error creating meal:", error);
@@ -163,11 +169,9 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   };
 
   const onAddCategory = () => {
-    // Placeholder for add category handler
     console.log("Add Category button pressed");
   };
 
-  // Derived filtered list using category + search
   const filteredMeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let list = meals;
@@ -186,8 +190,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   }, [meals, selectedCategory, searchQuery]);
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <AddMealModal
         visible={showAddMealModal}
         onClose={() => setShowAddMealModal(false)}
@@ -195,9 +198,11 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       />
       {isSubmitting && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#10B981" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
       )}
+      
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -209,9 +214,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <Text pointerEvents="none" style={styles.headerTitle}>
-          Meal plans
-        </Text>
+        <Text style={styles.headerTitle}>Meal Plans</Text>
       </View>
 
       {/* Search Bar */}
@@ -219,14 +222,14 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
         <TextInput
           style={styles.searchInput}
           placeholder="Search meals..."
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor={COLORS.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
         />
       </View>
 
-      {/* Categories and Add Category Button */}
+      {/* Categories */}
       <View style={styles.categoriesWrapper}>
         <ScrollView
           horizontal
@@ -241,33 +244,39 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           >
             <Text style={styles.addCategoryPlus}>+</Text>
           </TouchableOpacity>
-          {CATEGORIES.map((category) => (
-            <Pressable
-              key={category}
-              onPress={() => onSelectCategory(category)}
-              style={({ pressed }) => [
-                styles.categoryChip,
-                selectedCategory === category && styles.categoryChipActive,
-                pressed && styles.categoryChipPressed,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.categoryText,
-                  selectedCategory === category && styles.categoryTextActive,
+          {CATEGORIES.map((category, index) => {
+            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+            const color = colors[index % 3];
+            const isActive = selectedCategory === category;
+            
+            return (
+              <Pressable
+                key={category}
+                onPress={() => onSelectCategory(category)}
+                style={({ pressed }) => [
+                  styles.categoryChip,
+                  isActive && { backgroundColor: color, borderColor: color },
+                  pressed && styles.categoryChipPressed,
                 ]}
               >
-                {category}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={[
+                    styles.categoryText,
+                    isActive && styles.categoryTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
 
       {/* Loading State */}
       {parentLoading ? (
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="large" color="#00A86B" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.emptyStateTitle}>Loading your meals...</Text>
           <Text style={styles.emptyStateSubtitle}>Just a moment</Text>
         </View>
@@ -284,7 +293,14 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             onPress={reloadMeals}
             activeOpacity={0.8}
           >
-            <Text style={styles.retryButtonText}>Try Again</Text>
+            <LinearGradient
+              colors={[COLORS.primary, "#008F5C"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : filteredMeals.length === 0 ? (
@@ -300,91 +316,119 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             onPress={onAddMeal}
             activeOpacity={0.8}
           >
-            <Text style={styles.addFirstMealButtonText}>+ Add Your First Meal</Text>
+            <LinearGradient
+              colors={[COLORS.accent, COLORS.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            >
+              <Text style={styles.addFirstMealButtonText}>+ Add Your First Meal</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : (
         /* Meal cards */
         <ScrollView
           style={styles.mealsContainer}
+          contentContainerStyle={styles.mealsContent}
           showsVerticalScrollIndicator={false}
+          bounces={true}
         >
-          {filteredMeals.map((meal: any, index: any) => (
-            <TouchableOpacity
-              key={meal.id}
-              style={[styles.mealCard, index === 0 && styles.mealCardHighlighted]}
-              onPress={() => onMealSelect(meal)}
-              activeOpacity={0.9}
-            >
-              <MealImage 
-                mealName={meal.name}
-                imageUrl={meal.image?.startsWith('http') ? meal.image : null}
-                size={240}
-                style={styles.mealImageContainer}
-                showLoading={true}
-                onError={onImageError}
-                silent={!onImageError}
-              />
+          {filteredMeals.map((meal: any, index: any) => {
+            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+            const accentColor = colors[index % 3];
+            
+            return (
+              <TouchableOpacity
+                key={meal.id}
+                style={[
+                  styles.mealCard,
+                  { borderLeftWidth: 5, borderLeftColor: accentColor }
+                ]}
+                onPress={() => onMealSelect(meal)}
+                activeOpacity={0.9}
+              >
+                <MealImage 
+                  mealName={meal.name}
+                  imageUrl={meal.image?.startsWith('http') ? meal.image : null}
+                  size={240}
+                  style={styles.mealImageContainer}
+                  showLoading={true}
+                  onError={onImageError}
+                  silent={!onImageError}
+                />
 
-              <View style={styles.mealOverlay}>
-                <Text style={styles.mealName}>{meal.name}</Text>
+                <View style={styles.mealOverlay}>
+                  <View>
+                    <Text style={styles.mealName}>{meal.name}</Text>
 
-                <View style={styles.mealMetaRow}>
-                  <View style={styles.metaItem}>
-                    <Text style={styles.metaIcon}>🔥</Text>
-                    <Text style={styles.metaText}>{meal.calories}kcal</Text>
+                    <View style={styles.mealMetaRow}>
+                      <View style={styles.metaItem}>
+                        <Text style={styles.metaIcon}>🔥</Text>
+                        <Text style={styles.metaText}>{meal.calories}kcal</Text>
+                      </View>
+                      {meal.totalTime !== 0 ? (
+                        <View style={styles.metaItem}>
+                          <Text style={styles.metaIcon}>⏱</Text>
+                          <Text style={styles.metaText}>{meal.totalTime}min</Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  {meal.totalTime !== 0 ? (
-                    <View style={styles.metaItem}>
-                      <Text style={styles.metaIcon}>⏱</Text>
-                      <Text style={styles.metaText}>{meal.totalTime}min</Text>
-                    </View>
-                  ) : null}
-                </View>
 
-                <View style={styles.macrosRow}>
-                  {meal.macros?.protein !== 0 ? (
-                    <View style={styles.macroItem}>
-                      <View style={styles.macroCircle}>
-                        <View style={[styles.macroProgress, { width: "70%" }]} />
+                  <View style={styles.macrosRow}>
+                    {meal.macros?.protein !== 0 ? (
+                      <View style={styles.macroItem}>
+                        <View style={styles.macroCircle}>
+                          <LinearGradient
+                            colors={[COLORS.primary, "#008F5C"]}
+                            style={styles.macroGradient}
+                          />
+                        </View>
+                        <View>
+                          <Text style={styles.macroValue}>
+                            {meal.macros.protein}g
+                          </Text>
+                          <Text style={styles.macroLabel}>Protein</Text>
+                        </View>
                       </View>
-
-                      <View>
-                        <Text style={styles.macroValue}>
-                          {meal.macros.protein}g
-                        </Text>
-                        <Text style={styles.macroLabel}>Protein</Text>
+                    ) : null}
+                    {meal.macros?.fats !== 0 ? (
+                      <View style={styles.macroItem}>
+                        <View style={styles.macroCircle}>
+                          <LinearGradient
+                            colors={[COLORS.accent, "#E67700"]}
+                            style={styles.macroGradient}
+                          />
+                        </View>
+                        <View>
+                          <Text style={styles.macroValue}>{meal.macros.fats}g</Text>
+                          <Text style={styles.macroLabel}>Fats</Text>
+                        </View>
                       </View>
-                    </View>
-                  ) : null}
-                  {meal.macros?.fats !== 0 ? (
-                    <View style={styles.macroItem}>
-                      <View style={styles.macroCircle}>
-                        <View style={[styles.macroProgress, { width: "40%" }]} />
+                    ) : null}
+                    {meal.macros?.carbs !== 0 ? (
+                      <View style={styles.macroItem}>
+                        <View style={styles.macroCircle}>
+                          <LinearGradient
+                            colors={[COLORS.charcoal, "#3A3B44"]}
+                            style={styles.macroGradient}
+                          />
+                        </View>
+                        <View>
+                          <Text style={styles.macroValue}>
+                            {meal.macros.carbs}g
+                          </Text>
+                          <Text style={styles.macroLabel}>Carbs</Text>
+                        </View>
                       </View>
-                      <View>
-                        <Text style={styles.macroValue}>{meal.macros.fats}g</Text>
-                        <Text style={styles.macroLabel}>Fats</Text>
-                      </View>
-                    </View>
-                  ) : null}
-                  {meal.macros?.carbs !== 0 ? (
-                    <View style={styles.macroItem}>
-                      <View style={styles.macroCircle}>
-                        <View style={[styles.macroProgress, { width: "60%" }]} />
-                      </View>
-                      <View>
-                        <Text style={styles.macroValue}>
-                          {meal.macros.carbs}g
-                        </Text>
-                        <Text style={styles.macroLabel}>Carbs</Text>
-                      </View>
-                    </View>
-                  ) : null}
+                    ) : null}
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
+          <View style={{ height: 100 }} />
         </ScrollView>
       )}
 
@@ -394,31 +438,40 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
         onPress={onAddMeal}
         activeOpacity={0.8}
       >
-        <Text style={styles.addMealButtonText}>+ Add Meal</Text>
+        <LinearGradient
+          colors={[COLORS.accent, COLORS.primary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.fabGradient}
+        >
+          <Text style={styles.addMealButtonText}>+ Add Meal</Text>
+        </LinearGradient>
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F8FB", paddingTop: 90 },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.background,
+  },
 
   /* Header */
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 6,
-    position: "relative",
-    zIndex: 10,
-    backgroundColor: "#F7F8FB",
+    paddingVertical: 16,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#FFFFFF",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 16,
@@ -427,26 +480,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
-    zIndex: 2,
-    position: "relative",
   },
-  backIcon: { fontSize: 22, color: "#1A1A1A" },
+  backIcon: { fontSize: 22, color: COLORS.primary, fontWeight: "600" },
   headerTitle: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    textAlign: "center",
     fontSize: 28,
     fontWeight: "800",
-    color: "#1A1A1A",
+    color: COLORS.text,
+    flex: 1,
+    textAlign: "center",
+    marginRight: 44,
   },
 
   /* Search */
   searchContainer: {
     marginHorizontal: 20,
-    marginBottom: 12,
+    marginVertical: 16,
     borderRadius: 12,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -454,31 +506,32 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   searchInput: {
-    height: 40,
-    paddingHorizontal: 12,
+    height: 48,
+    paddingHorizontal: 16,
     fontSize: 16,
-    color: "#1A1A1A",
-  },
-
-  /* Categories and Add Category wrapper */
-  categoriesWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    color: COLORS.text,
   },
 
   /* Categories */
-  categoriesContainer: { maxHeight: 40, flexGrow: 0 },
+  categoriesWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  categoriesContainer: { 
+    maxHeight: 50, 
+    flexGrow: 0 
+  },
   categoriesContent: { gap: 10 },
 
   categoryChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E9ECF2",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.border,
     marginRight: 6,
     shadowColor: "#000",
     shadowOpacity: 0.06,
@@ -486,30 +539,28 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  categoryChipActive: {
-    backgroundColor: "#10B981",
-    borderColor: "#10B981",
-    shadowColor: "#10B981",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
   categoryChipPressed: {
     transform: [{ scale: 0.97 }],
     opacity: 0.92,
   },
-  categoryText: { fontSize: 14, fontWeight: "700", color: "#6B7280" },
-  categoryTextActive: { color: "#FFFFFF" },
+  categoryText: { 
+    fontSize: 15, 
+    fontWeight: "700", 
+    color: COLORS.textMuted 
+  },
+  categoryTextActive: { color: COLORS.white },
 
   addCategoryChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 22,
-    backgroundColor: "#FFFFFF",
-    marginRight: 6,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.white,
+    marginRight: 8,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+    borderStyle: "dashed",
     shadowColor: "#000",
     shadowOpacity: 0.06,
     shadowRadius: 8,
@@ -517,122 +568,153 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   addCategoryPlus: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: "700",
-    color: "#6B7280",
-    lineHeight: 20,
+    color: COLORS.primary,
+    lineHeight: 24,
   },
 
   /* List */
-  mealsContainer: { flex: 1, paddingHorizontal: 20 },
+  mealsContainer: { 
+    flex: 1,
+  },
+  mealsContent: {
+    paddingHorizontal: 20,
+  },
 
   /* Card */
   mealCard: {
     height: 240,
-    borderRadius: 22,
+    borderRadius: 20,
     marginBottom: 18,
     overflow: "hidden",
-    backgroundColor: "#E8E8E8",
+    backgroundColor: COLORS.charcoalLight,
     position: "relative",
     shadowColor: "#000",
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  mealCardHighlighted: {
-    borderWidth: 0, // remove green stroke look
-    borderColor: "transparent",
+    elevation: 5,
   },
 
   /* Meal image container */
   mealImageContainer: {
-    position: "absolute",
+    ...StyleSheet.absoluteFillObject,
     width: "100%",
     height: "100%",
     borderRadius: 0,
   },
 
-  /* Dark overlay like Figma (photo remains vibrant) */
+  /* Dark overlay */
   mealOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.35)",
-    padding: 18,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    padding: 20,
     justifyContent: "space-between",
   },
 
   /* Title */
   mealName: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "800",
-    color: "#FFFFFF",
-    marginBottom: 10,
-    letterSpacing: 0.2,
+    color: COLORS.white,
+    marginBottom: 12,
+    letterSpacing: 0.3,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
 
-  /* Kcal + time “pills” */
+  /* Kcal + time pills */
   mealMetaRow: { flexDirection: "row", gap: 10 },
   metaItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
   },
-  metaIcon: { fontSize: 15, color: "#FFFFFF" },
-  metaText: { fontSize: 14, fontWeight: "700", color: "#FFFFFF" },
+  metaIcon: { fontSize: 16, color: COLORS.white },
+  metaText: { fontSize: 14, fontWeight: "700", color: COLORS.white },
 
   /* Macros row */
   macrosRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingTop: 6,
+    paddingTop: 8,
   },
-  macroItem: { flexDirection: "row", alignItems: "center", gap: 10 },
+  macroItem: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    gap: 10 
+  },
 
-  /* White ring like Figma */
+  /* Gradient ring */
   macroCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "transparent",
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.95)",
+    borderColor: "rgba(255,255,255,0.3)",
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Hide the “progress” bar since Figma uses a ring */
-  macroProgress: { width: "0%", height: "100%", borderRadius: 20 },
+  macroGradient: {
+    width: "100%",
+    height: "100%",
+    opacity: 0.4,
+  },
 
-  macroValue: { fontSize: 16, fontWeight: "800", color: "#FFFFFF" },
-  macroLabel: { fontSize: 12, color: "rgba(255,255,255,0.9)" },
+  macroValue: { 
+    fontSize: 17, 
+    fontWeight: "800", 
+    color: COLORS.white,
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  macroLabel: { 
+    fontSize: 12, 
+    color: "rgba(255,255,255,0.9)",
+    fontWeight: "600",
+  },
 
   /* Add Meal Floating Button */
   addMealButton: {
     position: "absolute",
     bottom: 30,
     right: 30,
-    backgroundColor: "#10B981",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
     borderRadius: 30,
-    shadowColor: "#10B981",
+    shadowColor: COLORS.accent,
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    elevation: 8,
+    overflow: "hidden",
+  },
+  fabGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
   },
   addMealButtonText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontWeight: "700",
     fontSize: 16,
   },
+  
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0, 0, 0, 0.3)",
@@ -648,39 +730,55 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
   },
-  emptyStateEmoji: { fontSize: 64, marginBottom: 20 },
+  emptyStateEmoji: { 
+    fontSize: 80, 
+    marginBottom: 24 
+  },
   emptyStateTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1A1A1A",
-    marginBottom: 10,
+    fontSize: 26,
+    fontWeight: "800",
+    color: COLORS.text,
+    marginBottom: 12,
     textAlign: "center",
   },
   emptyStateSubtitle: {
     fontSize: 16, 
-    color: "#6B7280",
+    color: COLORS.textMuted,
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 30,
+    lineHeight: 24,
   },
   retryButton: {
-    backgroundColor: "#10B981",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     borderRadius: 30,
+    overflow: "hidden",
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  buttonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
   retryButtonText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontWeight: "700",
     fontSize: 16,
   },
   addFirstMealButton: {
-    backgroundColor: "#10B981",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     borderRadius: 30,
+    overflow: "hidden",
+    shadowColor: COLORS.accent,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   addFirstMealButtonText: {
-    color: "#FFFFFF",
+    color: COLORS.white,
     fontWeight: "700",
     fontSize: 16,
   },

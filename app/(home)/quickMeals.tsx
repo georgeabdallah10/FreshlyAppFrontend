@@ -21,7 +21,8 @@ import {
     Text,
     TextInput,
     TouchableOpacity,
-    View
+    View,
+    KeyboardAvoidingView,
 } from "react-native";
 
 type FormState = {
@@ -31,7 +32,7 @@ type FormState = {
   goal: "loss" | "gain" | "prefs";
   speed: "fast" | "medium" | "leisure";
   difficulty: "easy" | "medium";
-  cookingMethods: string[]; // multi-select
+  cookingMethods: string[];
   includeIngredients: string[];
   avoidIngredients: string[];
   servings: number;
@@ -51,31 +52,48 @@ const COLORS = {
   bg: "#FFFFFF",
   text: "#111214",
   sub: "#6B7280",
-  primary: "#00A86B", // green
-  accent: "#FD8100", // orange
-  card: "#F6F7F9",
-  border: "#E7EBEF",
-  selectedTint: "#EAF7F1",
+  grey: "#4C4D59",
+  primary: "#00A86B",
+  accent: "#FD8100",
+  card: "#F8F9FA",
+  border: "#E5E7EB",
+  selectedTint: "#E8F5EF",
+  selectedBorder: "#B8E6D5",
+  dangerTint: "#FFF1F0",
+  dangerBorder: "#FFCCC7",
+  disabled: "#D1D5DB",
 };
 
 const TOTAL_PHASES = 6;
 
-// ---- Option Row (radio / check) - MEMOIZED ----
+// ---- Enhanced Option Row with better visual feedback ----
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const OptionRow: React.FC<{
   label: string;
   selected: boolean;
   onPress: () => void;
   mode?: "radio" | "check";
-}> = React.memo(({ label, selected, onPress, mode = "radio" }) => {
+  icon?: keyof typeof Ionicons.glyphMap;
+}> = React.memo(({ label, selected, onPress, mode = "radio", icon }) => {
   const scale = useRef(new Animated.Value(1)).current;
+  const checkmarkScale = useRef(new Animated.Value(selected ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(checkmarkScale, {
+      toValue: selected ? 1 : 0,
+      useNativeDriver: true,
+      friction: 8,
+      tension: 120,
+    }).start();
+  }, [selected, checkmarkScale]);
 
   const pressIn = useCallback(() => {
+    Haptics.selectionAsync();
     Animated.spring(scale, {
-      toValue: 0.98,
+      toValue: 0.96,
       useNativeDriver: true,
-      friction: 7,
-      tension: 100,
+      friction: 8,
+      tension: 120,
     }).start();
   }, [scale]);
 
@@ -83,52 +101,56 @@ const OptionRow: React.FC<{
     Animated.spring(scale, {
       toValue: 1,
       useNativeDriver: true,
-      friction: 7,
-      tension: 100,
+      friction: 8,
+      tension: 120,
     }).start();
   }, [scale]);
-
-  const handlePress = useCallback(() => {
-    Haptics.selectionAsync();
-    onPress();
-  }, [onPress]);
 
   return (
     <AnimatedTouchable
       activeOpacity={0.9}
-      onPress={handlePress}
+      onPress={onPress}
       onPressIn={pressIn}
       onPressOut={pressOut}
       style={[
         styles.option,
         { transform: [{ scale }] },
-        selected && {
-          backgroundColor: COLORS.selectedTint,
-          borderColor: COLORS.primary,
-        },
+        selected && styles.optionSelected,
       ]}
     >
       <View
         style={[
           styles.radio,
-          mode === "check" && { borderRadius: 6 },
-          selected && {
-            backgroundColor: COLORS.primary,
-            borderColor: COLORS.primary,
-          },
+          mode === "check" && styles.checkbox,
+          selected && styles.radioSelected,
         ]}
       >
-        {selected && <Ionicons name="checkmark" size={16} color="#fff" />}
+        <Animated.View style={{ transform: [{ scale: checkmarkScale }] }}>
+          <Ionicons 
+            name={mode === "check" ? "checkmark-sharp" : "checkmark"} 
+            size={mode === "check" ? 18 : 16} 
+            color="#fff" 
+          />
+        </Animated.View>
       </View>
-      <Text style={[styles.optionText, selected && { color: COLORS.primary }]}>
+      {icon && (
+        <Ionicons 
+          name={icon} 
+          size={20} 
+          color={selected ? COLORS.primary : COLORS.sub} 
+          style={{ marginLeft: -4 }}
+        />
+      )}
+      <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
         {label}
       </Text>
     </AnimatedTouchable>
   );
 });
 
-// Add display name for debugging
 OptionRow.displayName = "OptionRow";
+
+// ---- Enhanced Phase 4 Block ----
 type Phase4Props = {
   animateKey: number;
   includeInput: string;
@@ -163,21 +185,26 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
   }) => {
     return (
       <>
-        <Question animateKey={animateKey} title="Must include (optional)">
+        <Question animateKey={animateKey} title="Include specific ingredients">
+          <Text style={styles.helperText}>
+            Add ingredients you want in your meal (optional)
+          </Text>
           <View style={styles.inputWithButton}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
               value={includeInput}
               onChangeText={onChangeIncludeInput}
-              placeholder="e.g. Chicken, onion"
+              placeholder="e.g., Chicken, garlic, spinach"
+              placeholderTextColor="#9CA3AF"
               returnKeyType="done"
               onSubmitEditing={addInclude}
             />
             <TouchableOpacity
               onPress={addInclude}
-              style={styles.addButton}
+              style={[styles.addButton, !includeInput.trim() && styles.addButtonDisabled]}
+              disabled={!includeInput.trim()}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <Ionicons name="add" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
           {includeIngredients.length > 0 && (
@@ -194,21 +221,26 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
           )}
         </Question>
 
-        <Question animateKey={animateKey} title="Avoid ingredients (optional)">
+        <Question animateKey={animateKey} title="Avoid ingredients">
+          <Text style={styles.helperText}>
+            List ingredients to exclude from your meal (optional)
+          </Text>
           <View style={styles.inputWithButton}>
             <TextInput
               style={[styles.input, { flex: 1 }]}
               value={avoidInput}
               onChangeText={onChangeAvoidInput}
-              placeholder="e.g. Peanuts, dairy"
+              placeholder="e.g., Peanuts, dairy, shellfish"
+              placeholderTextColor="#9CA3AF"
               returnKeyType="done"
               onSubmitEditing={addAvoid}
             />
             <TouchableOpacity
               onPress={addAvoid}
-              style={styles.addButton}
+              style={[styles.addButton, styles.addButtonDanger, !avoidInput.trim() && styles.addButtonDisabled]}
+              disabled={!avoidInput.trim()}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <Ionicons name="add" size={22} color="#fff" />
             </TouchableOpacity>
           </View>
           {avoidIngredients.length > 0 && (
@@ -225,12 +257,16 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
           )}
         </Question>
 
-        <Question animateKey={animateKey} title="Additional Instructions (optional)">
+        <Question animateKey={animateKey} title="Additional instructions">
+          <Text style={styles.helperText}>
+            Any special requests or cooking preferences (optional)
+          </Text>
           <TextInput
-            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            style={[styles.input, styles.textArea]}
             value={additionalInstructions}
             onChangeText={onChangeAdditionalInstructions}
-            placeholder="e.g. Make it spicy, add extra garlic, use olive oil only"
+            placeholder="e.g., Make it spicy, extra crispy, low sodium"
+            placeholderTextColor="#9CA3AF"
             returnKeyType="default"
             multiline
             numberOfLines={4}
@@ -260,10 +296,11 @@ const QuickMealsCreateScreen: React.FC = () => {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
   
-  // Loading state for meal generation
+  // Loading state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const spinnerRotation = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Cooldown timer effect
   useEffect(() => {
@@ -277,30 +314,49 @@ const QuickMealsCreateScreen: React.FC = () => {
     }
   }, [cooldownRemaining, isButtonDisabled]);
   
-  // Spinner rotation animation
+  // Enhanced spinner animation
   useEffect(() => {
     if (isGenerating) {
       spinnerRotation.setValue(0);
-      Animated.loop(
-        Animated.timing(spinnerRotation, {
-          toValue: 1,
-          duration: 1000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
+      Animated.parallel([
+        Animated.loop(
+          Animated.timing(spinnerRotation, {
+            toValue: 1,
+            duration: 1200,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          })
+        ),
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(pulseAnim, {
+              toValue: 1.08,
+              duration: 1000,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(pulseAnim, {
+              toValue: 1,
+              duration: 1000,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        ),
+      ]).start();
     } else {
       spinnerRotation.setValue(0);
+      pulseAnim.setValue(1);
     }
-  }, [isGenerating, spinnerRotation]);
+  }, [isGenerating, spinnerRotation, pulseAnim]);
   
-  // Progress simulator for loading state
+  // Progress simulator
   useEffect(() => {
     if (isGenerating) {
       setGenerationProgress(0);
       const interval = setInterval(() => {
         setGenerationProgress((prev) => {
-          if (prev >= 95) return 95; // Cap at 95% until real completion
+          if (prev >= 95) return 95;
           return prev + Math.random() * 15;
         });
       }, 500);
@@ -310,7 +366,6 @@ const QuickMealsCreateScreen: React.FC = () => {
     }
   }, [isGenerating]);
 
-  // Start cooldown function
   const startCooldown = (seconds: number = 30) => {
     setIsButtonDisabled(true);
     setCooldownRemaining(seconds);
@@ -323,31 +378,31 @@ Return ONLY a valid, minified JSON object matching this exact TypeScript shape:
 type IngredientSection = { title: string; items: string[] };
 
 type RecipeCard = {
-  name: string;                          // meal name
-  icon: string;                          // emoji or icon identifier
-  calories: number;                      // ACCURATE total calories for all servings
-  prepTime: number;                      // minutes to prep
-  cookTime: number;                      // minutes to cook
-  totalTime: number;                     // total minutes (prep + cook)
+  name: string;
+  icon: string;
+  calories: number;
+  prepTime: number;
+  cookTime: number;
+  totalTime: number;
   mealType: "Breakfast" | "Lunch" | "Dinner" | "Snack" | "Dessert";
-  cuisine: string;                       // e.g. "Italian", "Asian", "Mexican"
+  cuisine: string;
   difficulty: "Easy" | "Medium" | "Hard";
-  servings: number;                      // number of servings
-  protein: number;                       // grams per full recipe
-  fats: number;                          // grams per full recipe
-  carbs: number;                         // grams per full recipe
-  headerSummary: string;                 // mention servings and dish type
-  ingredients: IngredientSection[];      // group if useful, else one section with title: ""
-  instructions: string[][];              // array of steps; each step is an array of 1–2 short sentences
-  optionalAdditions: string[];           // 2–4 items
-  finalNote: string;                     // friendly, one sentence
+  servings: number;
+  protein: number;
+  fats: number;
+  carbs: number;
+  headerSummary: string;
+  ingredients: IngredientSection[];
+  instructions: string[][];
+  optionalAdditions: string[];
+  finalNote: string;
   pantryCheck: { usedFromPantry: string[] };
-  shoppingListMinimal: string[];         // missing essentials only
+  shoppingListMinimal: string[];
 };
 
 Rules:
 - No markdown, no code fences, no comments, no trailing commas.
-- NUTRITIONAL DATA: Provide accurate macros and calories based on real recipes. Calculate from actual ingredient quantities.
+- NUTRITIONAL DATA: Provide accurate macros and calories based on real recipes.
 - Use concise, realistic quantities scaled to choices_json.servings.
 - Do not include allergens, disliked items, or avoidIngredients.
 - Respect cookingMethods strictly if provided.
@@ -356,7 +411,7 @@ Rules:
 - Ensure all numeric nutritional fields are present and realistic.
 `;
 
-  // wizard state
+  // Wizard state
   const [phase, setPhase] = useState(0);
   const [includeInput, setIncludeInput] = useState("");
   const [avoidInput, setAvoidInput] = useState("");
@@ -375,10 +430,12 @@ Rules:
     servings: 2,
     additionalInstructions: "",
   });
-  // Stable handlers for Phase 4 so TextInput keeps focus (no remounts)
+
+  // Stable handlers for Phase 4
   const addInclude = useCallback(() => {
     const trimmed = includeInput.trim();
     if (!trimmed) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setForm((f) => ({
       ...f,
       includeIngredients: [...f.includeIngredients, trimmed],
@@ -387,6 +444,7 @@ Rules:
   }, [includeInput]);
 
   const removeInclude = useCallback((idx: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setForm((f) => ({
       ...f,
       includeIngredients: f.includeIngredients.filter((_, i) => i !== idx),
@@ -396,6 +454,7 @@ Rules:
   const addAvoid = useCallback(() => {
     const trimmed = avoidInput.trim();
     if (!trimmed) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setForm((f) => ({
       ...f,
       avoidIngredients: [...f.avoidIngredients, trimmed],
@@ -404,42 +463,42 @@ Rules:
   }, [avoidInput]);
 
   const removeAvoid = useCallback((idx: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setForm((f) => ({
       ...f,
       avoidIngredients: f.avoidIngredients.filter((_, i) => i !== idx),
     }));
   }, []);
 
-  // ---- Animations ----
+  // Progress animation
   const progressAnim = useRef(new Animated.Value(1 / TOTAL_PHASES)).current;
 
   const animateProgress = useCallback(
     (to: number) => {
       Animated.timing(progressAnim, {
         toValue: to,
-        duration: 450,
+        duration: 400,
         easing: Easing.out(Easing.cubic),
         useNativeDriver: false,
       }).start();
     },
     [progressAnim]
   );
+
   useEffect(() => {
     animateProgress((phase + 1) / TOTAL_PHASES);
   }, [phase, animateProgress]);
 
-  // Load user's families (for auto-attaching meals)
+  // Load families
   useEffect(() => {
     const loadFamilies = async () => {
       try {
         const { listMyFamilies } = await import('@/src/user/family');
         const data = await listMyFamilies();
-        console.log('[QuickMeals] Raw family data from API:', data);
         const familyList = Array.isArray(data) ? data.map((f: any) => ({
           id: f.id,
           name: f.display_name || f.name || 'Family'
         })) : [];
-        console.log('[QuickMeals] Families loaded:', familyList);
         setFamilies(familyList);
       } catch (error) {
         console.error('[QuickMeals] Failed to load families:', error);
@@ -448,7 +507,6 @@ Rules:
     loadFamilies();
   }, []);
 
-  // utils - wrapped in useCallback to maintain referential stability
   const setSingle = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
       setForm((f) => ({ ...f, [key]: value }));
@@ -457,21 +515,19 @@ Rules:
   );
 
   const next = useCallback(() => {
-    Haptics.selectionAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPhase((p) => Math.min(p + 1, TOTAL_PHASES - 1));
-    // Hide meal component when navigating forward (in case user is going through phases again)
     if (showMealComponent) {
       setshowMealComponent(false);
     }
   }, [showMealComponent]);
 
   const back = useCallback(() => {
-    Haptics.selectionAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (phase === 0) {
       router.back();
     } else {
       setPhase((p) => Math.max(p - 1, 0));
-      // Hide meal component when navigating back through phases
       if (showMealComponent) {
         setshowMealComponent(false);
       }
@@ -486,9 +542,9 @@ Rules:
       return;
     }
 
-    Haptics.selectionAsync();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setIsGenerating(true);
-    setshowMealComponent(false); // Hide previous meal if any
+    setshowMealComponent(false);
     
     try {
       const payload = {
@@ -504,7 +560,7 @@ Rules:
         servings: form.servings,
         additionalInstructions: form.additionalInstructions,
       };
-      // Build a compact inputs block
+
       const inputsBlock = `preferences_json:
 ${JSON.stringify(prefrences)}
 
@@ -515,7 +571,6 @@ choices_json:
 ${JSON.stringify(payload)}
 `;
 
-      // SYSTEM: only hard, timeless rules
       const system_prompt = `
 You are Freshly AI professional chef. Make sure to create real meals that are eatable and delicious. Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods and any additional instructions provided by the user. No prose, no markdown, no comments.
 
@@ -528,17 +583,15 @@ NUTRITIONAL ACCURACY IS CRITICAL:
 
 CRITICAL: If the user provides additionalInstructions in choices_json, follow them EXACTLY. Incorporate them into the recipe generation.
 `;
-      // USER: inputs + JSON schema directive
+
       const user_prompt = `${inputsBlock}
 ${JSON_DIRECTIVE}`;
 
-      // Call API with timeout
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT')), 45000)
       );
       
       const apiPromise = askAI({ system: system_prompt, prompt: user_prompt });
-      
       const res = await Promise.race([apiPromise, timeoutPromise]);
 
       let parsed: any = null;
@@ -551,20 +604,10 @@ ${JSON_DIRECTIVE}`;
         return;
       }
 
-      // Log the entire AI response for debugging
-      console.log('[QuickMeals] Full AI Response:', JSON.stringify(parsed, null, 2));
-      console.log('[QuickMeals] AI Response name:', parsed?.name);
-      console.log('[QuickMeals] AI Response ingredients:', parsed?.ingredients);
-
-      // The AI returns a RecipeCard structure, we need to extract the flat fields
-      // RecipeCard has: headerSummary, ingredients: IngredientSection[], instructions: string[][]
-      
-      // Extract name from response or fallback
       const name = String(parsed?.name || parsed?.headerSummary || 'Untitled Meal');
       const mt = String(parsed?.mealType || form.mealType || 'meal');
       const iconName = String(parsed?.icon || parsed?.iconName || 'restaurant');
 
-      // Extract nutritional data with safe defaults
       const extractNumeric = (value: any, defaultVal: number = 0): number => {
         const num = parseInt(String(value), 10);
         return isNaN(num) || num < 0 ? defaultVal : num;
@@ -578,53 +621,34 @@ ${JSON_DIRECTIVE}`;
       const fats = extractNumeric(parsed?.fats, 15);
       const carbs = extractNumeric(parsed?.carbs, 50);
       const servings = extractNumeric(parsed?.servings, form.servings || 2);
-
-      // Extract cuisine
       const cuisine = String(parsed?.cuisine || '').trim();
-
-      // Extract difficulty
       const difficulty = (['Easy', 'Medium', 'Hard'].includes(parsed?.difficulty) 
         ? parsed.difficulty 
         : form.difficulty || 'Easy');
 
-      // Handle ingredients - RecipeCard format has ingredients as IngredientSection[]
       let ingredients: string[] = [];
       if (Array.isArray(parsed?.ingredients)) {
-        // RecipeCard format: ingredients is array of { title: string, items: string[] }
         ingredients = parsed.ingredients.flatMap((section: any) => {
           if (typeof section === 'object' && section !== null && Array.isArray(section.items)) {
-            // Extract items from each section
             return section.items.map((item: any) => String(item).trim()).filter(Boolean);
           } else if (typeof section === 'object' && section !== null) {
-            // Old format: array of objects with name property
             return String(section.name || section.ingredient || '').trim();
           } else {
-            // Simple string format
             return String(section).trim();
           }
         }).filter(Boolean);
       }
       
-      // Handle instructions - RecipeCard format has instructions as string[][]
       let instructions: string[] = [];
       if (Array.isArray(parsed?.instructions)) {
         instructions = parsed.instructions.flatMap((step: any) => {
           if (Array.isArray(step)) {
-            // RecipeCard format: each step is an array of sentences
             return step.map((s: any) => String(s).trim()).filter(Boolean).join(' ');
           }
-          // Simple string format
           return String(step).trim();
         }).filter(Boolean);
       }
-      
-      console.log('[QuickMeals] Processed name:', name);
-      console.log('[QuickMeals] Processed calories:', calories);
-      console.log('[QuickMeals] Processed macros:', { protein, fats, carbs });
-      console.log('[QuickMeals] Processed servings:', servings);
-      console.log('[QuickMeals] Processed ingredients:', ingredients);
 
-      // Prepare meal data for saving (includes full nutritional data)
       const mealData = {
         name,
         selectedEmoji: iconName,
@@ -651,15 +675,16 @@ ${JSON_DIRECTIVE}`;
         ingredients,
         onPress: async () => { console.log('pressed'); },
         onSave: async () => {
-          // This will be called when user taps "Save Meal"
           await handleSaveMeal(mealData);
         },
       });
       
       setGenerationProgress(100);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setshowMealComponent(true);
     } catch (error: any) {
       console.error('[QuickMeals] Generation error:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       let errorMessage = 'Unable to generate meal. ';
       const errorStr = error.message?.toLowerCase() || '';
@@ -690,7 +715,6 @@ ${JSON_DIRECTIVE}`;
       setIsGenerating(false);
       setGenerationProgress(0);
     }
-    // eslint-disable-next-line no-console
   }, [form, prefrences, pantryItems, JSON_DIRECTIVE, isGenerating, isButtonDisabled, cooldownRemaining]);
 
   async function handleSaveMeal(mealInput: any) {
@@ -722,15 +746,9 @@ ${JSON_DIRECTIVE}`;
 
     const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
 
-    // Auto-attach to user's first family (enables sharing)
-    // If user is in a family, ALL meals should be shareable automatically
     let familyId: number | undefined;
-    console.log('[QuickMeals] Families available:', families);
     if (families.length > 0) {
       familyId = families[0].id;
-      console.log('[QuickMeals] ✅ Auto-attaching meal to family ID:', familyId);
-    } else {
-      console.log('[QuickMeals] ⚠️ User has no families - meal will be personal');
     }
 
     const meal = {
@@ -764,17 +782,18 @@ ${JSON_DIRECTIVE}`;
         : [],
       notes: typeof mealInput?.notes === 'string' ? mealInput.notes.trim() : undefined,
       isFavorite: false,
-      family_id: familyId, // Include family_id to enable sharing
+      family_id: familyId,
     };
 
     setIsSubmitting(true);
     try {
       const res = await createMealForSignleUser(meal as any);
       console.log('[QuickMeals] Meal saved successfully:', res);
-      // Success - no alert needed, animation handles it
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       startCooldown(30);
       console.error('[QuickMeals] Failed to save meal:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       let errorMessage = 'Unable to save meal. ';
       const errorStr = error.message?.toLowerCase() || '';
@@ -798,7 +817,6 @@ ${JSON_DIRECTIVE}`;
         errorMessage = 'Failed to save meal. Please try again.';
       }
       
-      // Show alert and throw error for animation
       alert(errorMessage);
       throw error;
     } finally {
@@ -806,7 +824,7 @@ ${JSON_DIRECTIVE}`;
     }
   }
 
-  // ---- Phases ----
+  // ---- Phase Components with enhanced icons ----
   const Phase0: React.FC<{ animateKey: number }> = useCallback(
     ({ animateKey }) => (
       <>
@@ -816,11 +834,13 @@ ${JSON_DIRECTIVE}`;
         >
           <OptionRow
             label="Pantry only"
+            icon="home"
             selected={form.ingredientSource === "pantry"}
             onPress={() => setSingle("ingredientSource", "pantry")}
           />
           <OptionRow
             label="Allow outside items"
+            icon="cart"
             selected={form.ingredientSource === "outside"}
             onPress={() => setSingle("ingredientSource", "outside")}
           />
@@ -828,14 +848,24 @@ ${JSON_DIRECTIVE}`;
 
         <Question animateKey={animateKey} title="Which meal are you planning?">
           {(["breakfast", "lunch", "dinner", "snack", "dessert"] as const).map(
-            (t) => (
-              <OptionRow
-                key={t}
-                label={t[0].toUpperCase() + t.slice(1)}
-                selected={form.mealType === t}
-                onPress={() => setSingle("mealType", t)}
-              />
-            )
+            (t) => {
+              const icons = {
+                breakfast: "sunny" as const,
+                lunch: "restaurant" as const,
+                dinner: "moon" as const,
+                snack: "fast-food" as const,
+                dessert: "ice-cream" as const,
+              };
+              return (
+                <OptionRow
+                  key={t}
+                  icon={icons[t]}
+                  label={t[0].toUpperCase() + t.slice(1)}
+                  selected={form.mealType === t}
+                  onPress={() => setSingle("mealType", t)}
+                />
+              );
+            }
           )}
         </Question>
       </>
@@ -849,16 +879,19 @@ ${JSON_DIRECTIVE}`;
         <Question animateKey={animateKey} title="What's your ideal meal budget?">
           <OptionRow
             label="Cheap and simple"
+            icon="cash-outline"
             selected={form.budget === 1}
             onPress={() => setSingle("budget", 1 as 1 | 2 | 3)}
           />
           <OptionRow
             label="Balanced cost"
+            icon="wallet-outline"
             selected={form.budget === 2}
             onPress={() => setSingle("budget", 2 as 1 | 2 | 3)}
           />
           <OptionRow
             label="Premium or specialty"
+            icon="diamond-outline"
             selected={form.budget === 3}
             onPress={() => setSingle("budget", 3 as 1 | 2 | 3)}
           />
@@ -866,17 +899,20 @@ ${JSON_DIRECTIVE}`;
 
         <Question animateKey={animateKey} title="How much time do you have?">
           <OptionRow
-            label="Quick (≤ 15m)"
+            label="Quick (≤ 15 min)"
+            icon="flash"
             selected={form.speed === "fast"}
             onPress={() => setSingle("speed", "fast")}
           />
           <OptionRow
-            label="Normal (≤ 25m)"
+            label="Normal (≤ 25 min)"
+            icon="time"
             selected={form.speed === "medium"}
             onPress={() => setSingle("speed", "medium")}
           />
           <OptionRow
-            label="Takes time (≤ 40m)"
+            label="Takes time (≤ 40 min)"
+            icon="hourglass"
             selected={form.speed === "leisure"}
             onPress={() => setSingle("speed", "leisure")}
           />
@@ -895,16 +931,19 @@ ${JSON_DIRECTIVE}`;
         >
           <OptionRow
             label="Lose weight"
+            icon="trending-down"
             selected={form.goal === "loss"}
             onPress={() => setSingle("goal", "loss")}
           />
           <OptionRow
             label="Gain weight"
+            icon="trending-up"
             selected={form.goal === "gain"}
             onPress={() => setSingle("goal", "gain")}
           />
           <OptionRow
             label="Use my saved preferences"
+            icon="heart"
             selected={form.goal === "prefs"}
             onPress={() => setSingle("goal", "prefs")}
           />
@@ -919,28 +958,29 @@ ${JSON_DIRECTIVE}`;
       <>
         <Question
           animateKey={animateKey}
-          title="Which cooking methods do you have access to?"
+          title="Which cooking methods do you have?"
         >
-          {["stovetop", "oven", "microwave", "airfryer", "nocook"].map((m) => (
+          {[
+            { key: "stovetop", label: "Stovetop", icon: "flame" as const },
+            { key: "oven", label: "Oven", icon: "business" as const },
+            { key: "microwave", label: "Microwave", icon: "radio-outline" as const },
+            { key: "airfryer", label: "Air fryer", icon: "airplane" as const },
+            { key: "nocook", label: "No appliances", icon: "close-circle-outline" as const },
+          ].map((m) => (
             <OptionRow
-              key={m}
+              key={m.key}
               mode="check"
-              label={
-                m === "nocook"
-                  ? "No appliances available"
-                  : m === "airfryer"
-                  ? "Air fryer"
-                  : m[0].toUpperCase() + m.slice(1)
-              }
-              selected={form.cookingMethods.includes(m)}
+              icon={m.icon}
+              label={m.label}
+              selected={form.cookingMethods.includes(m.key)}
               onPress={() =>
                 setForm((f) => {
-                  const has = f.cookingMethods.includes(m);
+                  const has = f.cookingMethods.includes(m.key);
                   return {
                     ...f,
                     cookingMethods: has
-                      ? f.cookingMethods.filter((x) => x !== m)
-                      : [...f.cookingMethods, m],
+                      ? f.cookingMethods.filter((x) => x !== m.key)
+                      : [...f.cookingMethods, m.key],
                   };
                 })
               }
@@ -955,10 +995,12 @@ ${JSON_DIRECTIVE}`;
   const Phase5: React.FC<{ animateKey: number }> = useCallback(
     ({ animateKey }) => {
       const increment = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setForm((f) => ({ ...f, servings: Math.min(f.servings + 1, 12) }));
       }, []);
 
       const decrement = useCallback(() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setForm((f) => ({ ...f, servings: Math.max(f.servings - 1, 1) }));
       }, []);
 
@@ -967,60 +1009,83 @@ ${JSON_DIRECTIVE}`;
           <Question animateKey={animateKey} title="How many servings?">
             <View style={styles.servingsRow}>
               <TouchableOpacity
-                style={styles.stepper}
+                style={[
+                  styles.stepper,
+                  form.servings <= 1 && styles.stepperDisabled
+                ]}
                 onPress={decrement}
                 disabled={form.servings <= 1}
               >
-                <Text
-                  style={[
-                    styles.stepperSymbol,
-                    form.servings <= 1 && { color: "#CCC" },
-                  ]}
-                >
-                  −
-                </Text>
+                <Ionicons 
+                  name="remove" 
+                  size={22} 
+                  color={form.servings <= 1 ? COLORS.disabled : COLORS.grey}
+                />
               </TouchableOpacity>
-              <Text style={styles.servings}>{form.servings}</Text>
+              <View style={styles.servingsDisplay}>
+                <Text style={styles.servings}>{form.servings}</Text>
+                <Text style={styles.servingsLabel}>
+                  {form.servings === 1 ? "serving" : "servings"}
+                </Text>
+              </View>
               <TouchableOpacity
-                style={styles.stepper}
+                style={[
+                  styles.stepper,
+                  form.servings >= 12 && styles.stepperDisabled
+                ]}
                 onPress={increment}
                 disabled={form.servings >= 12}
               >
-                <Text
-                  style={[
-                    styles.stepperSymbol,
-                    form.servings >= 12 && { color: "#CCC" },
-                  ]}
-                >
-                  +
-                </Text>
+                <Ionicons 
+                  name="add" 
+                  size={22} 
+                  color={form.servings >= 12 ? COLORS.disabled : COLORS.grey}
+                />
               </TouchableOpacity>
             </View>
           </Question>
 
           <Question animateKey={animateKey} title="Review your choices">
             <View style={styles.review}>
-              <ReviewRow k="Source" v={form.ingredientSource} />
-              <ReviewRow
-                k="Budget"
-                v={form.budget ? "$".repeat(form.budget) : "—"}
+              <ReviewRow 
+                icon="home" 
+                k="Source" 
+                v={form.ingredientSource === "pantry" ? "Pantry only" : "Outside items"} 
               />
               <ReviewRow
+                icon="wallet-outline"
+                k="Budget"
+                v={form.budget ? "$".repeat(form.budget) : "Not set"}
+              />
+              <ReviewRow
+                icon="restaurant"
                 k="Meal"
                 v={
                   form.mealType
                     ? form.mealType[0].toUpperCase() + form.mealType.slice(1)
-                    : "—"
+                    : "Not set"
                 }
               />
-              <ReviewRow k="Goal" v={form.goal} />
-              <ReviewRow k="Speed" v={form.speed} />
-              <ReviewRow k="Difficulty" v={form.difficulty} />
-              <ReviewRow
-                k="Methods"
-                v={form.cookingMethods.join(", ") || "—"}
+              <ReviewRow 
+                icon="heart" 
+                k="Goal" 
+                v={form.goal === "loss" ? "Lose weight" : form.goal === "gain" ? "Gain weight" : "My preferences"} 
               />
-              <ReviewRow k="Servings" v={String(form.servings)} />
+              <ReviewRow 
+                icon="time" 
+                k="Speed" 
+                v={form.speed === "fast" ? "≤ 15 min" : form.speed === "medium" ? "≤ 25 min" : "≤ 40 min"} 
+              />
+              <ReviewRow 
+                icon="flame" 
+                k="Methods" 
+                v={form.cookingMethods.length > 0 ? `${form.cookingMethods.length} selected` : "None"} 
+              />
+              <ReviewRow 
+                icon="people" 
+                k="Servings" 
+                v={`${form.servings} ${form.servings === 1 ? "serving" : "servings"}`} 
+              />
             </View>
           </Question>
         </>
@@ -1039,7 +1104,6 @@ ${JSON_DIRECTIVE}`;
         return Phase2;
       case 3:
         return Phase3;
-      // phase 4 is rendered via Phase4Block directly (stable component)
       case 5:
         return Phase5;
       default:
@@ -1057,23 +1121,38 @@ ${JSON_DIRECTIVE}`;
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={back}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           disabled={isGenerating}
+          style={styles.headerButton}
         >
-          <Ionicons name="arrow-back" size={22} color={isGenerating ? "#CCC" : COLORS.sub} />
+          <Ionicons 
+            name="arrow-back" 
+            size={24} 
+            color={isGenerating ? COLORS.disabled : COLORS.grey} 
+          />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Quick Meals</Text>
-        <View style={{ width: 22 }} />
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Quick Meals</Text>
+          <Text style={styles.headerSubtitle}>
+            Step {phase + 1} of {TOTAL_PHASES}
+          </Text>
+        </View>
+        <View style={{ width: 24 }} />
       </View>
 
-      {/* Progress */}
-      <View style={styles.track}>
-        <Animated.View style={[styles.bar, { width: progressWidth }]} />
+      {/* Enhanced Progress Bar */}
+      <View style={styles.progressContainer}>
+        <View style={styles.track}>
+          <Animated.View style={[styles.bar, { width: progressWidth }]} />
+        </View>
       </View>
 
       <ScrollView
@@ -1103,8 +1182,9 @@ ${JSON_DIRECTIVE}`;
             <PhaseComponent animateKey={phase} />
           )}
         </View>
-        <View style={styles.MealComponentContainer}>
-          {showMealComponent ? (
+        
+        {showMealComponent && (
+          <View style={styles.mealComponentContainer}>
             <RecipeItem
               name={currentMeal.name}
               iconName="apps-outline"
@@ -1113,11 +1193,11 @@ ${JSON_DIRECTIVE}`;
               onSave={currentMeal.onSave}
               ingredients={currentMeal.ingredients}
             />
-          ) : null}
-        </View>
+          </View>
+        )}
       </ScrollView>
 
-      {/* Footer nav */}
+      {/* Enhanced Footer Navigation */}
       <View style={styles.footer}>
         <TouchableOpacity
           onPress={back}
@@ -1129,13 +1209,13 @@ ${JSON_DIRECTIVE}`;
         >
           <Ionicons
             name="chevron-back"
-            size={18}
-            color={phase === 0 || isGenerating ? "#B8C1C7" : COLORS.primary}
+            size={20}
+            color={phase === 0 || isGenerating ? COLORS.disabled : COLORS.primary}
           />
           <Text
             style={[
               styles.btnGhostText, 
-              (phase === 0 || isGenerating) && { color: "#B8C1C7" }
+              (phase === 0 || isGenerating) && styles.btnGhostTextDisabled
             ]}
           >
             Back
@@ -1146,24 +1226,29 @@ ${JSON_DIRECTIVE}`;
           onPress={() => (phase === TOTAL_PHASES - 1 ? finish() : next())}
           style={[
             styles.btnSolid,
-            (isGenerating || isButtonDisabled) && { opacity: 0.6 }
+            (isGenerating || isButtonDisabled) && styles.btnSolidDisabled
           ]}
           disabled={isGenerating || isButtonDisabled}
         >
           <Text style={styles.btnSolidText}>
             {phase === TOTAL_PHASES - 1 
-              ? (isGenerating ? "Generating..." : "Generate Meal")
+              ? (isGenerating ? "Generating..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : "Generate Meal")
               : "Next"}
           </Text>
-          <Ionicons name="chevron-forward" size={18} color="#fff" />
+          <Ionicons name="chevron-forward" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
       
-      {/* Loading Overlay */}
+      {/* Enhanced Loading Overlay */}
       {isGenerating && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
-            <View style={styles.loadingSpinnerContainer}>
+            <Animated.View 
+              style={[
+                styles.loadingSpinnerContainer,
+                { transform: [{ scale: pulseAnim }] }
+              ]}
+            >
               <Animated.View 
                 style={[
                   styles.loadingSpinner,
@@ -1177,14 +1262,15 @@ ${JSON_DIRECTIVE}`;
                   },
                 ]} 
               />
-            </View>
-            <Text style={styles.loadingTitle}>Creating Your Meal</Text>
+              <View style={styles.spinnerCore} />
+            </Animated.View>
+            <Text style={styles.loadingTitle}>Creating Your Perfect Meal</Text>
             <Text style={styles.loadingSubtitle}>
-              Our AI chef is crafting the perfect recipe...
+              Our AI chef is analyzing your preferences and crafting a delicious recipe...
             </Text>
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBarTrack}>
-                <View 
+                <Animated.View 
                   style={[
                     styles.progressBarFill, 
                     { width: `${Math.min(generationProgress, 100)}%` }
@@ -1195,43 +1281,63 @@ ${JSON_DIRECTIVE}`;
                 {Math.round(Math.min(generationProgress, 100))}%
               </Text>
             </View>
-            <Text style={styles.loadingHint}>
-              This may take up to 45 seconds
-            </Text>
+            <View style={styles.loadingFooter}>
+              <Ionicons name="information-circle" size={16} color={COLORS.sub} />
+              <Text style={styles.loadingHint}>
+                This may take up to 45 seconds
+              </Text>
+            </View>
           </View>
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
-/* ---------- Presentational bits ---------- */
+/* ---------- Presentational Components ---------- */
 const Question: React.FC<{
   title: string;
   children: React.ReactNode;
   animateKey: number;
 }> = React.memo(({ title, children, animateKey }) => {
   const opacity = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
   const prevAnimateKey = useRef(animateKey);
 
   useEffect(() => {
-    // Only animate if the animateKey actually changed
     if (prevAnimateKey.current !== animateKey) {
       opacity.setValue(0);
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 300,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      translateY.setValue(20);
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 350,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 350,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
       prevAnimateKey.current = animateKey;
     }
-  }, [animateKey, opacity]);
+  }, [animateKey, opacity, translateY]);
 
   return (
-    <Animated.View style={[styles.card, { opacity }]}>
+    <Animated.View 
+      style={[
+        styles.card, 
+        { 
+          opacity,
+          transform: [{ translateY }]
+        }
+      ]}
+    >
       <Text style={styles.question}>{title}</Text>
-      <View style={{ gap: 10 }}>{children}</View>
+      <View style={styles.optionsContainer}>{children}</View>
     </Animated.View>
   );
 });
@@ -1242,196 +1348,360 @@ const Tag: React.FC<{
   label: string;
   onRemove: () => void;
   tone?: "positive" | "danger";
-}> = React.memo(({ label, onRemove, tone = "positive" }) => (
-  <TouchableOpacity
-    onPress={onRemove}
-    style={[
-      styles.tag,
-      tone === "positive"
-        ? { backgroundColor: COLORS.selectedTint, borderColor: COLORS.primary }
-        : { backgroundColor: "#FFECEC", borderColor: "#FFCDCD" },
-    ]}
-  >
-    <Text
+}> = React.memo(({ label, onRemove, tone = "positive" }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePress = () => {
+    Animated.sequence([
+      Animated.timing(scale, {
+        toValue: 0.9,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scale, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => onRemove());
+  };
+
+  return (
+    <AnimatedTouchable
+      onPress={handlePress}
       style={[
-        styles.tagText,
-        tone === "positive" ? { color: COLORS.primary } : { color: "#C93333" },
+        styles.tag,
+        { transform: [{ scale }] },
+        tone === "positive" ? styles.tagPositive : styles.tagDanger,
       ]}
     >
-      {label} ×
-    </Text>
-  </TouchableOpacity>
-));
+      <Text
+        style={[
+          styles.tagText,
+          tone === "positive" ? styles.tagTextPositive : styles.tagTextDanger,
+        ]}
+      >
+        {label}
+      </Text>
+      <Ionicons 
+        name="close-circle" 
+        size={16} 
+        color={tone === "positive" ? COLORS.primary : "#EF4444"}
+        style={{ marginLeft: 4 }}
+      />
+    </AnimatedTouchable>
+  );
+});
 
 Tag.displayName = "Tag";
 
-const ReviewRow: React.FC<{ k: string; v: string }> = React.memo(({ k, v }) => (
+const ReviewRow: React.FC<{ 
+  icon: keyof typeof Ionicons.glyphMap;
+  k: string; 
+  v: string;
+}> = React.memo(({ icon, k, v }) => (
   <View style={styles.row}>
-    <Text style={styles.rowK}>{k}</Text>
+    <View style={styles.rowLeft}>
+      <Ionicons name={icon} size={18} color={COLORS.sub} />
+      <Text style={styles.rowK}>{k}</Text>
+    </View>
     <Text style={styles.rowV}>{v}</Text>
   </View>
 ));
 
 ReviewRow.displayName = "ReviewRow";
 
-/* ---------- Styles ---------- */
+/* ---------- Enhanced Styles ---------- */
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.bg },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.bg 
+  },
   header: {
-    paddingTop: 56,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
+    paddingTop: Platform.OS === "ios" ? 60 : 48,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    backgroundColor: COLORS.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
-  MealComponentContainer: {
-    width: 350,
-    height: "auto",
-    marginLeft: -19,
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.card,
   },
-  headerTitle: { fontSize: 15, fontWeight: "700", color: COLORS.sub },
+  headerCenter: {
+    flex: 1,
+    alignItems: "center",
+  },
+  headerTitle: { 
+    fontSize: 17, 
+    fontWeight: "700", 
+    color: COLORS.grey,
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: COLORS.sub,
+    marginTop: 2,
+  },
+  progressContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: COLORS.bg,
+  },
   track: {
     height: 6,
-    backgroundColor: "#EEF2F5",
-    marginHorizontal: 16,
-    borderRadius: 6,
+    backgroundColor: COLORS.card,
+    borderRadius: 8,
     overflow: "hidden",
   },
   bar: {
     height: 6,
     backgroundColor: COLORS.accent,
-    borderRadius: 6,
+    borderRadius: 8,
+    shadowColor: COLORS.accent,
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   scrollInner: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 100,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 120,
     alignItems: "center",
-    gap: 12,
+    gap: 16,
   },
   card: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: 20,
     backgroundColor: COLORS.bg,
     borderWidth: 1,
     borderColor: COLORS.border,
-    padding: 16,
+    padding: 20,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    elevation: 3,
   },
   question: {
-    fontSize: 18,
-    fontWeight: "800",
+    fontSize: 20,
+    fontWeight: "700",
     color: COLORS.text,
-    marginBottom: 10,
+    marginBottom: 16,
+    letterSpacing: -0.5,
   },
   helperText: {
     fontSize: 14,
-    color: "#666",
-    marginBottom: 12,
+    color: COLORS.sub,
+    marginBottom: 14,
     lineHeight: 20,
+  },
+  optionsContainer: {
+    gap: 12,
   },
   option: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     backgroundColor: COLORS.card,
-    borderRadius: 14,
-    borderWidth: 1,
+    borderRadius: 16,
+    borderWidth: 2,
     borderColor: COLORS.border,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+  },
+  optionSelected: {
+    backgroundColor: COLORS.selectedTint,
+    borderColor: COLORS.selectedBorder,
   },
   radio: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: COLORS.border,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#fff",
   },
-  optionText: { fontSize: 16, fontWeight: "700", color: COLORS.text },
+  checkbox: {
+    borderRadius: 8,
+  },
+  radioSelected: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  optionText: { 
+    flex: 1,
+    fontSize: 16, 
+    fontWeight: "600", 
+    color: COLORS.text,
+    letterSpacing: -0.2,
+  },
+  optionTextSelected: {
+    color: COLORS.primary,
+    fontWeight: "700",
+  },
   input: {
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     backgroundColor: COLORS.bg,
+    color: COLORS.text,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+    paddingTop: 14,
   },
   inputWithButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
-  tokens: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
+  addButtonDanger: {
+    backgroundColor: "#EF4444",
+  },
+  addButtonDisabled: {
+    backgroundColor: COLORS.disabled,
+    shadowOpacity: 0,
+  },
+  tokens: { 
+    flexDirection: "row", 
+    flexWrap: "wrap", 
+    gap: 10, 
+    marginTop: 12 
+  },
   tag: {
-    borderWidth: 1,
-    borderRadius: 16,
-    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderRadius: 20,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  tagText: { fontSize: 13, fontWeight: "800" },
+  tagPositive: {
+    backgroundColor: COLORS.selectedTint,
+    borderColor: COLORS.selectedBorder,
+  },
+  tagDanger: {
+    backgroundColor: COLORS.dangerTint,
+    borderColor: COLORS.dangerBorder,
+  },
+  tagText: { 
+    fontSize: 14, 
+    fontWeight: "600",
+  },
+  tagTextPositive: {
+    color: COLORS.primary,
+  },
+  tagTextDanger: {
+    color: "#EF4444",
+  },
 
-  servingsRow: { flexDirection: "row", alignItems: "center", gap: 18 },
+  servingsRow: { 
+    flexDirection: "row", 
+    alignItems: "center", 
+    justifyContent: "center",
+    gap: 24,
+    paddingVertical: 8,
+  },
   stepper: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     backgroundColor: COLORS.card,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  stepperSymbol: { fontSize: 22, color: COLORS.text, lineHeight: 22 },
+  stepperDisabled: {
+    backgroundColor: "#F3F4F6",
+    borderColor: "#E5E7EB",
+  },
+  servingsDisplay: {
+    alignItems: "center",
+    minWidth: 80,
+  },
   servings: {
-    fontSize: 20,
+    fontSize: 32,
     fontWeight: "800",
-    color: COLORS.text,
-    minWidth: 32,
-    textAlign: "center",
+    color: COLORS.primary,
+    letterSpacing: -1,
+  },
+  servingsLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.sub,
+    marginTop: 2,
   },
 
   review: {
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-    backgroundColor: COLORS.bg,
+    borderRadius: 16,
+    padding: 16,
+    gap: 14,
+    backgroundColor: COLORS.card,
   },
-  row: { flexDirection: "row", justifyContent: "space-between" },
-  rowK: { fontSize: 14, color: COLORS.sub },
-  rowV: { fontSize: 14, fontWeight: "800", color: COLORS.primary },
+  row: { 
+    flexDirection: "row", 
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  rowLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  rowK: { 
+    fontSize: 15, 
+    fontWeight: "600",
+    color: COLORS.sub 
+  },
+  rowV: { 
+    fontSize: 15, 
+    fontWeight: "700", 
+    color: COLORS.primary 
+  },
 
   footer: {
     position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: Platform.OS === "ios" ? 28 : 16,
+    left: 20,
+    right: 20,
+    bottom: Platform.OS === "ios" ? 36 : 20,
     flexDirection: "row",
     gap: 12,
   },
   btnGhost: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
+    height: 54,
+    borderRadius: 16,
     borderWidth: 2,
     borderColor: COLORS.primary,
     alignItems: "center",
@@ -1441,117 +1711,147 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.bg,
   },
   btnGhostDisabled: {
-    borderColor: "#DDE6E3",
-    backgroundColor: "#F4F7F6",
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.card,
   },
-  btnGhostText: { fontSize: 16, fontWeight: "800", color: COLORS.primary },
+  btnGhostText: { 
+    fontSize: 16, 
+    fontWeight: "700", 
+    color: COLORS.primary 
+  },
+  btnGhostTextDisabled: {
+    color: COLORS.disabled,
+  },
 
   btnSolid: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
+    height: 54,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
     backgroundColor: COLORS.accent,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    shadowColor: COLORS.accent,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
+    elevation: 6,
   },
-  btnSolidText: { fontSize: 16, fontWeight: "800", color: "#fff" },
-
-  counter: {
-    position: "absolute",
-    bottom: Platform.OS === "ios" ? 6 : 2,
-    left: 0,
-    right: 0,
-    textAlign: "center",
-    fontSize: 10,
-    color: "#A7B0B5",
-    letterSpacing: 1,
+  btnSolidDisabled: {
+    opacity: 0.5,
+  },
+  btnSolidText: { 
+    fontSize: 16, 
+    fontWeight: "700", 
+    color: "#fff" 
   },
   
-  // Loading overlay styles
+  mealComponentContainer: {
+    width: "100%",
+    marginTop: 8,
+  },
+
+  // Enhanced Loading Overlay
   loadingOverlay: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.85)",
+    backgroundColor: "rgba(17, 18, 20, 0.92)",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
   },
   loadingCard: {
     backgroundColor: COLORS.bg,
-    borderRadius: 24,
-    padding: 32,
+    borderRadius: 28,
+    padding: 36,
     alignItems: "center",
-    width: "85%",
-    maxWidth: 360,
+    width: "88%",
+    maxWidth: 380,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 12,
   },
   loadingSpinnerContainer: {
-    marginBottom: 24,
+    marginBottom: 28,
+    position: "relative",
   },
   loadingSpinner: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 4,
-    borderColor: "#E8F5E9",
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 5,
+    borderColor: "#E8F5EF",
     borderTopColor: COLORS.primary,
+  },
+  spinnerCore: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: COLORS.selectedTint,
+    transform: [{ translateX: -24 }, { translateY: -24 }],
   },
   loadingTitle: {
     fontSize: 22,
     fontWeight: "700",
     color: COLORS.text,
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 10,
+    letterSpacing: -0.5,
   },
   loadingSubtitle: {
     fontSize: 15,
     color: COLORS.sub,
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: 28,
+    paddingHorizontal: 8,
   },
   progressBarContainer: {
     width: "100%",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
   },
   progressBarTrack: {
     width: "100%",
-    height: 8,
-    backgroundColor: "#E8F5E9",
-    borderRadius: 4,
+    height: 10,
+    backgroundColor: "#E8F5EF",
+    borderRadius: 6,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
     backgroundColor: COLORS.primary,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   progressText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "700",
     color: COLORS.primary,
   },
+  loadingFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    width: "100%",
+    justifyContent: "center",
+  },
   loadingHint: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.sub,
-    textAlign: "center",
-    marginTop: 16,
-    opacity: 0.7,
+    fontWeight: "500",
   },
 });
 

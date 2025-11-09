@@ -10,7 +10,7 @@ import {
   Dimensions,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { copilot, walkthroughable, CopilotStep as CopilotStepType } from '@okgrow/react-native-copilot';
+import { copilot, walkthroughable, CopilotStep as CopilotStepType, CopilotProps } from '@okgrow/react-native-copilot';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -195,9 +195,11 @@ const CustomTooltip: React.FC<TooltipProps> = ({
 
 const WalkthroughableTooltip = walkthroughable(CustomTooltip);
 
-const CustomStepNumber: React.FC<{ currentStepNumber: number }> = ({
-  currentStepNumber,
-}) => {
+const CustomStepNumber: React.FC<{
+  isFirstStep?: boolean;
+  isLastStep?: boolean;
+  currentStepNumber?: number;
+}> = () => {
   const pulseAnim = React.useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -263,12 +265,11 @@ export const resetTutorial = async (): Promise<void> => {
   }
 };
 
-const MainScreenTutorialBase: React.FC<
-  MainScreenTutorialProps & {
-    start: () => void;
-    copilotEvents: any;
-  }
-> = ({ children, start, copilotEvents }) => {
+const MainScreenTutorialBase: React.FC<MainScreenTutorialProps & CopilotProps> = ({
+  children,
+  start,
+  copilotEvents,
+}) => {
   const [tutorialReady, setTutorialReady] = useState(false);
   const overlayOpacity = React.useRef(new Animated.Value(0)).current;
 
@@ -300,7 +301,7 @@ const MainScreenTutorialBase: React.FC<
   useEffect(() => {
     if (tutorialReady) {
       const timeout = setTimeout(() => {
-        start();
+        start?.();
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }, 500);
 
@@ -335,15 +336,15 @@ const MainScreenTutorialBase: React.FC<
     copilotEvents.on('stop', handleStop);
 
     return () => {
-      copilotEvents.off('start', handleStart);
-      copilotEvents.off('stop', handleStop);
+      copilotEvents?.off?.('start', handleStart);
+      copilotEvents?.off?.('stop', handleStop);
     };
   }, [copilotEvents, overlayOpacity]);
 
   return <>{children(CopilotStepType)}</>;
 };
 
-const MainScreenTutorial = copilot({
+const MainScreenTutorial = copilot<MainScreenTutorialProps>({
   overlay: 'svg',
   animated: true,
   backdropColor: COLORS.overlay,

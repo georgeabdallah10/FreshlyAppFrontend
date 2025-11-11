@@ -1,3 +1,5 @@
+import PantryItemImage from "@/components/pantry/PantryItemImage";
+import { preloadPantryImages } from "@/src/services/pantryImageService";
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -76,6 +78,15 @@ export default function MatchMyGroceryScreen() {
   const [showEditModal, setShowEditModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!groceryItems.length) return;
+    const names = groceryItems.map((item) => item.name).filter(Boolean);
+    if (!names.length) return;
+    preloadPantryImages(names).catch((err) => {
+      console.warn("Failed to preload grocery images", err);
+    });
+  }, [groceryItems]);
 
   useEffect(() => {
     Animated.parallel([
@@ -257,7 +268,13 @@ export default function MatchMyGroceryScreen() {
             ]}
           >
             <View style={styles.itemIcon}>
-              <Ionicons name="nutrition-outline" size={28} color="#00A86B" />
+              <PantryItemImage
+                itemName={item.name}
+                size={48}
+                borderColor="#ECEEF2"
+                borderWidth={1.5}
+                silent
+              />
             </View>
             <View style={styles.itemContent}>
               <Text style={styles.itemName}>{item.name}</Text>
@@ -312,7 +329,13 @@ export default function MatchMyGroceryScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.itemIcon}>
-                <Ionicons name="nutrition-outline" size={28} color="#00A86B" />
+                <PantryItemImage
+                  itemName={item.name}
+                  size={52}
+                  borderColor="#ECEEF2"
+                  borderWidth={1.5}
+                  silent
+                />
               </View>
               <View style={styles.matchItemInfo}>
                 <Text style={styles.itemName}>{item.name}</Text>
@@ -398,11 +421,22 @@ export default function MatchMyGroceryScreen() {
                 },
               ]}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.summaryItemName}>{item.name}</Text>
-                <Text style={styles.summarySub}>
-                  Need: {req} {item.unit}   •   In pantry: {pan} {item.unit}
-                </Text>
+              <View style={styles.summaryItemLeft}>
+                <View style={styles.itemIcon}>
+                  <PantryItemImage
+                    itemName={item.name}
+                    size={44}
+                    borderColor="#ECEEF2"
+                    borderWidth={1.5}
+                    silent
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.summaryItemName}>{item.name}</Text>
+                  <Text style={styles.summarySub}>
+                    Need: {req} {item.unit}   •   In pantry: {pan} {item.unit}
+                  </Text>
+                </View>
               </View>
               <Text style={[styles.summaryItemQuantity, diff === 0 && { color: '#00A86B' }]}>
                 {diff === 0 ? 'OK' : `${diff} ${item.unit}`}
@@ -628,12 +662,6 @@ const styles = StyleSheet.create({
     borderColor: "#ECEEF2",
   },
   itemIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#FFF",
-    alignItems: "center",
-    justifyContent: "center",
     marginRight: 12,
   },
   itemContent: {
@@ -758,6 +786,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#000000",
     flex: 1,
+  },
+  summaryItemLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 12,
   },
   summaryItemQuantity: {
     fontSize: 15,

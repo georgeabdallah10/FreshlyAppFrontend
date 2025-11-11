@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 80,
+    marginBottom: 0,
   },
   logoImage: {
     width: 280,
@@ -110,7 +110,6 @@ const styles = StyleSheet.create({
     fontSize: 64,
     fontWeight: '700',
     color: '#00A86B',
-    marginTop: 24,
     fontFamily: 'System',
     letterSpacing: -1.5,
   },

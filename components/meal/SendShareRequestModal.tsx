@@ -106,7 +106,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
       const data = await listFamilyMembers(familyId);
       const normalized = (data || [])
         .map(mapMemberToUser)
-        .filter((member): member is UserSearchResult => Boolean(member && member.id !== user?.id));
+        .filter((member: any): member is UserSearchResult => Boolean(member && member.id !== user?.id));
       setFamilyMembers(normalized);
     } catch (error: any) {
       console.error('[SendShareRequestModal] Error loading family members:', error);

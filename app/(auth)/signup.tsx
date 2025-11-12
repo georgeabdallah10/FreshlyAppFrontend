@@ -1,9 +1,17 @@
-import { Storage } from "@/src/utils/storage";
-import React, { useEffect, useRef, useState } from "react";
-
 import ToastBanner from "@/components/generalMessage";
-import { useRouter } from "expo-router";
 import {
+  loginUser,
+  registerUser,
+  sendVerificationCode,
+  signupWithOAuth,
+  type OAuthProvider,
+} from "../../src/auth/auth";
+import { supabase } from "@/src/supabase/client";
+import { Storage } from "@/src/utils/storage";
+import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -16,11 +24,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import {
-  loginUser,
-  registerUser,
-  sendVerificationCode,
-} from "../../src/auth/auth";
+import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import { useAuthRequest } from "expo-auth-session";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -79,6 +88,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
     duration: 3500,
     topOffset: 50,
   });
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const isAppleAvailable = Platform.OS === "ios";
+  const isOAuthBusy = Boolean(oauthLoading);
 
   const showToast = (
     type: ToastType,
@@ -175,10 +187,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
   async function onsubmit() {
     setIsCreatingAccount(true);
-    
+
     try {
       console.log("Starting account registration...");
-      
+
       const result = await registerUser({
         email: email,
         password: password,
@@ -192,9 +204,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
           calorie_target: 0,
         },
       });
-      
+
       console.log("Registration result:", result);
-      
+
       if (result.ok) {
         setUsername("");
         setEmail("");
@@ -202,31 +214,37 @@ export default function CreateAccountScreen(): React.JSX.Element {
         setConfirmPassword("");
         setMobile("");
         console.log("Registration successful, attempting auto-login...");
-        
+
         const login = await loginUser({ email, password });
         if (!login.ok) {
           setIsCreatingAccount(false);
-          
+
           // Provide specific error messages based on status code
           let errorMessage = "Unable to sign you in automatically. ";
           if (login.status === 401) {
-            errorMessage += "Invalid credentials. Please try signing in manually.";
+            errorMessage +=
+              "Invalid credentials. Please try signing in manually.";
           } else if (login.status === 429) {
-            errorMessage += "Too many login attempts. Please wait a moment and try again.";
+            errorMessage +=
+              "Too many login attempts. Please wait a moment and try again.";
           } else if (login.status === 500) {
             errorMessage += "Server error. Please try signing in manually.";
           } else if (login.status === -1) {
-            errorMessage += "Network connection issue. Please check your internet and try again.";
+            errorMessage +=
+              "Network connection issue. Please check your internet and try again.";
           } else {
             errorMessage += login.message || "Please try signing in manually.";
           }
-          
+
           showToast("error", errorMessage);
           return;
         }
-        
+
         await Storage.setItem("access_token", login.data.access_token);
-        showToast("success", "Account created successfully! Welcome to Freshly!");
+        showToast(
+          "success",
+          "Account created successfully! Welcome to Freshly!"
+        );
 
         // Send verification code (non-blocking)
         sendVerificationCode(email).catch((e) => {
@@ -243,62 +261,75 @@ export default function CreateAccountScreen(): React.JSX.Element {
         return;
       } else {
         setIsCreatingAccount(false);
-        
+
         // Start cooldown on failed signup to prevent spam
         startCooldown(60);
-        
+
         // Provide specific error messages based on status code and response
         let errorMessage = "";
-        
+
         if (result.status === 400) {
           // Bad request - likely validation error
           if (result.message.toLowerCase().includes("email")) {
-            errorMessage = "This email is already registered. Please use a different email or sign in.";
+            errorMessage =
+              "This email is already registered. Please use a different email or sign in.";
           } else if (result.message.toLowerCase().includes("password")) {
-            errorMessage = "Password must be at least 8 characters long and contain letters and numbers.";
+            errorMessage =
+              "Password must be at least 8 characters long and contain letters and numbers.";
           } else if (result.message.toLowerCase().includes("phone")) {
             errorMessage = "Please enter a valid phone number.";
           } else {
-            errorMessage = result.message || "Please check your information and try again.";
+            errorMessage =
+              result.message || "Please check your information and try again.";
           }
         } else if (result.status === 409) {
           // Conflict - user already exists
-          errorMessage = "An account with this email already exists. Please sign in instead.";
+          errorMessage =
+            "An account with this email already exists. Please sign in instead.";
         } else if (result.status === 422) {
           // Validation error
-          errorMessage = result.message || "Please check that all fields are filled in correctly.";
+          errorMessage =
+            result.message ||
+            "Please check that all fields are filled in correctly.";
         } else if (result.status === 429) {
           // Too many requests
-          errorMessage = "Too many signup attempts. Please wait a few minutes and try again.";
+          errorMessage =
+            "Too many signup attempts. Please wait a few minutes and try again.";
           startCooldown(120); // Longer cooldown for rate limiting
         } else if (result.status === 500) {
           // Server error
-          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+          errorMessage =
+            "Our servers are experiencing issues. Please try again in a few moments.";
         } else if (result.status === -1) {
           // Network error
-          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+          errorMessage =
+            "Unable to connect to the server. Please check your internet connection and try again.";
         } else {
-          errorMessage = result.message || "Unable to create your account. Please try again.";
+          errorMessage =
+            result.message ||
+            "Unable to create your account. Please try again.";
         }
-        
+
         showToast("error", errorMessage);
       }
     } catch (error: any) {
       setIsCreatingAccount(false);
       startCooldown(60);
-      
+
       // Handle different types of errors
       let errorMessage = "";
       if (error.name === "TypeError" && error.message.includes("Network")) {
-        errorMessage = "No internet connection. Please check your network and try again.";
+        errorMessage =
+          "No internet connection. Please check your network and try again.";
       } else if (error.name === "AbortError") {
-        errorMessage = "Request timed out. Please check your connection and try again.";
+        errorMessage =
+          "Request timed out. Please check your connection and try again.";
       } else if (error.message) {
         errorMessage = error.message;
       } else {
         errorMessage = "An unexpected error occurred. Please try again.";
       }
-      
+
       showToast("error", errorMessage);
     }
   }
@@ -331,7 +362,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
       if (missing.length === 1) {
         showToast("error", `Please enter your ${missing[0].toLowerCase()}.`);
       } else {
-        showToast("error", `Please complete these fields: ${missing.join(", ")}.`);
+        showToast(
+          "error",
+          `Please complete these fields: ${missing.join(", ")}.`
+        );
       }
       return;
     }
@@ -346,7 +380,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
     // 3) Validate phone number format
     const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/;
     if (!phoneRegex.test(mobile.trim())) {
-      showToast("error", "Please enter a valid phone number (at least 10 digits).");
+      showToast(
+        "error",
+        "Please enter a valid phone number (at least 10 digits)."
+      );
       return;
     }
 
@@ -355,12 +392,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
       showToast("error", "Password must be at least 8 characters long.");
       return;
     }
-    
+
     if (!/[a-zA-Z]/.test(password)) {
       showToast("error", "Password must contain at least one letter.");
       return;
     }
-    
+
     if (!/[0-9]/.test(password)) {
       showToast("error", "Password must contain at least one number.");
       return;
@@ -368,7 +405,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
     // 5) Validate password match
     if (password !== confirmPassword) {
-      showToast("error", "Passwords don't match. Please enter the same password in both fields.");
+      showToast(
+        "error",
+        "Passwords don't match. Please enter the same password in both fields."
+      );
       return;
     }
 
@@ -389,9 +429,114 @@ export default function CreateAccountScreen(): React.JSX.Element {
     });
   };
 
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: "YOUR_CLIENT_ID",
+      redirectUri: AuthSession.makeRedirectUri({ scheme: "myapp" }),
+      scopes: ["profile", "email"],
+    },
+    { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" }
+  );
+
   const handleSignIn = () => {
     console.log("Navigate to sign in");
     router.replace("/(auth)/Login");
+  };
+
+  const handleOAuthSignup = async (provider: OAuthProvider) => {
+    if (oauthLoading) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      showToast("error", "OAuth signup is currently unavailable on web.");
+      return;
+    }
+
+    try {
+      console.log(`[Signup] ${provider} signup started`);
+      setOauthLoading(provider);
+
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: "myapp",
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        console.error("[Signup] Supabase OAuth error:", error);
+        throw new Error(error.message || "Unable to start authentication.");
+      }
+
+      if (!data?.url) {
+        throw new Error("Unable to open provider login page.");
+      }
+
+      const authResult = await promptAsync();
+
+      if (authResult.type !== "success") {
+        throw new Error(
+          authResult.type === "dismiss"
+            ? "Authentication cancelled."
+            : "Authentication failed. Please try again."
+        );
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error(
+          "[Signup] Failed to fetch Supabase session:",
+          sessionError
+        );
+        throw new Error("Authentication failed. Please try again.");
+      }
+
+      const supabaseToken = sessionData.session?.access_token;
+
+      if (!supabaseToken) {
+        throw new Error("Missing Supabase session after authentication.");
+      }
+
+      console.log(
+        "[Signup] Supabase OAuth successful, creating user in backend..."
+      );
+      const backend = await signupWithOAuth(supabaseToken, provider);
+
+      if (!backend.ok) {
+        if (backend.status === 409) {
+          showToast("error", "Account already exists. Please log in instead.");
+        } else if (backend.status === 401) {
+          showToast("error", "Authentication failed. Please try again.");
+        } else {
+          showToast(
+            "error",
+            backend.message || "Unable to create account. Please try again."
+          );
+        }
+        return;
+      }
+
+      await Storage.setItem("access_token", backend.data.access_token);
+      console.log("[Signup] User created successfully in backend");
+      showToast("success", "Signed up successfully! Welcome to Freshly!");
+      router.replace("/(user)/setPfp");
+    } catch (error: any) {
+      console.error("[Signup] OAuth signup error:", error);
+      showToast(
+        "error",
+        error?.message || "Unable to complete signup. Please try again."
+      );
+    } finally {
+      setOauthLoading(null);
+    }
   };
 
   return (
@@ -446,6 +591,64 @@ export default function CreateAccountScreen(): React.JSX.Element {
             <Text style={styles.subtitle}>
               Please enter your details below.
             </Text>
+
+            <View style={styles.oauthSection}>
+              <TouchableOpacity
+                style={[
+                  styles.oauthButton,
+                  oauthLoading === "google" && styles.oauthButtonActive,
+                ]}
+                onPress={() => handleOAuthSignup("google")}
+                activeOpacity={0.8}
+                disabled={isOAuthBusy}
+              >
+                <View style={styles.oauthButtonContent}>
+                  {oauthLoading === "google" ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Ionicons name="logo-google" size={18} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.oauthButtonText}>
+                    Continue with Google
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {isAppleAvailable && (
+                <TouchableOpacity
+                  style={[
+                    styles.oauthButton,
+                    styles.oauthButtonApple,
+                    oauthLoading === "apple" && styles.oauthButtonAppleActive,
+                  ]}
+                  onPress={() => handleOAuthSignup("apple")}
+                  activeOpacity={0.8}
+                  disabled={isOAuthBusy}
+                >
+                  <View style={styles.oauthButtonContent}>
+                    {oauthLoading === "apple" ? (
+                      <ActivityIndicator color="#111111" size="small" />
+                    ) : (
+                      <Ionicons name="logo-apple" size={18} color="#111111" />
+                    )}
+                    <Text
+                      style={[
+                        styles.oauthButtonText,
+                        styles.oauthButtonAppleText,
+                      ]}
+                    >
+                      Continue with Apple
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.oauthDividerRow}>
+              <View style={styles.oauthDivider} />
+              <Text style={styles.oauthDividerText}>or</Text>
+              <View style={styles.oauthDivider} />
+            </View>
 
             {/* Username Input */}
             <View
@@ -640,20 +843,23 @@ export default function CreateAccountScreen(): React.JSX.Element {
               <Animated.View
                 style={[
                   styles.createButton,
-                  (isButtonDisabled || isCreatingAccount) && styles.createButtonDisabled,
+                  (isButtonDisabled || isCreatingAccount) &&
+                    styles.createButtonDisabled,
                   {
                     transform: [{ scale: buttonScale }],
                   },
                 ]}
               >
                 {isButtonDisabled && cooldownRemaining > 0 ? (
-                  <Text style={styles.createButtonText}>{cooldownRemaining}s</Text>
+                  <Text style={styles.createButtonText}>
+                    {cooldownRemaining}s
+                  </Text>
                 ) : (
                   <Text style={styles.createButtonText}>→</Text>
                 )}
               </Animated.View>
             </TouchableOpacity>
-            
+
             {/* Cooldown message */}
             {isButtonDisabled && cooldownRemaining > 0 && (
               <Text style={styles.cooldownText}>
@@ -786,6 +992,59 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: moderateScale(18),
     marginBottom: verticalScale(18),
+  },
+  oauthSection: {
+    marginBottom: verticalScale(14),
+  },
+  oauthButton: {
+    backgroundColor: "#4985F8",
+    borderRadius: moderateScale(10),
+    paddingVertical: verticalScale(12),
+    paddingHorizontal: scale(12),
+    justifyContent: "center",
+    marginBottom: verticalScale(10),
+  },
+  oauthButtonActive: {
+    opacity: 0.8,
+  },
+  oauthButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  oauthButtonText: {
+    color: "#FFFFFF",
+    fontSize: moderateScale(14),
+    fontWeight: "600",
+  },
+  oauthButtonApple: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  oauthButtonAppleActive: {
+    opacity: 0.8,
+  },
+  oauthButtonAppleText: {
+    color: "#111111",
+  },
+  oauthDividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: verticalScale(18),
+    justifyContent: "center",
+  },
+  oauthDivider: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#E5E7EB",
+  },
+  oauthDividerText: {
+    fontSize: moderateScale(13),
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginHorizontal: 10,
   },
   inputContainer: {
     flexDirection: "row",

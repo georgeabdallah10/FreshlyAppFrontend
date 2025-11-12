@@ -148,9 +148,21 @@ export function useUnreadNotifications() {
   return useNotifications({ is_read: false });
 }
 
-// Get meal share request notifications
+// Get meal share notifications (requests + responses)
 export function useMealShareNotifications() {
-  return useNotifications({ type: 'meal_share_request' });
+  const query = useNotifications();
+  const mealShareTypes: NotificationType[] = [
+    'meal_share_request',
+    'meal_share_accepted',
+    'meal_share_declined',
+  ];
+
+  return {
+    ...query,
+    data: (query.data || []).filter((notification) =>
+      mealShareTypes.includes(notification.type)
+    ),
+  };
 }
 
 // Handle notification click - marks as read and returns related_id

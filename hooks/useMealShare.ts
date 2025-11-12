@@ -11,6 +11,7 @@ import {
     mealShareService
 } from '@/src/services/mealShare.service';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/src/config/queryClient';
 
 // ============================================
 // QUERY KEYS
@@ -76,12 +77,14 @@ export function useShareRequest(requestId: number, enabled = true) {
  * const { data: count } = usePendingRequestCount();
  */
 export function usePendingRequestCount() {
-  const { data: requests } = useReceivedShareRequests({ status: 'pending' });
-  
-  return {
-    data: requests?.length ?? 0,
-    isLoading: false,
-  };
+  return useQuery({
+    queryKey: mealShareKeys.pendingCount(),
+    queryFn: async () => {
+      const pending = await mealShareService.getPendingRequests();
+      return pending.length;
+    },
+    staleTime: 15 * 1000,
+  });
 }
 
 // ============================================
@@ -93,7 +96,7 @@ export function usePendingRequestCount() {
  * @example
  * const sendRequest = useSendShareRequest();
  * await sendRequest.mutateAsync({
- *   meal_id: 123,
+ *   mealId: 123,
  *   recipientUserId: 456,
  *   message: 'Check out this recipe!'
  * });
@@ -105,8 +108,9 @@ export function useSendShareRequest() {
     mutationFn: (input: SendShareRequestInput) =>
       mealShareService.sendMealShareRequest(input),
     onSuccess: () => {
-      // Invalidate sent requests to refresh the list
       queryClient.invalidateQueries({ queryKey: mealShareKeys.sent() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.received() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.pendingCount() });
     },
   });
 }
@@ -123,10 +127,15 @@ export function useAcceptShareRequest() {
   return useMutation({
     mutationFn: (requestId: number) =>
       mealShareService.acceptShareRequest(requestId),
-    onSuccess: () => {
-      // Invalidate received requests and pending count
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: mealShareKeys.received() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.sent() });
       queryClient.invalidateQueries({ queryKey: mealShareKeys.pendingCount() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.meals.all });
+      if (data?.acceptedMealDetail?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.meals.detail(data.acceptedMealDetail.id) });
+      }
     },
   });
 }
@@ -144,8 +153,8 @@ export function useDeclineShareRequest() {
     mutationFn: (requestId: number) =>
       mealShareService.declineShareRequest(requestId),
     onSuccess: () => {
-      // Invalidate received requests and pending count
       queryClient.invalidateQueries({ queryKey: mealShareKeys.received() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.sent() });
       queryClient.invalidateQueries({ queryKey: mealShareKeys.pendingCount() });
     },
   });
@@ -164,8 +173,9 @@ export function useCancelShareRequest() {
     mutationFn: (requestId: number) =>
       mealShareService.cancelShareRequest(requestId),
     onSuccess: () => {
-      // Invalidate sent requests to refresh the list
       queryClient.invalidateQueries({ queryKey: mealShareKeys.sent() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.received() });
+      queryClient.invalidateQueries({ queryKey: mealShareKeys.pendingCount() });
     },
   });
 }

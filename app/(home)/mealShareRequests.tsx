@@ -13,12 +13,13 @@ import {
     useReceivedShareRequests,
     useSentShareRequests,
 } from '@/hooks/useMealShare';
-import { MealShareRequest } from '@/src/services/mealShare.service';
+import { MealShareRequest, type MealShareMealDetail, type BasicUserSummary, type ShareRequestStatus } from '@/src/services/mealShare.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
+    Image,
     RefreshControl,
     ScrollView,
     StyleSheet,
@@ -28,6 +29,57 @@ import {
 } from 'react-native';
 
 type Tab = 'received' | 'sent';
+
+const formatStatus = (status: ShareRequestStatus) =>
+  status.charAt(0).toUpperCase() + status.slice(1);
+
+const getUserDisplayName = (user?: BasicUserSummary) =>
+  user?.name ||
+  user?.full_name ||
+  user?.display_name ||
+  user?.email?.split('@')[0] ||
+  'User';
+
+const getUserInitial = (user?: BasicUserSummary) =>
+  getUserDisplayName(user).charAt(0).toUpperCase();
+
+const formatDate = (dateString: string) => {
+  try {
+    return new Date(dateString).toLocaleDateString();
+  } catch {
+    return dateString;
+  }
+};
+
+const formatMacroValue = (value?: number, suffix: string = 'g') => {
+  if (value === undefined || value === null) return null;
+  return `${Math.round(value)}${suffix}`;
+};
+
+const MealMacros = ({ meal }: { meal?: MealShareMealDetail }) => {
+  if (!meal?.macros) return null;
+
+  const { protein, carbs, fats, calories } = meal.macros;
+  const chips = [
+    { label: 'Protein', value: formatMacroValue(protein) },
+    { label: 'Carbs', value: formatMacroValue(carbs) },
+    { label: 'Fats', value: formatMacroValue(fats) },
+    { label: 'Calories', value: calories !== undefined ? `${calories} kcal` : null },
+  ].filter((chip) => chip.value);
+
+  if (chips.length === 0) return null;
+
+  return (
+    <View style={styles.macroRow}>
+      {chips.map((chip) => (
+        <View key={chip.label} style={styles.macroChip}>
+          <Text style={styles.macroLabel}>{chip.label}</Text>
+          <Text style={styles.macroValue}>{chip.value}</Text>
+        </View>
+      ))}
+    </View>
+  );
+};
 
 const MealShareRequestsScreen = () => {
   const router = useRouter();
@@ -65,13 +117,18 @@ const MealShareRequestsScreen = () => {
     setRefreshing(false);
   };
 
-  const handleAccept = async (requestId: number) => {
+  const handleAccept = async (request: MealShareRequest) => {
     try {
-      await acceptRequest.mutateAsync(requestId);
+      const response = await acceptRequest.mutateAsync(request.id);
+      const clonedName =
+        response?.acceptedMealDetail?.name ||
+        request.acceptedMealDetail?.name ||
+        request.mealDetail?.name ||
+        'meal';
       setToast({
         visible: true,
         type: 'success',
-        message: 'Request accepted! You can now view this meal.',
+        message: `Request accepted! "${clonedName}" was added to your meals.`,
       });
     } catch (error: any) {
       setToast({
@@ -116,147 +173,207 @@ const MealShareRequestsScreen = () => {
     }
   };
 
-  const renderReceivedRequest = (request: MealShareRequest) => (
-    <View key={request.id} style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <View style={styles.senderAvatar}>
-          <Text style={styles.senderInitial}>
-            {request.sender?.name?.charAt(0).toUpperCase() || 'F'}
-          </Text>
-        </View>
-        <View style={styles.requestInfo}>
-          <Text style={styles.requestTitle}>
-            {request.sender?.name || 'Family Member'} sent you a meal
-          </Text>
-          <Text style={styles.requestTime}>
-            {new Date(request.created_at).toLocaleDateString()}
-          </Text>
-        </View>
-        <View style={[styles.statusBadge, styles[`status${request.status}`]]}>
-          <Text style={[styles.statusText, styles[`statusText${request.status}`]]}>
-            {request.status}
-          </Text>
-        </View>
-      </View>
+  const renderReceivedRequest = (request: MealShareRequest) => {
+    const meal = request.mealDetail;
+    const acceptedMeal = request.acceptedMealDetail;
 
-      <View style={styles.mealInfo}>
-        <Text style={styles.mealName}>{request.meal?.name || 'Meal'}</Text>
-        {request.meal?.description && (
+    return (
+      <View key={request.id} style={styles.requestCard}>
+        <View style={styles.requestHeader}>
+          <View style={styles.senderAvatar}>
+            <Text style={styles.senderInitial}>
+              {getUserInitial(request.sender)}
+            </Text>
+          </View>
+          <View style={styles.requestInfo}>
+            <Text style={styles.requestTitle}>
+              {getUserDisplayName(request.sender)} shared a meal with you
+            </Text>
+            <Text style={styles.requestTime}>{formatDate(request.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, styles[`status${request.status}`]]}>
+            <Text style={[styles.statusText, styles[`statusText${request.status}`]]}>
+              {formatStatus(request.status)}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.mealPreview}>
+          {meal?.image ? (
+            <Image source={{ uri: meal.image }} style={styles.mealImage} />
+          ) : (
+            <View style={styles.mealImagePlaceholder}>
+              <Ionicons name="image-outline" size={24} color="#9CA3AF" />
+            </View>
+          )}
+          <View style={styles.mealInfo}>
+            <Text style={styles.mealName}>{meal?.name || `Meal #${request.mealId}`}</Text>
+            {meal?.mealType && (
+              <View style={styles.mealMeta}>
+                <Ionicons name="restaurant" size={14} color="#6B7280" />
+                <Text style={styles.mealMetaText}>{meal.mealType}</Text>
+              </View>
+            )}
+            {meal?.cuisine && (
+              <View style={styles.mealMeta}>
+                <Ionicons name="earth-outline" size={14} color="#6B7280" />
+                <Text style={styles.mealMetaText}>{meal.cuisine}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <MealMacros meal={meal} />
+
+        {meal?.description && (
           <Text style={styles.mealDescription} numberOfLines={2}>
-            {request.meal.description}
+            {meal.description}
           </Text>
         )}
-        {request.meal?.meal_type && (
-          <View style={styles.mealMeta}>
-            <Ionicons name="restaurant" size={14} color="#6B7280" />
-            <Text style={styles.mealMetaText}>{request.meal.meal_type}</Text>
+
+        {request.message && (
+          <View style={styles.messageBox}>
+            <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
+            <Text style={styles.messageText}>{request.message}</Text>
+          </View>
+        )}
+
+        {acceptedMeal && (
+          <View style={styles.acceptedInfo}>
+            <Ionicons name="checkmark-done-circle" size={20} color="#10B981" />
+            <View style={styles.acceptedInfoText}>
+              <Text style={styles.acceptedTitle}>Added to your meals</Text>
+              <Text style={styles.acceptedSubtitle}>
+                {acceptedMeal.name} · ID #{acceptedMeal.id}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {request.status === 'pending' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.declineButton]}
+              onPress={() => handleDecline(request.id)}
+              disabled={declineRequest.isPending}
+              activeOpacity={0.7}
+            >
+              {declineRequest.isPending ? (
+                <ActivityIndicator size="small" color="#EF4444" />
+              ) : (
+                <>
+                  <Ionicons name="close-circle" size={18} color="#EF4444" />
+                  <Text style={styles.declineButtonText}>Decline</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() => handleAccept(request)}
+              disabled={acceptRequest.isPending}
+              activeOpacity={0.7}
+            >
+              {acceptRequest.isPending ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
+                  <Text style={styles.acceptButtonText}>Accept</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         )}
       </View>
+    );
+  };
 
-      {request.message && (
-        <View style={styles.messageBox}>
-          <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
-          <Text style={styles.messageText}>{request.message}</Text>
+  const renderSentRequest = (request: MealShareRequest) => {
+    const meal = request.mealDetail;
+    const acceptedMeal = request.acceptedMealDetail;
+
+    return (
+      <View key={request.id} style={styles.requestCard}>
+        <View style={styles.requestHeader}>
+          <View style={styles.receiverAvatar}>
+            <Text style={styles.receiverInitial}>
+              {getUserInitial(request.recipient)}
+            </Text>
+          </View>
+          <View style={styles.requestInfo}>
+            <Text style={styles.requestTitle}>
+              Sent to {getUserDisplayName(request.recipient)}
+            </Text>
+            <Text style={styles.requestTime}>{formatDate(request.createdAt)}</Text>
+          </View>
+          <View style={[styles.statusBadge, styles[`status${request.status}`]]}>
+            <Text style={[styles.statusText, styles[`statusText${request.status}`]]}>
+              {formatStatus(request.status)}
+            </Text>
+          </View>
         </View>
-      )}
 
-      {request.status === 'pending' && (
-        <View style={styles.actionButtons}>
+        <View style={styles.mealPreview}>
+          {meal?.image ? (
+            <Image source={{ uri: meal.image }} style={styles.mealImage} />
+          ) : (
+            <View style={styles.mealImagePlaceholder}>
+              <Ionicons name="image-outline" size={24} color="#9CA3AF" />
+            </View>
+          )}
+          <View style={styles.mealInfo}>
+            <Text style={styles.mealName}>{meal?.name || `Meal #${request.mealId}`}</Text>
+            {meal?.mealType && (
+              <View style={styles.mealMeta}>
+                <Ionicons name="restaurant" size={14} color="#6B7280" />
+                <Text style={styles.mealMetaText}>{meal.mealType}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <MealMacros meal={meal} />
+
+        {request.message && (
+          <View style={styles.messageBox}>
+            <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
+            <Text style={styles.messageText}>{request.message}</Text>
+          </View>
+        )}
+
+        {acceptedMeal && (
+          <View style={styles.acceptedInfo}>
+            <Ionicons name="gift-outline" size={20} color="#2563EB" />
+            <View style={styles.acceptedInfoText}>
+              <Text style={styles.acceptedTitle}>Recipient accepted</Text>
+              <Text style={styles.acceptedSubtitle}>
+                Cloned as "{acceptedMeal.name}" (ID #{acceptedMeal.id})
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {request.status === 'pending' && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.declineButton]}
-            onPress={() => handleDecline(request.id)}
-            disabled={declineRequest.isPending}
+            style={[styles.actionButton, styles.cancelButton]}
+            onPress={() => handleCancel(request.id)}
+            disabled={cancelRequest.isPending}
             activeOpacity={0.7}
           >
-            {declineRequest.isPending ? (
+            {cancelRequest.isPending ? (
               <ActivityIndicator size="small" color="#EF4444" />
             ) : (
               <>
-                <Ionicons name="close-circle" size={18} color="#EF4444" />
-                <Text style={styles.declineButtonText}>Decline</Text>
+                <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
+                <Text style={styles.cancelButtonText}>Cancel Request</Text>
               </>
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.acceptButton]}
-            onPress={() => handleAccept(request.id)}
-            disabled={acceptRequest.isPending}
-            activeOpacity={0.7}
-          >
-            {acceptRequest.isPending ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                <Text style={styles.acceptButtonText}>Accept</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderSentRequest = (request: MealShareRequest) => (
-    <View key={request.id} style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <View style={styles.receiverAvatar}>
-          <Text style={styles.receiverInitial}>
-            {request.receiver?.name?.charAt(0).toUpperCase() || 'F'}
-          </Text>
-        </View>
-        <View style={styles.requestInfo}>
-          <Text style={styles.requestTitle}>
-            Sent to {request.receiver?.name || 'Family Member'}
-          </Text>
-          <Text style={styles.requestTime}>
-            {new Date(request.created_at).toLocaleDateString()}
-          </Text>
-        </View>
-        <View style={[styles.statusBadge, styles[`status${request.status}`]]}>
-          <Text style={[styles.statusText, styles[`statusText${request.status}`]]}>
-            {request.status}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.mealInfo}>
-        <Text style={styles.mealName}>{request.meal?.name || 'Meal'}</Text>
-        {request.meal?.description && (
-          <Text style={styles.mealDescription} numberOfLines={2}>
-            {request.meal.description}
-          </Text>
         )}
       </View>
-
-      {request.message && (
-        <View style={styles.messageBox}>
-          <Ionicons name="chatbubble-outline" size={16} color="#6B7280" />
-          <Text style={styles.messageText}>{request.message}</Text>
-        </View>
-      )}
-
-      {request.status === 'pending' && (
-        <TouchableOpacity
-          style={[styles.actionButton, styles.cancelButton]}
-          onPress={() => handleCancel(request.id)}
-          disabled={cancelRequest.isPending}
-          activeOpacity={0.7}
-        >
-          {cancelRequest.isPending ? (
-            <ActivityIndicator size="small" color="#EF4444" />
-          ) : (
-            <>
-              <Ionicons name="close-circle-outline" size={18} color="#EF4444" />
-              <Text style={styles.cancelButtonText}>Cancel Request</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+    );
+  };
 
   const pendingReceivedCount = receivedRequests?.filter(r => r.status === 'pending').length || 0;
   const pendingSentCount = sentRequests?.filter(r => r.status === 'pending').length || 0;
@@ -541,8 +658,28 @@ const styles = StyleSheet.create({
   statusTextdeclined: {
     color: '#EF4444',
   },
-  mealInfo: {
+  mealPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  mealImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  mealImagePlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealInfo: {
+    flex: 1,
   },
   mealName: {
     fontSize: 16,
@@ -559,12 +696,34 @@ const styles = StyleSheet.create({
   mealMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    marginTop: 4,
   },
   mealMetaText: {
     fontSize: 13,
     color: '#6B7280',
     textTransform: 'capitalize',
+    marginLeft: 4,
+  },
+  macroRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  macroChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    backgroundColor: '#F9FAFB',
+  },
+  macroLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+  },
+  macroValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   messageBox: {
     flexDirection: 'row',
@@ -580,6 +739,27 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     lineHeight: 20,
+  },
+  acceptedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0FDF4',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  acceptedInfoText: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  acceptedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  acceptedSubtitle: {
+    fontSize: 13,
+    color: '#047857',
   },
   actionButtons: {
     flexDirection: 'row',

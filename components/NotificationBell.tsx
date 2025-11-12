@@ -9,13 +9,15 @@ import { useUnreadCount } from '@/hooks/useNotifications';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type StyleProp, type ViewStyle } from 'react-native';
 
 interface NotificationBellProps {
   iconSize?: number;
   iconColor?: string;
   badgeColor?: string;
   onPress?: () => void;
+  extraCount?: number;
+  containerStyle?: StyleProp<ViewStyle>;
 }
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({
@@ -23,10 +25,14 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   iconColor = '#1F2937',
   badgeColor = '#FF3B30',
   onPress,
+  extraCount = 0,
+  containerStyle,
 }) => {
   const router = useRouter();
   const { data: unreadData, isLoading } = useUnreadCount();
   const unreadCount = unreadData?.count || 0;
+  const totalCount = unreadCount + (extraCount || 0);
+  const showBadge = totalCount > 0;
 
   const handlePress = () => {
     if (onPress) {
@@ -39,17 +45,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   return (
     <TouchableOpacity
       onPress={handlePress}
-      style={styles.container}
+      style={[styles.container, containerStyle]}
       activeOpacity={0.7}
       disabled={isLoading}
     >
       <View style={styles.iconContainer}>
         <Ionicons name="notifications-outline" size={iconSize} color={iconColor} />
         
-        {unreadCount > 0 && (
+        {showBadge && (
           <View style={[styles.badge, { backgroundColor: badgeColor }]}>
             <Text style={styles.badgeText}>
-              {unreadCount > 99 ? '99+' : unreadCount}
+              {totalCount > 99 ? '99+' : totalCount}
             </Text>
           </View>
         )}

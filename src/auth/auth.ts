@@ -43,6 +43,62 @@ export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; status: number; message: string };
 
+export type OAuthSignupResponse = {
+  access_token: string;
+  token_type: string;
+  user: UserOut;
+};
+
+export type OAuthProvider = 'google' | 'apple';
+
+export async function signupWithOAuth(accessToken: string, provider: OAuthProvider): Promise<ApiResult<OAuthSignupResponse>> {
+  try {
+    const res = await fetch(`${BASE_URL}/auth/signup/oauth`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ provider }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = json?.detail || json?.message || `Request failed with status ${res.status}`;
+      return { ok: false, status: res.status, message };
+    }
+
+    return { ok: true, data: json as OAuthSignupResponse };
+  } catch (error: any) {
+    return { ok: false, status: -1, message: error?.message || 'Network Error' };
+  }
+}
+
+export async function loginWithOAuth(accessToken: string, provider: OAuthProvider): Promise<ApiResult<OAuthSignupResponse>> {
+  try {
+    const res = await fetch(`${BASE_URL}/auth/login/oauth`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ provider }),
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = json?.detail || json?.message || `Request failed with status ${res.status}`;
+      return { ok: false, status: res.status, message };
+    }
+
+    return { ok: true, data: json as OAuthSignupResponse };
+  } catch (error: any) {
+    return { ok: false, status: -1, message: error?.message || 'Network Error' };
+  }
+}
+
 export async function registerUser(
   input: RegisterInput
 ): Promise<ApiResult<UserOut>> {

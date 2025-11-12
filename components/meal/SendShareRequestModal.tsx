@@ -2,12 +2,13 @@
  * ============================================
  * SEND MEAL SHARE REQUEST MODAL
  * ============================================
- * Modal for selecting family members to share a meal with
+ * Modal for searching any user to share a meal with
  */
 
 import ToastBanner from '@/components/generalMessage';
 import { useUser } from '@/context/usercontext';
 import { useSendShareRequest } from '@/hooks/useMealShare';
+import { searchUsers, type UserSearchResult } from '@/src/services/user.service';
 import { listFamilyMembers } from '@/src/user/family';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -25,7 +26,7 @@ import {
 
 interface FamilyMember {
   id: number;
-  user_id: number;
+  user_id?: number;
   name?: string;
   display_name?: string;
   email?: string;
@@ -44,7 +45,7 @@ interface SendShareRequestModalProps {
   visible: boolean;
   mealId: number;
   mealName: string;
-  familyId: number;
+  familyId?: number | null;
   onClose: () => void;
   onSuccess?: () => void;
 }
@@ -53,15 +54,19 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   visible,
   mealId,
   mealName,
-  familyId,
+  familyId = null,
   onClose,
   onSuccess,
 }) => {
   const { user } = useUser();
-  const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
+  const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [familyMembers, setFamilyMembers] = useState<UserSearchResult[]>([]);
+  const [familyLoading, setFamilyLoading] = useState(false);
+  const [familyError, setFamilyError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
-  const [members, setMembers] = useState<FamilyMember[]>([]);
-  const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{
     visible: boolean;
     type: 'success' | 'error';
@@ -71,6 +76,45 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   const sendRequest = useSendShareRequest();
   const slideAnim = React.useRef(new Animated.Value(0)).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const mapMemberToUser = React.useCallback((member: FamilyMember): UserSearchResult | null => {
+    const id = member.user?.id ?? member.user_id ?? member.id;
+    if (!id) {
+      return null;
+    }
+
+    return {
+      id,
+      name: member.user?.name ?? member.name,
+      full_name: member.user?.full_name,
+      display_name: member.user?.display_name ?? member.display_name,
+      email: member.user?.email ?? member.email,
+      avatar_path: member.user?.avatar_path ?? member.avatar_path,
+    };
+  }, []);
+
+  const loadFamilyMembers = React.useCallback(async () => {
+    if (!familyId) {
+      setFamilyMembers([]);
+      setFamilyError(null);
+      return;
+    }
+
+    try {
+      setFamilyLoading(true);
+      setFamilyError(null);
+      const data = await listFamilyMembers(familyId);
+      const normalized = (data || [])
+        .map(mapMemberToUser)
+        .filter((member): member is UserSearchResult => Boolean(member && member.id !== user?.id));
+      setFamilyMembers(normalized);
+    } catch (error: any) {
+      console.error('[SendShareRequestModal] Error loading family members:', error);
+      setFamilyError(error?.message || 'Failed to load family members');
+    } finally {
+      setFamilyLoading(false);
+    }
+  }, [familyId, mapMemberToUser, user?.id]);
 
   React.useEffect(() => {
     if (visible) {
@@ -89,7 +133,11 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         }),
       ]).start();
     } else {
-      setSelectedMemberId(null);
+      setSelectedUser(null);
+      setSearchQuery('');
+      setSearchResults([]);
+      setFamilyMembers([]);
+      setFamilyError(null);
       setMessage('');
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -104,71 +152,71 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, loadFamilyMembers]);
 
-  const loadFamilyMembers = async () => {
-    if (!familyId) {
-      console.warn('[SendShareRequestModal] familyId is not set');
+  React.useEffect(() => {
+    if (!visible) {
       return;
     }
-    
-    try {
-      setLoading(true);
-      console.log('[SendShareRequestModal] Loading members for familyId:', familyId);
-      
-      const data = await listFamilyMembers(familyId);
-      
-      // Filter out the current user from the list
-      const currentUserId = user?.id;
-      
-      const filteredMembers = (data || []).filter((member: FamilyMember) => {
-        const memberId = member.user_id || member.id;
-        return memberId !== currentUserId;
-      });
-      
-      console.log('[SendShareRequestModal] Loaded members:', filteredMembers.length);
-      setMembers(filteredMembers);
-      
-      if (filteredMembers.length === 0) {
+
+    const trimmed = searchQuery.trim();
+
+    if (trimmed.length < 2) {
+      setSearchResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    let isCancelled = false;
+    const timeout = setTimeout(async () => {
+      try {
+        const results = await searchUsers(trimmed);
+        if (isCancelled) return;
+        const filtered = (results || []).filter((candidate) => candidate.id !== user?.id);
+        setSearchResults(filtered);
+      } catch (error: any) {
+        if (isCancelled) return;
+        console.error('[SendShareRequestModal] Error searching users:', error);
         setToast({
           visible: true,
           type: 'error',
-          message: 'No other family members available to share with',
+          message: error?.message || 'Failed to search users',
         });
+      } finally {
+        if (!isCancelled) {
+          setSearching(false);
+        }
       }
-    } catch (error: any) {
-      console.error('[SendShareRequestModal] Error loading members:', error);
-      setToast({
-        visible: true,
-        type: 'error',
-        message: error?.message || 'Failed to load family members',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timeout);
+    };
+  }, [searchQuery, user?.id, visible]);
 
   const handleSend = async () => {
-    if (!selectedMemberId) {
+    if (!selectedUser?.id) {
       setToast({
         visible: true,
         type: 'error',
-        message: 'Please select a family member',
+        message: 'Please select a recipient',
       });
       return;
     }
 
     try {
       await sendRequest.mutateAsync({
-        meal_id: mealId,
-        recipientUserId: selectedMemberId,
+        mealId,
+        recipientUserId: selectedUser.id,
         message: message.trim() || undefined,
       });
 
       setToast({
         visible: true,
         type: 'success',
-        message: 'Share request sent successfully!',
+        message: `Share request sent to ${getUserName(selectedUser)}!`,
       });
 
       setTimeout(() => {
@@ -188,40 +236,127 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   };
 
   // Memoize member name extraction to prevent infinite logging
-  const getMemberName = React.useCallback((member: FamilyMember): string => {
-    // Try nested user object first (backend structure)
-    const nestedUser = member.user;
-    if (nestedUser) {
-      const name = nestedUser.name || nestedUser.full_name || nestedUser.display_name;
-      if (name) {
-        return String(name).trim();
-      }
-      
-      // Fallback to nested email
-      if (nestedUser.email) {
-        const emailName = nestedUser.email.split('@')[0];
-        return String(emailName).trim();
-      }
-    }
-    
-    // Try direct fields on member object
-    const name = member.name 
-      || member.display_name 
-      || member.email?.split('@')[0] // Extract username from email
-      || member.email;
-    
+  const getUserName = React.useCallback((candidate: UserSearchResult | null | undefined): string => {
+    if (!candidate) return 'User';
+
+    const name =
+      candidate.name ||
+      candidate.full_name ||
+      candidate.display_name ||
+      candidate.email?.split('@')[0];
+
     if (name) {
       return String(name).trim();
     }
-    
-    // Last resort fallback
-    return `User ${member.user_id || member.id}`;
+
+    return `User ${candidate.id}`;
   }, []);
 
-  const getMemberInitial = React.useCallback((member: FamilyMember): string => {
-    const name = getMemberName(member);
+  const getUserInitial = React.useCallback((candidate: UserSearchResult | null | undefined): string => {
+    const name = getUserName(candidate);
     return (name.charAt(0) || 'U').toUpperCase();
-  }, [getMemberName]);
+  }, [getUserName]);
+
+  const renderUserOption = (candidate: UserSearchResult) => (
+    <TouchableOpacity
+      key={candidate.id}
+      style={[
+        styles.memberCard,
+        selectedUser?.id === candidate.id && styles.memberCardSelected,
+      ]}
+      onPress={() => setSelectedUser(candidate)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.memberAvatar}>
+        <Text style={styles.memberInitial}>{getUserInitial(candidate)}</Text>
+      </View>
+      <View style={styles.memberInfo}>
+        <Text style={styles.memberName}>{getUserName(candidate)}</Text>
+        {candidate.email && <Text style={styles.memberEmail}>{candidate.email}</Text>}
+      </View>
+      {selectedUser?.id === candidate.id && (
+        <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+      )}
+    </TouchableOpacity>
+  );
+
+  const renderFamilySection = () => {
+    if (!familyId) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyText}>No family connected</Text>
+          <Text style={styles.emptySubtext}>
+            Join or create a family to quickly send meals to them.
+          </Text>
+        </View>
+      );
+    }
+
+    if (familyLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#10B981" />
+          <Text style={styles.loadingText}>Loading members...</Text>
+        </View>
+      );
+    }
+
+    if (familyError) {
+      return <Text style={styles.errorText}>{familyError}</Text>;
+    }
+
+    if (familyMembers.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="people-circle-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyText}>No family members available</Text>
+          <Text style={styles.emptySubtext}>
+            Invite more family members to share meals with them.
+          </Text>
+        </View>
+      );
+    }
+
+    return familyMembers.map(renderUserOption);
+  };
+
+  const renderSearchResultsSection = () => {
+    if (searchQuery.trim().length < 2) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="search-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyText}>Search the Freshly community</Text>
+          <Text style={styles.emptySubtext}>
+            Enter at least 2 characters to find other users by name or email.
+          </Text>
+        </View>
+      );
+    }
+
+    if (searching) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#10B981" />
+          <Text style={styles.loadingText}>Searching users...</Text>
+        </View>
+      );
+    }
+
+    if (searchResults.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
+          <Text style={styles.emptyText}>No users found</Text>
+          <Text style={styles.emptySubtext}>
+            Try a different name or search by their email address.
+          </Text>
+        </View>
+      );
+    }
+
+    return searchResults.map(renderUserOption);
+  };
 
   return (
     <Modal
@@ -263,58 +398,63 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             </View>
             <Text style={styles.modalTitle}>Share "{mealName}"</Text>
             <Text style={styles.modalSubtitle}>
-              Select a family member to share this meal with
+              Pick a family member or search the Freshly community to share this meal.
             </Text>
+          </View>
+
+          <View style={styles.searchSection}>
+            <Text style={styles.messageLabel}>Send to any Freshly user</Text>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Type a name or email"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoCorrect={false}
+                autoCapitalize="none"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
+                  <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {selectedUser && (
+              <View style={styles.selectedRecipient}>
+                <Ionicons name="person-circle" size={32} color="#10B981" />
+                <View style={styles.selectedRecipientInfo}>
+                  <Text style={styles.selectedRecipientLabel}>Selected recipient</Text>
+                  <Text style={styles.selectedRecipientName}>{getUserName(selectedUser)}</Text>
+                  {selectedUser.email && (
+                    <Text style={styles.selectedRecipientEmail}>{selectedUser.email}</Text>
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedUser(null)}
+                  style={styles.selectedRecipientClear}
+                >
+                  <Ionicons name="close" size={18} color="#6B7280" />
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <ScrollView
             style={styles.membersList}
             showsVerticalScrollIndicator={false}
           >
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#10B981" />
-                <Text style={styles.loadingText}>Loading family members...</Text>
-              </View>
-            ) : members.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="people-outline" size={48} color="#D1D5DB" />
-                <Text style={styles.emptyText}>No other family members available</Text>
-                <Text style={styles.emptySubtext}>
-                  Invite more family members to share meals with them
-                </Text>
-              </View>
-            ) : (
-              members.map((member) => (
-                <TouchableOpacity
-                  key={member.user_id || member.id}
-                  style={[
-                    styles.memberCard,
-                    selectedMemberId === (member.user_id || member.id) &&
-                      styles.memberCardSelected,
-                  ]}
-                  onPress={() => setSelectedMemberId(member.user_id || member.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.memberAvatar}>
-                    <Text style={styles.memberInitial}>
-                      {getMemberInitial(member)}
-                    </Text>
-                  </View>
-                  <View style={styles.memberInfo}>
-                    <Text style={styles.memberName}>
-                      {getMemberName(member)}
-                    </Text>
-                    {(member.user?.email || member.email) && (
-                      <Text style={styles.memberEmail}>{member.user?.email || member.email}</Text>
-                    )}
-                  </View>
-                  {selectedMemberId === (member.user_id || member.id) && (
-                    <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-                  )}
-                </TouchableOpacity>
-              ))
-            )}
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Family members</Text>
+              {renderFamilySection()}
+            </View>
+
+            <View style={styles.sectionDivider} />
+
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>Search results</Text>
+              {renderSearchResultsSection()}
+            </View>
           </ScrollView>
 
           <View style={styles.messageSection}>
@@ -342,11 +482,11 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!selectedMemberId || sendRequest.isPending) &&
+                (!selectedUser?.id || sendRequest.isPending) &&
                   styles.sendButtonDisabled,
               ]}
               onPress={handleSend}
-              disabled={!selectedMemberId || sendRequest.isPending}
+              disabled={!selectedUser?.id || sendRequest.isPending}
               activeOpacity={0.7}
             >
               {sendRequest.isPending ? (
@@ -431,6 +571,71 @@ const styles = StyleSheet.create({
     maxHeight: 300,
     marginBottom: 20,
   },
+  sectionContainer: {
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 16,
+  },
+  searchSection: {
+    marginBottom: 16,
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  searchIcon: {
+    marginRight: 6,
+  },
+  clearButton: {
+    marginLeft: 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#111827',
+  },
+  selectedRecipient: {
+    marginTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#ECFDF5',
+  },
+  selectedRecipientInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  selectedRecipientLabel: {
+    fontSize: 12,
+    color: '#047857',
+    marginBottom: 2,
+  },
+  selectedRecipientName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  selectedRecipientEmail: {
+    fontSize: 13,
+    color: '#047857',
+  },
+  selectedRecipientClear: {
+    padding: 6,
+  },
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -439,6 +644,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: '#6B7280',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#EF4444',
+    textAlign: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

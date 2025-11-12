@@ -1,8 +1,15 @@
 import ToastBanner from "@/components/generalMessage";
+import {
+  loginUser,
+  loginWithOAuth,
+  type OAuthProvider,
+} from "../../src/auth/auth";
+import { supabase } from "@/src/supabase/client";
 import { Storage } from "@/src/utils/storage";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -14,7 +21,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { loginUser } from "../../src/auth/auth";
+import { Ionicons } from "@expo/vector-icons";
+import * as WebBrowser from "expo-web-browser";
+import * as AuthSession from "expo-auth-session";
+import { useAuthRequest } from "expo-auth-session";
+
+WebBrowser.maybeCompleteAuthSession();
 
 type ToastType = "success" | "error";
 interface ToastState {
@@ -56,6 +68,9 @@ export default function LoginScreen(): React.JSX.Element {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const isAppleAvailable = Platform.OS === "ios";
+  const isOAuthBusy = Boolean(oauthLoading);
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -103,7 +118,7 @@ export default function LoginScreen(): React.JSX.Element {
         email: email,
         password: password,
       });
-      
+
       if (result.ok) {
         await Storage.setItem("access_token", result.data.access_token);
         showToast("success", "Login successful! Redirecting...");
@@ -114,43 +129,52 @@ export default function LoginScreen(): React.JSX.Element {
       } else {
         setIsLoggingIn(false);
         startCooldown(30); // Shorter cooldown for login attempts
-        
+
         // Provide specific error messages based on status code
         let errorMessage = "";
-        
+
         if (result.status === 401) {
-          errorMessage = "Incorrect email or password. Please check your credentials and try again.";
+          errorMessage =
+            "Incorrect email or password. Please check your credentials and try again.";
         } else if (result.status === 404) {
-          errorMessage = "Account not found. Please check your email or sign up for a new account.";
+          errorMessage =
+            "Account not found. Please check your email or sign up for a new account.";
         } else if (result.status === 429) {
-          errorMessage = "Too many login attempts. Please wait a moment and try again.";
+          errorMessage =
+            "Too many login attempts. Please wait a moment and try again.";
           startCooldown(120); // Extended cooldown for rate limiting
         } else if (result.status === 500) {
-          errorMessage = "Our servers are experiencing issues. Please try again in a few moments.";
+          errorMessage =
+            "Our servers are experiencing issues. Please try again in a few moments.";
         } else if (result.status === -1) {
-          errorMessage = "Unable to connect to the server. Please check your internet connection and try again.";
+          errorMessage =
+            "Unable to connect to the server. Please check your internet connection and try again.";
         } else {
-          errorMessage = result.message || "Login failed. Please check your credentials and try again.";
+          errorMessage =
+            result.message ||
+            "Login failed. Please check your credentials and try again.";
         }
-        
+
         showToast("error", errorMessage);
       }
     } catch (error: any) {
       setIsLoggingIn(false);
       startCooldown(30);
-      
+
       // Handle different types of errors
       let errorMessage = "";
       if (error.name === "TypeError" && error.message.includes("Network")) {
-        errorMessage = "No internet connection. Please check your network and try again.";
+        errorMessage =
+          "No internet connection. Please check your network and try again.";
       } else if (error.name === "AbortError") {
-        errorMessage = "Request timed out. Please check your connection and try again.";
+        errorMessage =
+          "Request timed out. Please check your connection and try again.";
       } else if (error.message) {
         errorMessage = error.message;
       } else {
         errorMessage = "An unexpected error occurred. Please try again.";
       }
-      
+
       showToast("error", errorMessage);
     }
   }
@@ -227,6 +251,124 @@ export default function LoginScreen(): React.JSX.Element {
     router.replace("/(auth)/signup");
   };
 
+  const [request, response, promptAsync] = useAuthRequest(
+    {
+      clientId: "YOUR_CLIENT_ID",
+      redirectUri: AuthSession.makeRedirectUri({ scheme: "myapp" }),
+      scopes: ["profile", "email"],
+    },
+    { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" }
+  );
+
+  const handleOAuthLogin = async (provider: OAuthProvider) => {
+    if (oauthLoading) {
+      return;
+    }
+
+    if (Platform.OS === "web") {
+      showToast("error", "OAuth login is not available on web.");
+      return;
+    }
+
+    try {
+      console.log(`[Login] ${provider} login started`);
+      setOauthLoading(provider);
+
+      const redirectTo = AuthSession.makeRedirectUri({
+        scheme: "myapp",
+      });
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        console.error("[Login] Supabase OAuth error:", error);
+        throw new Error(error.message || "Unable to start authentication.");
+      }
+
+      if (!data?.url) {
+        throw new Error("Unable to open provider login page.");
+      }
+
+      const authResult = await promptAsync();
+      if (authResult.type !== "success") {
+        throw new Error(
+          authResult.type === "dismiss"
+            ? "Authentication cancelled."
+            : "Authentication failed. Please try again."
+        );
+      }
+      if (authResult.type !== "success") {
+        throw new Error(
+          authResult.type === "dismiss"
+            ? "Authentication cancelled."
+            : "Authentication failed. Please try again."
+        );
+      }
+
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.getSession();
+
+      if (sessionError) {
+        console.error(
+          "[Login] Failed to fetch Supabase session:",
+          sessionError
+        );
+        throw new Error("Login failed. Please try again.");
+      }
+
+      const supabaseToken = sessionData.session?.access_token;
+
+      if (!supabaseToken) {
+        throw new Error("Missing Supabase session after authentication.");
+      }
+
+      console.log(
+        "[Login] Supabase token received, authenticating with backend..."
+      );
+      const backend = await loginWithOAuth(supabaseToken, provider);
+
+      if (!backend.ok) {
+        if (backend.status === 404) {
+          showToast("error", "No account found. Please sign up first.");
+        } else if (backend.status === 400) {
+          showToast(
+            "error",
+            "Provider mismatch. Please use the same method you signed up with."
+          );
+        } else if (backend.status === 401) {
+          showToast("error", "Login failed. Please try again.");
+        } else {
+          showToast(
+            "error",
+            backend.message || "Unable to sign you in. Please try again."
+          );
+        }
+        return;
+      }
+
+      await Storage.setItem("access_token", backend.data.access_token);
+      console.log(
+        "[Login] Backend authentication successful, user session stored"
+      );
+      showToast("success", "Login successful! Redirecting...");
+      router.replace("/(home)/main");
+    } catch (error: any) {
+      console.error("[Login] OAuth login error:", error);
+      showToast(
+        "error",
+        error?.message || "Unable to complete login. Please try again."
+      );
+    } finally {
+      setOauthLoading(null);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -278,6 +420,65 @@ export default function LoginScreen(): React.JSX.Element {
             <Text style={styles.subtitle}>
               Login to plan smarter, shop better, {"\n"} and eat healthier.
             </Text>
+
+            <View style={styles.oauthSection}>
+              <TouchableOpacity
+                style={[
+                  styles.oauthButton,
+                  oauthLoading === "google" && styles.oauthButtonActive,
+                ]}
+                onPress={() => handleOAuthLogin("google")}
+                activeOpacity={0.8}
+                disabled={isOAuthBusy}
+              >
+                <View style={styles.oauthButtonContent}>
+                  {oauthLoading === "google" ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Ionicons name="logo-google" size={18} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.oauthButtonText}>
+                    Sign in with Google
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {isAppleAvailable && (
+                <TouchableOpacity
+                  style={[
+                    styles.oauthButton,
+                    styles.oauthButtonApple,
+                    oauthLoading === "apple" && styles.oauthButtonAppleActive,
+                  ]}
+                  onPress={() => handleOAuthLogin("apple")}
+                  activeOpacity={0.8}
+                  disabled={isOAuthBusy}
+                >
+                  <View style={styles.oauthButtonContent}>
+                    {oauthLoading === "apple" ? (
+                      <ActivityIndicator color="#111111" size="small" />
+                    ) : (
+                      <Ionicons name="logo-apple" size={18} color="#111111" />
+                    )}
+                    <Text
+                      style={[
+                        styles.oauthButtonText,
+                        styles.oauthButtonAppleText,
+                      ]}
+                    >
+                      Sign in with Apple
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.oauthDividerRow}>
+              <View style={styles.oauthDivider} />
+              <Text style={styles.oauthDividerText}>or sign in with email</Text>
+              <View style={styles.oauthDivider} />
+            </View>
+
             {/* Email Input */}
             <Animated.View
               style={[
@@ -313,7 +514,6 @@ export default function LoginScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                
                 <Image
                   source={require("../../assets/icons/lock.png")}
                   style={styles.menuCardIcon}
@@ -366,20 +566,23 @@ export default function LoginScreen(): React.JSX.Element {
               <Animated.View
                 style={[
                   styles.loginButton,
-                  (isButtonDisabled || isLoggingIn) && styles.loginButtonDisabled,
+                  (isButtonDisabled || isLoggingIn) &&
+                    styles.loginButtonDisabled,
                   {
                     transform: [{ scale: buttonScale }],
                   },
                 ]}
               >
                 {isButtonDisabled && cooldownRemaining > 0 ? (
-                  <Text style={styles.loginButtonText}>{cooldownRemaining}s</Text>
+                  <Text style={styles.loginButtonText}>
+                    {cooldownRemaining}s
+                  </Text>
                 ) : (
                   <Text style={styles.loginButtonText}>→</Text>
                 )}
               </Animated.View>
             </TouchableOpacity>
-            
+
             {/* Cooldown message */}
             {isButtonDisabled && cooldownRemaining > 0 && (
               <Text style={styles.cooldownText}>
@@ -459,6 +662,59 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 28,
+  },
+  oauthSection: {
+    marginBottom: 20,
+  },
+  oauthButton: {
+    backgroundColor: "#4285F4",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  oauthButtonApple: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  oauthButtonActive: {
+    opacity: 0.8,
+  },
+  oauthButtonAppleActive: {
+    opacity: 0.8,
+  },
+  oauthButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  oauthButtonText: {
+    color: "#FFFFFF",
+    fontSize: 15,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  oauthButtonAppleText: {
+    color: "#111111",
+  },
+  oauthDividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  oauthDivider: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: "#E5E7EB",
+  },
+  oauthDividerText: {
+    fontSize: 12,
+    color: "#9CA3AF",
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    marginHorizontal: 10,
   },
   inputContainer: {
     flexDirection: "row",

@@ -1,5 +1,6 @@
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
+import { createMealForSignleUser, type CreateMealInput } from "@/src/user/meals";
 import {
   createConversation,
   deleteConversation,
@@ -14,6 +15,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
   Modal,
@@ -42,7 +44,20 @@ type IngredientSection = {
 };
 
 export type RecipeCard = {
+  mealName: string;
   headerSummary: string;
+  cuisine: string;
+  mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Dessert';
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  servings: number;
+  calories: number;
+  prepTimeMinutes: number;
+  cookTimeMinutes: number;
+  totalTimeMinutes: number;
+  proteinGrams: number;
+  fatGrams: number;
+  carbGrams: number;
+  notes: string;
   ingredients: IngredientSection[];
   instructions: string[][];
   optionalAdditions: string[];
@@ -149,14 +164,65 @@ function extractJson(s: string) {
 function tryParseRecipe(s: string): RecipeCard | null {
   try {
     const obj = JSON.parse(extractJson(s));
-    if (
+    const hasCoreFields =
+      typeof obj?.mealName === "string" &&
       typeof obj?.headerSummary === "string" &&
+      typeof obj?.cuisine === "string" &&
+      typeof obj?.mealType === "string" &&
+      typeof obj?.difficulty === "string" &&
+      typeof obj?.servings === "number" &&
+      typeof obj?.calories === "number" &&
+      typeof obj?.prepTimeMinutes === "number" &&
+      typeof obj?.cookTimeMinutes === "number" &&
+      typeof obj?.totalTimeMinutes === "number" &&
+      typeof obj?.proteinGrams === "number" &&
+      typeof obj?.fatGrams === "number" &&
+      typeof obj?.carbGrams === "number" &&
+      typeof obj?.notes === "string" &&
       Array.isArray(obj?.ingredients) &&
-      Array.isArray(obj?.instructions)
-    ) {
+      Array.isArray(obj?.instructions) &&
+      Array.isArray(obj?.optionalAdditions) &&
+      Array.isArray(obj?.shoppingListMinimal) &&
+      obj?.pantryCheck &&
+      Array.isArray(obj?.pantryCheck?.usedFromPantry);
+
+    if (hasCoreFields) {
       return obj as RecipeCard;
     }
-  } catch {}
+
+    const legacyShape =
+      typeof obj?.headerSummary === "string" &&
+      Array.isArray(obj?.ingredients) &&
+      Array.isArray(obj?.instructions);
+
+    if (legacyShape) {
+      const fallbackName = obj.headerSummary;
+      return {
+        mealName: fallbackName,
+        headerSummary: fallbackName,
+        cuisine: obj.cuisine || "Fusion",
+        mealType: (obj.mealType as RecipeCard['mealType']) || 'Dinner',
+        difficulty: (obj.difficulty as RecipeCard['difficulty']) || 'Easy',
+        servings: Number(obj.servings) || 2,
+        calories: Number(obj.calories) || 400,
+        prepTimeMinutes: Number(obj.prepTimeMinutes) || 10,
+        cookTimeMinutes: Number(obj.cookTimeMinutes) || 15,
+        totalTimeMinutes: Number(obj.totalTimeMinutes) || 25,
+        proteinGrams: Number(obj.proteinGrams) || 20,
+        fatGrams: Number(obj.fatGrams) || 18,
+        carbGrams: Number(obj.carbGrams) || 35,
+        notes: obj.notes || "",
+        ingredients: obj.ingredients,
+        instructions: obj.instructions,
+        optionalAdditions: obj.optionalAdditions || [],
+        finalNote: obj.finalNote || "",
+        pantryCheck: obj.pantryCheck || { usedFromPantry: [] },
+        shoppingListMinimal: obj.shoppingListMinimal || [],
+      } as RecipeCard;
+    }
+  } catch {
+    // ignore parse errors
+  }
   return null;
 }
 
@@ -236,11 +302,17 @@ const TypingIndicator = React.memo(function TypingIndicator() {
 });
 
 /** --- HOISTED: RecipeCardView (memoized) --- */
-type RecipeCardViewProps = { data: RecipeCard; onMatchGrocery: (r: RecipeCard) => void };
+type RecipeCardViewProps = {
+  data: RecipeCard;
+  onMatchGrocery: (r: RecipeCard) => void;
+  onSaveMeal: (r: RecipeCard) => void;
+  isSaving?: boolean;
+};
 
-function RecipeCardViewBase({ data, onMatchGrocery }: RecipeCardViewProps) {
+function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false }: RecipeCardViewProps) {
   const cardFadeAnim = useRef(new Animated.Value(0)).current;
   const cardSlideAnim = useRef(new Animated.Value(30)).current;
+  const title = data.mealName?.trim() || data.headerSummary?.trim() || "AI Meal";
 
   useEffect(() => {
     Animated.parallel([
@@ -258,7 +330,67 @@ function RecipeCardViewBase({ data, onMatchGrocery }: RecipeCardViewProps) {
         { opacity: cardFadeAnim, transform: [{ translateY: cardSlideAnim }] },
       ]}
     >
-      <Text style={styles.headerSummaryText}>{data.headerSummary}</Text>
+      <Text style={styles.headerSummaryText}>{title}</Text>
+
+      <View style={styles.metaChipsRow}>
+        <View style={styles.metaChip}>
+          <Ionicons name="restaurant" size={14} color="#00A86B" />
+          <Text style={styles.metaChipText}>{data.mealType}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Ionicons name="earth-outline" size={14} color="#FD8100" />
+          <Text style={styles.metaChipText}>{data.cuisine}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Ionicons name="barbell" size={14} color="#2563EB" />
+          <Text style={styles.metaChipText}>{data.difficulty}</Text>
+        </View>
+        <View style={styles.metaChip}>
+          <Ionicons name="people-outline" size={14} color="#6B7280" />
+          <Text style={styles.metaChipText}>{data.servings} serving{data.servings === 1 ? '' : 's'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statsGrid}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Calories</Text>
+          <Text style={styles.statValue}>{Math.round(data.calories)} kcal</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Protein</Text>
+          <Text style={styles.statValue}>{Math.round(data.proteinGrams)} g</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Fats</Text>
+          <Text style={styles.statValue}>{Math.round(data.fatGrams)} g</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Carbs</Text>
+          <Text style={styles.statValue}>{Math.round(data.carbGrams)} g</Text>
+        </View>
+      </View>
+
+      <View style={styles.timeRow}>
+        <View style={styles.timeBlock}>
+          <Text style={styles.timeLabel}>Prep</Text>
+          <Text style={styles.timeValue}>{data.prepTimeMinutes} min</Text>
+        </View>
+        <View style={styles.timeBlock}>
+          <Text style={styles.timeLabel}>Cook</Text>
+          <Text style={styles.timeValue}>{data.cookTimeMinutes} min</Text>
+        </View>
+        <View style={styles.timeBlock}>
+          <Text style={styles.timeLabel}>Total</Text>
+          <Text style={styles.timeValue}>{data.totalTimeMinutes} min</Text>
+        </View>
+      </View>
+
+      {data.notes ? (
+        <View style={styles.cardSection}>
+          <Text style={styles.sectionTitle}>Chef Notes</Text>
+          <Text style={styles.bulletText}>{data.notes}</Text>
+        </View>
+      ) : null}
 
       <View style={styles.cardSection}>
         <Text style={styles.sectionTitle}>Ingredients</Text>
@@ -318,14 +450,32 @@ function RecipeCardViewBase({ data, onMatchGrocery }: RecipeCardViewProps) {
         </View>
       ) : null}
 
-      <TouchableOpacity
-        style={styles.matchGroceryButton}
-        onPress={() => onMatchGrocery(data)}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="cart-outline" size={20} color="#FFF" />
-        <Text style={styles.matchGroceryText}>Match My Grocery</Text>
-      </TouchableOpacity>
+      <View style={styles.cardActionsRow}>
+        <TouchableOpacity
+          style={[styles.matchGroceryButton, styles.cardActionButton]}
+          onPress={() => onMatchGrocery(data)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="cart-outline" size={20} color="#FFF" />
+          <Text style={styles.matchGroceryText}>Match My Grocery</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.saveMealButton, styles.cardActionButton, isSaving && styles.saveMealButtonDisabled]}
+          onPress={() => onSaveMeal(data)}
+          activeOpacity={0.8}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color="#00A86B" />
+          ) : (
+            <>
+              <Ionicons name="bookmark-outline" size={20} color="#00A86B" />
+              <Text style={styles.saveMealText}>Save Meal</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
@@ -468,16 +618,29 @@ OUTPUT TONE
 - Focused on clarity and user experience.
 `;
 
-  const JSON_DIRECTIVE = `
+const JSON_DIRECTIVE = `
 OUTPUT FORMAT (REQUIRED)
-Return ONLY a valid, minified JSON object matching this exact TypeScript shape:
+Respond ONLY with valid, minified JSON that matches this exact TypeScript shape:
 
 type IngredientSection = { title: string; items: string[] };
 
 type RecipeCard = {
-  headerSummary: string;
+  mealName: string; // plain title, e.g. "Chicken Salad"
+  headerSummary: string; // MUST be identical to mealName
+  cuisine: string; // e.g. "Mediterranean"
+  mealType: "Breakfast" | "Lunch" | "Dinner" | "Snack" | "Dessert";
+  difficulty: "Easy" | "Medium" | "Hard";
+  servings: number; // integer >=1
+  calories: number; // total kcal >= 50
+  prepTimeMinutes: number; // >= 1
+  cookTimeMinutes: number; // >= 0
+  totalTimeMinutes: number; // MUST equal prepTimeMinutes + cookTimeMinutes
+  proteinGrams: number; // >= 0
+  fatGrams: number; // >= 0
+  carbGrams: number; // >= 0
+  notes: string; // helpful serving/storage tips
   ingredients: IngredientSection[];
-  instructions: string[][];
+  instructions: string[][]; // each inner array = bullet lines for a numbered step
   optionalAdditions: string[];
   finalNote: string;
   pantryCheck: { usedFromPantry: string[] };
@@ -487,8 +650,9 @@ type RecipeCard = {
 Rules:
 - Do not include markdown, code fences, or explanations.
 - No trailing commas, no comments.
-- If something is not applicable, use [] or "".
-- Keep quantities inside ingredient item strings.`;
+- Provide realistic numbers for nutrition and times; never leave them 0.
+- Ingredients strings must include quantity + unit (e.g. "2 cups spinach").
+- Notes/finalNote should be complete sentences.`;
 
   useEffect(() => {
     if (showActionSheet) {
@@ -905,6 +1069,145 @@ Rules:
     }
   };
 
+  const [savingMealId, setSavingMealId] = useState<string | null>(null);
+
+  const inferMealTypeFromSummary = (summary?: string): CreateMealInput['mealType'] => {
+    const text = summary?.toLowerCase() ?? '';
+    if (text.includes('breakfast')) return 'Breakfast';
+    if (text.includes('lunch')) return 'Lunch';
+    if (text.includes('snack')) return 'Snack';
+    if (text.includes('dessert') || text.includes('sweet')) return 'Dessert';
+    return 'Dinner';
+  };
+
+  const extractMealName = (summary?: string) => {
+    if (!summary) return 'AI Meal';
+    const firstLine = summary.split('\n')[0];
+    const firstSentence = firstLine.split(/[.!?]/)[0];
+    const sanitized = firstSentence.replace(/recipe|delicious|tasty/gi, '').trim();
+    return sanitized || 'AI Meal';
+  };
+
+  const buildMealInputFromRecipe = (recipe: RecipeCard): CreateMealInput => {
+    const toNumber = (value: unknown, fallback = 0) => {
+      const num = typeof value === "number" ? value : Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    };
+
+    const positiveInt = (value: unknown, fallback = 0) => {
+      const num = Math.max(0, Math.round(toNumber(value, fallback)));
+      return num;
+    };
+
+    const normalizeMealType = (value?: string): CreateMealInput['mealType'] => {
+      const map: Record<string, CreateMealInput['mealType']> = {
+        breakfast: 'Breakfast',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        snack: 'Snack',
+        dessert: 'Dessert',
+      };
+      const key = (value || '').toLowerCase();
+      return map[key] ?? inferMealTypeFromSummary(recipe.headerSummary);
+    };
+
+    const normalizeDifficulty = (value?: string): CreateMealInput['difficulty'] => {
+      const map: Record<string, CreateMealInput['difficulty']> = {
+        easy: 'Easy',
+        medium: 'Medium',
+        hard: 'Hard',
+      };
+      const key = (value || '').toLowerCase();
+      return map[key] ?? 'Easy';
+    };
+
+    const allIngredients = (recipe.ingredients || []).flatMap((section) => section.items || []);
+    const normalizedIngredients = allIngredients
+      .map((item) => {
+        const parsed = parseIngredientToJson(item);
+        const rawName = parsed.ingredient_name || item;
+        const name = String(rawName).replace(/^•\s*/, '').trim();
+        const amountParts = [parsed.quantity, parsed.unit].map((part) => String(part || '').trim()).filter(Boolean);
+        const amount = amountParts.join(' ') || '1';
+        if (!name) {
+          return null;
+        }
+        return {
+          name,
+          amount,
+          inPantry: false,
+        };
+      })
+      .filter((ing): ing is { name: string; amount: string; inPantry: boolean } => Boolean(ing));
+
+    if (!normalizedIngredients.length) {
+      throw new Error('Meal is missing ingredients.');
+    }
+
+    const instructions = (recipe.instructions || [])
+      .map((stepLines) => {
+        const lines = Array.isArray(stepLines) ? stepLines : [String(stepLines)];
+        return lines.filter(Boolean).join(' ').trim();
+      })
+      .filter(Boolean);
+
+    const prepTime = positiveInt(recipe.prepTimeMinutes, 10);
+    const cookTime = positiveInt(recipe.cookTimeMinutes, 10);
+    const totalTime = positiveInt(recipe.totalTimeMinutes, prepTime + cookTime);
+
+    const mealName = (recipe.mealName || extractMealName(recipe.headerSummary)).trim() || "AI Meal";
+
+    return {
+      id: Date.now(),
+      name: mealName,
+      image: "🍽️",
+      calories: positiveInt(recipe.calories, 200),
+      prepTime,
+      cookTime,
+      totalTime,
+      mealType: normalizeMealType(recipe.mealType),
+      cuisine: recipe.cuisine?.trim() || undefined,
+      tags: undefined,
+      macros: {
+        protein: positiveInt(recipe.proteinGrams, 10),
+        fats: positiveInt(recipe.fatGrams, 10),
+        carbs: positiveInt(recipe.carbGrams, 20),
+      },
+      difficulty: normalizeDifficulty(recipe.difficulty),
+      servings: Math.max(1, positiveInt(recipe.servings, 2)),
+      dietCompatibility: [],
+      goalFit: [],
+      ingredients: normalizedIngredients,
+      instructions,
+      cookingTools: [],
+      notes: recipe.notes?.trim() || recipe.finalNote?.trim() || undefined,
+      isFavorite: false,
+    };
+  };
+
+  const handleSaveGeneratedMeal = async (messageId: string, recipe: RecipeCard) => {
+    if (savingMealId) {
+      return;
+    }
+
+    try {
+      const payload = buildMealInputFromRecipe(recipe);
+      setSavingMealId(messageId);
+      await createMealForSignleUser(payload);
+      showToast('success', 'Meal saved to your collection! Redirecting...');
+      router.push("/(home)/meals");
+    } catch (error: any) {
+      console.error('[ChatAI] Failed to save meal:', error);
+      const errorMessage =
+        error?.message?.toLowerCase().includes('409')
+          ? 'This meal already exists. Try renaming it or tweaking the recipe.'
+          : error?.message || 'Failed to save meal. Please try again.';
+      showToast('error', errorMessage);
+    } finally {
+      setSavingMealId(null);
+    }
+  };
+
   const handleMatchGrocery = (recipe: RecipeCard) => {
     const groceryList: any[] = [];
 
@@ -1079,6 +1382,8 @@ Rules:
                 key={msg.id}
                 data={msg.recipe}
                 onMatchGrocery={handleMatchGrocery}
+                onSaveMeal={() => handleSaveGeneratedMeal(msg.id, msg.recipe)}
+                isSaving={savingMealId === msg.id}
               />
             );
           }
@@ -1602,6 +1907,14 @@ const styles = StyleSheet.create({
     color: "#FD8100",
     marginBottom: 2,
   },
+  cardActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 16,
+  },
+  cardActionButton: {
+    flex: 1,
+  },
   matchGroceryButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -1610,17 +1923,108 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 25,
-    marginTop: 16,
     shadowColor: "#00A86B",
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 5,
+    marginRight: 12,
   },
   matchGroceryText: {
     color: "#FFF",
     fontSize: 16,
     fontWeight: "600",
     marginLeft: 8,
+  },
+  saveMealButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#00A86B",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+  },
+  saveMealButtonDisabled: {
+    opacity: 0.7,
+  },
+  saveMealText: {
+    color: "#00A86B",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  metaChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F2FDF6",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: "#D1F2E3",
+    gap: 6,
+  },
+  metaChipText: {
+    fontSize: 13,
+    color: "#065F46",
+    fontWeight: "600",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 16,
+    gap: 10,
+  },
+  statCard: {
+    flexBasis: "48%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  timeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  timeBlock: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  timeLabel: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginBottom: 4,
+  },
+  timeValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111827",
   },
 });

@@ -1,5 +1,4 @@
 // ==================== screens/MealDetailScreen.tsx ====================
-import { useUser } from "@/context/usercontext";
 import {
   deleteMealForSignleUser,
   updateMealForSignleUser,
@@ -56,33 +55,36 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [deleting, setDeleting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [familyId, setFamilyId] = useState<number | null>(null);
-  const { user } = useUser();
 
-  // Debug log whenever familyId changes
   React.useEffect(() => {
-    console.log('[MealDetailScreen] familyId state changed to:', familyId);
-    console.log('[MealDetailScreen] Should show Share button:', familyId !== null);
-  }, [familyId]);
+    let isMounted = true;
 
-  // Load user's family - if user has a family, they can share any meal
-  React.useEffect(() => {
     const loadFamily = async () => {
       try {
-        console.log('[MealDetailScreen] Starting to load family...');
         const { listMyFamilies } = await import("@/src/user/family");
         const data = await listMyFamilies();
-        console.log('[MealDetailScreen] Family data received:', data);
+        if (!isMounted) {
+          return;
+        }
+
         if (Array.isArray(data) && data.length > 0) {
           setFamilyId(data[0].id);
-          console.log('[MealDetailScreen] ✅ Family ID set to:', data[0].id);
         } else {
-          console.log('[MealDetailScreen] ⚠️ No families found in response');
+          setFamilyId(null);
         }
-      } catch (error: any) {
-        console.error("[MealDetailScreen] ❌ Failed to load family:", error);
+      } catch (error) {
+        console.error("[MealDetailScreen] Failed to load families:", error);
+        if (isMounted) {
+          setFamilyId(null);
+        }
       }
     };
+
     loadFamily();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleSave = async () => {
@@ -157,16 +159,13 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             </Text>
           </TouchableOpacity>
           
-          {/* Show "Share" button if user has a family */}
           {familyId !== null && (
             <TouchableOpacity
               onPress={() => {
-                console.log('[MealDetailScreen] Share button pressed', {
+                console.log("[MealDetailScreen] Share button pressed", {
                   mealId: meal.id,
                   mealName: meal.name,
-                  familyId: familyId,
-                  mealHasFamilyId: (meal as any).family_id,
-                  fullMealObject: meal,
+                  familyId,
                 });
                 setShowShareModal(true);
               }}

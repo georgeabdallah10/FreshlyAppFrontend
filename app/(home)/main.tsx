@@ -48,9 +48,6 @@ const BottomNavigation = ({
   const segmants = useSegments() as string[];
   const [quickAddModal, setQuickAddModal] = useState(false);
 
-  // Get pending meal share request count
-  const { data: pendingCount = 0 } = usePendingRequestCount();
-
   useEffect(() => {
     const activeIndex = tabs.indexOf(activeTab);
     const targetPosition = activeIndex * (tabWidth + spacing);
@@ -154,14 +151,6 @@ const BottomNavigation = ({
               >
               <IconButton iconName='people-circle-outline' iconColor="#000000" iconSize={40} />
               </Text>
-              {/* Notification badge for pending meal share requests */}
-              {pendingCount > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationText}>
-                    {pendingCount > 9 ? "9+" : pendingCount}
-                  </Text>
-                </View>
-              )}
             </View>
           </TouchableOpacity>
 
@@ -184,6 +173,7 @@ const HomeDashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { data: pendingShareCount = 0 } = usePendingRequestCount();
 
   const menuItems: MenuItem[] = [
     {
@@ -264,12 +254,14 @@ const HomeDashboard = () => {
             resizeMode="contain"
           />
         </View>
-        <TouchableOpacity
-          style={styles.notificationButton}
+        <NotificationBell
+          iconSize={24}
+          iconColor="#1F2937"
+          badgeColor="#FF3B30"
           onPress={() => router.push("/(home)/notifications")}
-        >
-          <IconButton iconName="notifications-outline" iconSize={24} iconColor="#1F2937" badgeColor="#FF3B30"/>
-        </TouchableOpacity>
+          extraCount={pendingShareCount}
+          containerStyle={styles.notificationButton}
+        />
       </View>
 
         {/* Welcome Text */}
@@ -561,25 +553,6 @@ const styles = StyleSheet.create({
   },
   logoImageInactive: {
     opacity: 0.6,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: 2,
-    right: 2,
-    backgroundColor: "#FF3B30",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  notificationText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
   },
 });
 

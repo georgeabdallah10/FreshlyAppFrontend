@@ -1,3 +1,4 @@
+import ToastBanner from "@/components/generalMessage";
 import PantryItemImage from "@/components/pantry/PantryItemImage";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
 import React, { useState, useRef, useEffect } from "react";
@@ -24,6 +25,7 @@ type GroceryItem = {
   inPantry: boolean;
   addedToCart?: boolean;
   shortfall?: string;
+  image?: string;
 };
 
 type ScreenStep = "list" | "match" | "summary";
@@ -34,13 +36,44 @@ export default function MatchMyGroceryScreen() {
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
 
   // --- Incoming data from Chat screen ---
-  type PantryIncoming = { id: number | string; name: string; quantity?: number | string; category?: string };
+  type PantryIncoming = {
+    id: number | string;
+    name: string;
+    quantity?: number | string;
+    category?: string;
+    image?: string;
+    image_url?: string;
+    photo_url?: string;
+  };
   const [pantryFromChat, setPantryFromChat] = useState<PantryIncoming[]>([]);
 
   const { groceryData, pantryData } = useLocalSearchParams<{ groceryData?: string; pantryData?: string }>();
 
   // Normalize names for a loose match
   const norm = (s: string) => s.toLowerCase().trim();
+
+  const extractImageUrl = (value?: unknown) => {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  };
+
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info";
+    message: string;
+    duration?: number;
+    topOffset?: number;
+  }>({ visible: false, type: "success", message: "", topOffset: 60 });
+
+  const showToast = (
+    type: "success" | "error" | "info",
+    message: string,
+    duration?: number,
+    topOffset?: number
+  ) => {
+    setToast({ visible: true, type, message, duration, topOffset });
+  };
 
   useEffect(() => {
     try {
@@ -54,16 +87,24 @@ export default function MatchMyGroceryScreen() {
         const name = String(it.ingredient_name ?? it.name ?? '').trim();
         const qtyStr = it.quantity != null ? String(it.quantity) : '';
         const unitStr = it.unit != null ? String(it.unit) : '';
-        const exists = pantry.some(p => norm(String(p.name)) === norm(name));
+        const matchedPantry = pantry.find(p => norm(String(p.name)) === norm(name));
+        const exists = !!matchedPantry;
+        const recipeImage = extractImageUrl(
+          it.image ?? it.image_url ?? it.photo ?? it.photo_url ?? it.icon
+        );
+        const pantryImage = extractImageUrl(
+          matchedPantry?.image ?? matchedPantry?.image_url ?? matchedPantry?.photo_url
+        );
         return {
           id: String(idx + 1),
           name,
           quantity: qtyStr,
           unit: unitStr,
-          available: !!exists,
-          inPantry: !!exists,
+          available: exists,
+          inPantry: exists,
+          image: recipeImage || pantryImage,
           // Shortfall requires units + quantities; leave undefined for now
-        } as GroceryItem;
+        };
       });
 
       setGroceryItems(mapped);
@@ -71,6 +112,7 @@ export default function MatchMyGroceryScreen() {
       console.warn('Failed to parse data from params', e);
       setGroceryItems([]);
       setPantryFromChat([]);
+      showToast("error", "Unable to load grocery data. Please try again.");
     }
   }, [groceryData, pantryData]);
 
@@ -219,6 +261,7 @@ export default function MatchMyGroceryScreen() {
       unit: "unit",
       available: false,
       inPantry: false,
+      image: undefined,
     };
     setGroceryItems((prev) => [...prev, newItem]);
   };
@@ -270,10 +313,11 @@ export default function MatchMyGroceryScreen() {
             <View style={styles.itemIcon}>
               <PantryItemImage
                 itemName={item.name}
+                imageUrl={item.image?.startsWith("http") ? item.image : undefined}
                 size={48}
                 borderColor="#ECEEF2"
                 borderWidth={1.5}
-                silent
+                onError={(msg) => showToast("error", msg, 4000)}
               />
             </View>
             <View style={styles.itemContent}>
@@ -331,10 +375,11 @@ export default function MatchMyGroceryScreen() {
               <View style={styles.itemIcon}>
                 <PantryItemImage
                   itemName={item.name}
+                  imageUrl={item.image?.startsWith("http") ? item.image : undefined}
                   size={52}
                   borderColor="#ECEEF2"
                   borderWidth={1.5}
-                  silent
+                  onError={(msg) => showToast("error", msg, 4000)}
                 />
               </View>
               <View style={styles.matchItemInfo}>
@@ -425,10 +470,11 @@ export default function MatchMyGroceryScreen() {
                 <View style={styles.itemIcon}>
                   <PantryItemImage
                     itemName={item.name}
+                    imageUrl={item.image?.startsWith("http") ? item.image : undefined}
                     size={44}
                     borderColor="#ECEEF2"
                     borderWidth={1.5}
-                    silent
+                    onError={(msg) => showToast("error", msg, 4000)}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -471,6 +517,13 @@ export default function MatchMyGroceryScreen() {
 
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onHide={() => setToast((t) => ({ ...t, visible: false }))}
+        topOffset={toast.topOffset ?? 60}
+      />
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="arrow-back" size={24} color="#000" />

@@ -42,6 +42,11 @@ export interface UpdateUserInput {
   avatar_path?: string;
 }
 
+export interface UserSearchResult extends User {
+  full_name?: string;
+  display_name?: string;
+}
+
 // ============================================
 // API FUNCTIONS
 // ============================================
@@ -113,6 +118,20 @@ export async function getUserStats(): Promise<{
   return await apiClient.get('/users/me/stats');
 }
 
+/**
+ * Search users globally by name or email
+ */
+export async function searchUsers(query: string): Promise<UserSearchResult[]> {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  return await apiClient.get<UserSearchResult[]>('/users/search', {
+    params: { query: trimmed },
+  });
+}
+
 // ============================================
 // EXPORT ALL
 // ============================================
@@ -126,6 +145,7 @@ export const userApi = {
   deleteUserAccount,
   changePassword,
   getUserStats,
+  searchUsers,
 };
 
 export default userApi;

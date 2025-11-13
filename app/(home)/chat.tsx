@@ -13,7 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -70,6 +70,143 @@ type ChatMessage =
   | { id: string; kind: "user"; text: string }
   | { id: string; kind: "ai_text"; text: string; isTyping?: boolean }
   | { id: string; kind: "ai_recipe"; recipe: RecipeCard };
+
+const OUTPUT_FORMAT_MARKER = "\n\nOUTPUT FORMAT (REQUIRED)";
+
+const IMAGE_PROMPT_MARKERS = [
+  "a delicious, appetizing photo of",
+  "professional photograph of",
+  "clean white background",
+  "restaurant-style presentation",
+];
+
+const IMAGE_RESPONSE_MARKERS = [
+  '"image_url"',
+  '"imageurl"',
+  '"b64_json"',
+  "generate-image",
+  "generated image url",
+  "dall-e",
+];
+
+const IMAGE_FILE_EXTENSION_REGEX = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+const isLikelyImageUrl = (value?: string | null): boolean => {
+  if (!value) {
+    return false;
+  }
+  const candidate = value.trim();
+  if (!candidate) {
+    return false;
+  }
+  if (candidate.startsWith("data:image/")) {
+    return true;
+  }
+  if (!candidate.startsWith("http")) {
+    return false;
+  }
+  if (IMAGE_FILE_EXTENSION_REGEX.test(candidate)) {
+    return true;
+  }
+  if (candidate.includes("supabase.co/storage")) {
+    return true;
+  }
+  return false;
+};
+
+const isImageGenerationContent = (rawContent?: string | null): boolean => {
+  if (!rawContent) {
+    return false;
+  }
+
+  const content = rawContent.trim();
+  if (!content) {
+    return false;
+  }
+
+  const lower = content.toLowerCase();
+
+  if (IMAGE_PROMPT_MARKERS.some((marker) => lower.includes(marker))) {
+    return true;
+  }
+
+  if (IMAGE_RESPONSE_MARKERS.some((marker) => lower.includes(marker))) {
+    return true;
+  }
+
+  if (isLikelyImageUrl(content)) {
+    return true;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object") {
+      const candidateValues: Array<unknown> = [
+        (parsed as any).url,
+        (parsed as any).image_url,
+        (parsed as any).imageUrl,
+      ];
+
+      const dataField = (parsed as any).data;
+      if (Array.isArray(dataField)) {
+        for (const entry of dataField) {
+          if (entry?.url) {
+            candidateValues.push(entry.url);
+          }
+          if (entry?.b64_json) {
+            candidateValues.push(`data:image/png;base64,${entry.b64_json}`);
+          }
+        }
+      }
+
+      if (
+        candidateValues.some(
+          (value) => typeof value === "string" && isLikelyImageUrl(value)
+        )
+      ) {
+        return true;
+      }
+
+      if (
+        Array.isArray(dataField) &&
+        dataField.some((entry) => typeof entry?.b64_json === "string")
+      ) {
+        return true;
+      }
+    }
+  } catch {
+    // Not JSON, ignore
+  }
+
+  return false;
+};
+
+const cleanUserPromptText = (raw?: string | null): string => {
+  if (!raw) {
+    return "";
+  }
+
+  let content = raw.replace(/^\s*USER:\s*/i, "");
+  const markerIndex = content.indexOf(OUTPUT_FORMAT_MARKER);
+  if (markerIndex > 0) {
+    content = content.substring(0, markerIndex);
+  }
+  return content.trim();
+};
+
+const findFirstUserPrompt = (
+  messages: Array<{ role?: string; content?: string }>
+): string | null => {
+  for (const msg of messages) {
+    if ((msg.role || "").toLowerCase() === "user") {
+      const cleaned = cleanUserPromptText(msg.content);
+      if (cleaned) {
+        return cleaned;
+      }
+    }
+  }
+  return null;
+};
 
 // Helper to parse ingredient strings into structured data
 function parseIngredientToJson(ingredient: string) {
@@ -499,6 +636,71 @@ export default function ChatAIScreen() {
   const [showConversationList, setShowConversationList] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const conversationSlideAnim = useRef(new Animated.Value(-300)).current;
+  const [firstPrompts, setFirstPrompts] = useState<Record<number, string>>({});
+  const firstPromptsRef = useRef(firstPrompts);
+  const firstPromptFetchesRef = useRef<Partial<Record<number, Promise<void>>>>({});
+
+  useEffect(() => {
+    firstPromptsRef.current = firstPrompts;
+  }, [firstPrompts]);
+
+  const setFirstPromptForConversation = useCallback((conversationId: number, prompt: string) => {
+    const sanitized = prompt.trim();
+    if (!sanitized || firstPromptsRef.current[conversationId]) {
+      return;
+    }
+    firstPromptsRef.current[conversationId] = sanitized;
+    setFirstPrompts((prev) => ({
+      ...prev,
+      [conversationId]: sanitized,
+    }));
+  }, []);
+
+  const ensureFirstPrompt = useCallback(
+    async (conversationId: number) => {
+      if (firstPromptsRef.current[conversationId]) {
+        return firstPromptsRef.current[conversationId];
+      }
+      if (firstPromptFetchesRef.current[conversationId]) {
+        await firstPromptFetchesRef.current[conversationId];
+        return firstPromptsRef.current[conversationId];
+      }
+
+      const fetchPromise = (async () => {
+        try {
+          const { messages } = await getConversation(conversationId);
+          const prompt = findFirstUserPrompt(messages);
+          if (prompt) {
+            setFirstPromptForConversation(conversationId, prompt);
+          }
+        } catch (error) {
+          console.error(
+            `[ChatAI] Failed to prefetch first prompt for conversation ${conversationId}:`,
+            error
+          );
+        }
+      })();
+
+      firstPromptFetchesRef.current[conversationId] = fetchPromise;
+      await fetchPromise;
+      delete firstPromptFetchesRef.current[conversationId];
+      return firstPromptsRef.current[conversationId];
+    },
+    [setFirstPromptForConversation]
+  );
+
+  const prefetchFirstPrompts = useCallback(
+    (conversationList: Conversation[]) => {
+      conversationList.forEach((convo) => {
+        if (!firstPromptsRef.current[convo.id]) {
+          ensureFirstPrompt(convo.id).catch(() => {
+            /* handled in ensureFirstPrompt */
+          });
+        }
+      });
+    },
+    [ensureFirstPrompt]
+  );
 
   // Toast state for better UX
   const [toast, setToast] = useState<{
@@ -713,6 +915,7 @@ Rules:
       setIsLoadingConversations(true);
       const convos = await getConversations();
       setConversations(convos);
+      prefetchFirstPrompts(convos);
     } catch (error: any) {
       console.error('Failed to load conversations:', error);
       showToast('error', 'Failed to load conversation history');
@@ -730,6 +933,9 @@ Rules:
       const uiMessages: ChatMessage[] = apiMessages
         .filter(msg => {
           const content = msg.content || '';
+          if (isImageGenerationContent(content)) {
+            return false;
+          }
           const contentLower = content.toLowerCase();
           
           // Filter out system prompts (messages with 3+ system markers)
@@ -766,14 +972,7 @@ Rules:
           
           // If it's a user message, clean up the prompt formatting
           if (msg.role === 'user') {
-            // Remove "USER:\n" prefix if present
-            content = content.replace(/^\n*USER:\n*/i, '');
-            
-            // Remove JSON_DIRECTIVE if present (everything after the user's actual text)
-            const jsonDirectiveStart = content.indexOf('\n\nOUTPUT FORMAT (REQUIRED)');
-            if (jsonDirectiveStart > 0) {
-              content = content.substring(0, jsonDirectiveStart).trim();
-            }
+            content = cleanUserPromptText(content);
           }
           
           // Try to parse as recipe
@@ -789,6 +988,11 @@ Rules:
           } as ChatMessage;
         });
       
+      const firstPrompt = findFirstUserPrompt(apiMessages);
+      if (firstPrompt) {
+        setFirstPromptForConversation(conversationId, firstPrompt);
+      }
+
       setMessages(uiMessages);
       setCurrentConversationId(conversationId);
       setShowConversationList(false);
@@ -1040,11 +1244,17 @@ Rules:
         conversationId: currentConversationId,
       });
 
+      const resolvedConversationId = currentConversationId ?? response.conversation_id;
+
       // If no conversation was active, set the new one
       if (!currentConversationId && response.conversation_id) {
         setCurrentConversationId(response.conversation_id);
         // Reload conversations to show the new one
         loadConversations();
+      }
+
+      if (resolvedConversationId) {
+        setFirstPromptForConversation(resolvedConversationId, userText);
       }
 
       // Remove typing indicator by id
@@ -1296,43 +1506,47 @@ Rules:
                   No conversations yet. Start chatting!
                 </Text>
               ) : (
-                conversations.map((convo) => (
-                  <View key={convo.id} style={styles.conversationItem}>
-                    <TouchableOpacity
-                      style={[
-                        styles.conversationItemButton,
-                        currentConversationId === convo.id && styles.conversationItemActive,
-                      ]}
-                      onPress={() => loadConversation(convo.id)}
-                    >
-                      <View style={styles.conversationItemContent}>
-                        <Text
-                          style={styles.conversationItemTitle}
-                          numberOfLines={1}
+                conversations.map((convo) => {
+                  const promptPreview =
+                    firstPrompts[convo.id]?.trim() ||
+                    convo.title ||
+                    "New Chat";
+                  
+                  return (
+                    <View key={convo.id} style={styles.conversationItem}>
+                      <TouchableOpacity
+                        style={[
+                          styles.conversationItemButton,
+                          currentConversationId === convo.id && styles.conversationItemActive,
+                        ]}
+                        onPress={() => loadConversation(convo.id)}
+                      >
+                        <View style={styles.conversationItemContent}>
+                          <Text style={styles.conversationItemPrompt}>
+                            {promptPreview}
+                          </Text>
+                          <Text style={styles.conversationItemMeta}>
+                            {convo.message_count} messages
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                      <View style={styles.conversationItemActions}>
+                        <TouchableOpacity
+                          onPress={() => handleRenameConversation(convo.id, convo.title)}
+                          style={styles.conversationActionButton}
                         >
-                          {convo.title}
-                        </Text>
-                        <Text style={styles.conversationItemMeta}>
-                          {convo.message_count} messages
-                        </Text>
+                          <Ionicons name="pencil" size={18} color="#666" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteConversation(convo.id)}
+                          style={styles.conversationActionButton}
+                        >
+                          <Ionicons name="trash" size={18} color="#FF3B30" />
+                        </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
-                    <View style={styles.conversationItemActions}>
-                      <TouchableOpacity
-                        onPress={() => handleRenameConversation(convo.id, convo.title)}
-                        style={styles.conversationActionButton}
-                      >
-                        <Ionicons name="pencil" size={18} color="#666" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleDeleteConversation(convo.id)}
-                        style={styles.conversationActionButton}
-                      >
-                        <Ionicons name="trash" size={18} color="#FF3B30" />
-                      </TouchableOpacity>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </ScrollView>
           </Animated.View>
@@ -1638,11 +1852,12 @@ const styles = StyleSheet.create({
   conversationItemContent: {
     flex: 1,
   },
-  conversationItemTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#000",
+  conversationItemPrompt: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#111",
     marginBottom: 4,
+    lineHeight: 18,
   },
   conversationItemMeta: {
     fontSize: 12,

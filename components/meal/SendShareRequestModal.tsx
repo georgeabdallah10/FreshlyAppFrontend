@@ -2,13 +2,13 @@
  * ============================================
  * SEND MEAL SHARE REQUEST MODAL
  * ============================================
- * Modal for searching any user to share a meal with
+ * Modal for sharing a meal with users in the same family
  */
 
 import ToastBanner from '@/components/generalMessage';
 import { useUser } from '@/context/usercontext';
 import { useSendShareRequest } from '@/hooks/useMealShare';
-import { searchUsers, type UserSearchResult } from '@/src/services/user.service';
+import { type UserSearchResult } from '@/src/services/user.service';
 import { listFamilyMembers } from '@/src/user/family';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -61,8 +61,6 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   const { user } = useUser();
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
   const [familyMembers, setFamilyMembers] = useState<UserSearchResult[]>([]);
   const [familyLoading, setFamilyLoading] = useState(false);
   const [familyError, setFamilyError] = useState<string | null>(null);
@@ -135,7 +133,6 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
     } else {
       setSelectedUser(null);
       setSearchQuery('');
-      setSearchResults([]);
       setFamilyMembers([]);
       setFamilyError(null);
       setMessage('');
@@ -154,47 +151,27 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
     }
   }, [visible, loadFamilyMembers]);
 
-  React.useEffect(() => {
-    if (!visible) {
-      return;
+  const normalizedQuery = React.useMemo(() => searchQuery.trim().toLowerCase(), [searchQuery]);
+
+  const filteredFamilyMembers = React.useMemo(() => {
+    if (!normalizedQuery) {
+      return familyMembers;
     }
 
-    const trimmed = searchQuery.trim();
+    return familyMembers.filter((member) => {
+      const candidateFields = [
+        member.name,
+        member.full_name,
+        member.display_name,
+        member.email,
+      ].filter(Boolean) as string[];
 
-    if (trimmed.length < 2) {
-      setSearchResults([]);
-      setSearching(false);
-      return;
-    }
-
-    setSearching(true);
-    let isCancelled = false;
-    const timeout = setTimeout(async () => {
-      try {
-        const results = await searchUsers(trimmed);
-        if (isCancelled) return;
-        const filtered = (results || []).filter((candidate) => candidate.id !== user?.id);
-        setSearchResults(filtered);
-      } catch (error: any) {
-        if (isCancelled) return;
-        console.error('[SendShareRequestModal] Error searching users:', error);
-        setToast({
-          visible: true,
-          type: 'error',
-          message: error?.message || 'Failed to search users',
-        });
-      } finally {
-        if (!isCancelled) {
-          setSearching(false);
-        }
-      }
-    }, 350);
-
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [searchQuery, user?.id, visible]);
+      return candidateFields.some((value) =>
+        value.toLowerCase().includes(normalizedQuery)
+      );
+    });
+  }, [familyMembers, normalizedQuery]);
+  const hasSearchQuery = normalizedQuery.length > 0;
 
   const handleSend = async () => {
     if (!selectedUser?.id) {
@@ -202,6 +179,16 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         visible: true,
         type: 'error',
         message: 'Please select a recipient',
+      });
+      return;
+    }
+
+    const isFamilyMember = familyMembers.some((member) => member.id === selectedUser.id);
+    if (!isFamilyMember) {
+      setToast({
+        visible: true,
+        type: 'error',
+        message: 'You can only share meals with members of your family.',
       });
       return;
     }
@@ -318,44 +305,20 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
       );
     }
 
-    return familyMembers.map(renderUserOption);
-  };
-
-  const renderSearchResultsSection = () => {
-    if (searchQuery.trim().length < 2) {
-      return (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={48} color="#D1D5DB" />
-          <Text style={styles.emptyText}>Search the Freshly community</Text>
-          <Text style={styles.emptySubtext}>
-            Enter at least 2 characters to find other users by name or email.
-          </Text>
-        </View>
-      );
-    }
-
-    if (searching) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
-          <Text style={styles.loadingText}>Searching users...</Text>
-        </View>
-      );
-    }
-
-    if (searchResults.length === 0) {
+    if (hasSearchQuery && filteredFamilyMembers.length === 0) {
       return (
         <View style={styles.emptyContainer}>
           <Ionicons name="alert-circle-outline" size={48} color="#D1D5DB" />
-          <Text style={styles.emptyText}>No users found</Text>
+          <Text style={styles.emptyText}>No matching family members</Text>
           <Text style={styles.emptySubtext}>
-            Try a different name or search by their email address.
+            Try a different name or search by a family member's email address.
           </Text>
         </View>
       );
     }
 
-    return searchResults.map(renderUserOption);
+    const membersToRender = hasSearchQuery ? filteredFamilyMembers : familyMembers;
+    return membersToRender.map(renderUserOption);
   };
 
   return (
@@ -398,12 +361,12 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             </View>
             <Text style={styles.modalTitle}>Share "{mealName}"</Text>
             <Text style={styles.modalSubtitle}>
-              Pick a family member or search the Freshly community to share this meal.
+              Pick a family member to share this meal.
             </Text>
           </View>
 
           <View style={styles.searchSection}>
-            <Text style={styles.messageLabel}>Send to any Freshly user</Text>
+            <Text style={styles.messageLabel}>Send to a family member</Text>
             <View style={styles.searchInputWrapper}>
               <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
               <TextInput
@@ -445,15 +408,10 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Family members</Text>
+              <Text style={styles.sectionTitle}>
+                {hasSearchQuery ? 'Matching family members' : 'Family members'}
+              </Text>
               {renderFamilySection()}
-            </View>
-
-            <View style={styles.sectionDivider} />
-
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Search results</Text>
-              {renderSearchResultsSection()}
             </View>
           </ScrollView>
 
@@ -579,11 +537,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 12,
-  },
-  sectionDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginVertical: 16,
   },
   searchSection: {
     marginBottom: 16,

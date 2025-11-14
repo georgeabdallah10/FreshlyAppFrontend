@@ -34,7 +34,7 @@ declare module '@okgrow/react-native-copilot' {
     options?: CopilotOptions
   ): (component: ComponentType<P & CopilotProps>) => ComponentType<P>;
 
-  export function walkthroughable<P>(
+   export function walkthroughable<P>(
     component: ComponentType<P>
   ): ComponentType<P>;
 

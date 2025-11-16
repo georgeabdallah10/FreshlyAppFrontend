@@ -1,4 +1,5 @@
-import { createMyPantryItem } from "@/src/user/pantry";
+import { useUser } from "@/context/usercontext";
+import { upsertPantryItemByName } from "@/src/user/pantry";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useRef, useState } from "react";
@@ -36,6 +37,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   visible,
   onClose,
 }) => {
+  const { activeFamilyId } = useUser();
   const [modalType, setModalType] = useState<"choice" | "single" | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [productName, setProductName] = useState("");
@@ -130,14 +132,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
   const addsignleproduct = async () => {
     try {
-      const res = await createMyPantryItem({
-        ingredient_name: productName,
-        quantity: productQuantity,
-        category: selectedCategory,
-        unit: productUnit || null, // NEW: pass unit
-      });
+      const res = await upsertPantryItemByName(
+        {
+          ingredient_name: productName.trim(),
+          quantity: productQuantity,
+          category: selectedCategory,
+          unit: productUnit || null, // NEW: pass unit
+        },
+        { familyId: activeFamilyId ?? null }
+      );
       console.log(res);
-      return { success: true };
+      return { success: true, merged: res.merged };
     } catch (error: any) {
       let errorMessage = "Unable to add item to pantry. ";
       
@@ -217,11 +222,13 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     setIsSubmitting(true);
     
     try {
-      await addsignleproduct();
+      const result = await addsignleproduct();
 
       Alert.alert(
         "Success!",
-        `${productName} added successfully to your pantry`,
+        result?.merged
+          ? `${productName} quantity updated in your pantry`
+          : `${productName} added successfully to your pantry`,
         [
           {
             text: "OK",

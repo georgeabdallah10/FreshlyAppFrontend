@@ -6,7 +6,7 @@ export type setPrefrencesInput = {
   allergen_ingredient_ids: number[];
   disliked_ingredient_ids: number[];
   goal: string;
-  calorie_target: number;
+  calorie_target: number | null;
 };
 
 export type UserPreferenceOut = {
@@ -17,6 +17,9 @@ export type UserPreferenceOut = {
   disliked_ingredient_ids: number[] | null;
   goal: string | null;
   calorie_target: number | null;
+  age?: number | null;
+  height?: number | null;
+  weight?: number | null;
   created_at: string;
   updated_at: string;
 };
@@ -31,20 +34,20 @@ export async function setPrefrences(
   try {
     const token = await Storage.getItem("access_token");
 
-    const res = await fetch(`${BASE_URL}/preferences/me`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        diet_codes: input.diet_codes,
-        allergen_ingredient_ids: input.allergen_ingredient_ids,
-        disliked_ingredient_ids: input.disliked_ingredient_ids,
-        goal: input.goal,
-        calorie_target: input.calorie_target,
-      }),
-    });
+  const res = await fetch(`${BASE_URL}/preferences/me`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      diet_codes: input.diet_codes,
+      allergen_ingredient_ids: input.allergen_ingredient_ids,
+      disliked_ingredient_ids: input.disliked_ingredient_ids,
+      goal: input.goal,
+      calorie_target: input.calorie_target,
+    }),
+  });
 
     if (!res.ok) {
       const msg = await res.text();

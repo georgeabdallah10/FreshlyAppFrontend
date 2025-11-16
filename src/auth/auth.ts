@@ -283,6 +283,10 @@ export const updateUserInfo = async (
     location: string;
     avatar_path: string;
     status: string;
+    age: number | null;
+    height: number | null;
+    weight: number | null;
+    gender: "male" | "female" | null;
   }>
 ): Promise<User> => {
   try {

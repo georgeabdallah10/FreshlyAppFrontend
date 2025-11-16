@@ -10,61 +10,95 @@ async function getAuthHeaders() {
   };
 }
 
+export type PantryScope = "personal" | "family";
+
 export type PantryItem = {
   id: number;
   family_id?: number | null;
   owner_user_id?: number | null;
+  scope?: PantryScope;
   ingredient_id?: number | null;
   ingredient_name?: string | null; // backend creates/finds by name if id not sent
-  quantity?: number | null;
+  quantity?: number | null | string;
   unit?: string | null;
   expires_at?: string | null; // ISO date string
   created_at?: string;
-  category?: string;
+  updated_at?: string;
+  image_url?: string | null;
+  category?: string | null;
 };
 
 export type CreatePantryItemInput = {
-  // For personal pantry we must send scope='personal' and NO family_id
   ingredient_id?: number;
   ingredient_name?: string; // if no id, send a name and backend will create/find
   quantity?: number;
   unit?: string | null;
   expires_at?: string | null; // ISO date string or null
-  category: string | null;
+  category?: string | null;
 };
 
 export type UpdatePantryItemInput = {
-  name?: string; // optional
+  ingredient_name?: string | null;
+  name?: string | null; // legacy alias so existing callers keep working
   quantity?: number | null;
   unit?: string | null;
   expires_at?: string | null;
   category?: string | null;
 };
 
+export type PantryQueryOptions = {
+  familyId?: number | null;
+};
+
 // -------------------- API calls --------------------
-export async function listMyPantryItems(): Promise<PantryItem[]> {
+export async function listMyPantryItems(
+  options: PantryQueryOptions = {}
+): Promise<PantryItem[]> {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${BASE_URL}/pantry-items/me`, { headers });
+  const familyId = options.familyId ?? null;
+  const url = familyId
+    ? `${BASE_URL}/pantry-items/family/${familyId}`
+    : `${BASE_URL}/pantry-items/me`;
+
+  const res = await fetch(url, { headers });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(`List pantry failed (${res.status}): ${text}`);
   }
-  return res.json();
+
+  const data = await res.json();
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
 }
 
 export async function createMyPantryItem(
-  input: CreatePantryItemInput
+  input: CreatePantryItemInput,
+  options: PantryQueryOptions = {}
 ): Promise<PantryItem> {
   const headers = await getAuthHeaders();
+  const familyId = options.familyId ?? null;
+  const scope: PantryScope = familyId ? "family" : "personal";
 
-  // The backend requires scope='personal' here.
-  const payload = {
-    scope: "personal",
-    family_id: null,
+  const payload: Record<string, any> = {
     ...input,
+    scope,
   };
 
-  const res = await fetch(`${BASE_URL}/pantry-items/me`, {
+  if (familyId) {
+    payload.family_id = familyId;
+  }
+
+  if (!payload.ingredient_name && payload.name) {
+    payload.ingredient_name = payload.name;
+    delete payload.name;
+  }
+
+  const url = familyId
+    ? `${BASE_URL}/pantry-items`
+    : `${BASE_URL}/pantry-items/me`;
+
+  const res = await fetch(url, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
@@ -82,10 +116,20 @@ export async function updatePantryItem(
   updates: UpdatePantryItemInput
 ): Promise<PantryItem> {
   const headers = await getAuthHeaders();
+  const payload: Record<string, any> = {};
+
+  if (updates.ingredient_name !== undefined || updates.name !== undefined) {
+    payload.ingredient_name = updates.ingredient_name ?? updates.name;
+  }
+  if (updates.quantity !== undefined) payload.quantity = updates.quantity;
+  if (updates.unit !== undefined) payload.unit = updates.unit;
+  if (updates.expires_at !== undefined) payload.expires_at = updates.expires_at;
+  if (updates.category !== undefined) payload.category = updates.category;
+
   const res = await fetch(`${BASE_URL}/pantry-items/${itemId}`, {
     method: "PATCH",
     headers,
-    body: JSON.stringify(updates),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -131,6 +175,7 @@ const parseQuantityValue = (value: unknown): number => {
 export type UpsertPantryItemOptions = {
   existingItems?: PantryMergeItem[];
   strategy?: "increment" | "replace";
+  familyId?: number | null;
 };
 
 export type UpsertPantryItemResult = {
@@ -150,7 +195,7 @@ export async function upsertPantryItemByName(
 
   const snapshot: PantryMergeItem[] = options.existingItems
     ? [...options.existingItems]
-    : await listMyPantryItems();
+    : await listMyPantryItems({ familyId: options.familyId ?? null });
 
   const matchIndex = snapshot.findIndex(
     (item) => resolveItemName(item) === normalizedIncoming
@@ -171,7 +216,7 @@ export async function upsertPantryItemByName(
       const nextQuantity = Number.isFinite(delta) ? delta : baseQuantity;
 
       const updatePayload: UpdatePantryItemInput = {
-        name:
+        ingredient_name:
           match.ingredient_name ??
           match.name ??
           input.ingredient_name ??
@@ -198,7 +243,9 @@ export async function upsertPantryItemByName(
     }
   }
 
-  const created = await createMyPantryItem(input);
+  const created = await createMyPantryItem(input, {
+    familyId: options.familyId ?? null,
+  });
   snapshot.push(created);
   return { item: created, merged: false, snapshot };
 }

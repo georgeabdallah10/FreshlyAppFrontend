@@ -1,7 +1,7 @@
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
-import { createMyPantryItem } from "@/src/user/pantry";
+import { listMyPantryItems, upsertPantryItemByName, type PantryItem as ApiPantryItem } from "@/src/user/pantry";
 import { getConfidenceColor } from "@/src/utils/aiApi";
 import { scanImageViaProxy } from "@/src/utils/groceryScanProxy";
 import { Ionicons } from "@expo/vector-icons";
@@ -54,7 +54,7 @@ const UNITS = ["g", "kg", "oz", "lb", "cup", "mL", "L", "ea", "pc", "can", "jar"
 
 const AllGroceryScanner = () => {
   const router = useRouter();
-  const { loadPantryItems } = useUser();
+  const { loadPantryItems, activeFamilyId } = useUser();
   
   // Main state
   const [currentStep, setCurrentStep] = useState<ScanStep>("selection");
@@ -287,13 +287,27 @@ const AllGroceryScanner = () => {
     setIsSubmitting(true);
     
     try {
+      let snapshot: ApiPantryItem[] | undefined = await listMyPantryItems(
+        activeFamilyId ? { familyId: activeFamilyId } : undefined
+      ).catch((err) => {
+        console.warn("Failed to preload pantry items before merge:", err);
+        return undefined;
+      });
+
       for (const item of scannedItems) {
-        await createMyPantryItem({
-          ingredient_name: item.name,
-          quantity: parseFloat(item.quantity) || 1,
-          category: item.category,
-          unit: item.unit,
+        const parsedQty = parseFloat(item.quantity);
+        const payload = {
+          ingredient_name: item.name.trim(),
+          quantity: Number.isFinite(parsedQty) ? parsedQty : undefined,
+          category: item.category || null,
+          unit: item.unit || null,
+        };
+
+        const result = await upsertPantryItemByName(payload, {
+          existingItems: snapshot,
+          familyId: activeFamilyId ?? null,
         });
+        snapshot = result.snapshot;
       }
       
       await loadPantryItems();

@@ -1,8 +1,9 @@
 import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
+import { listMyFamilies } from "@/src/user/family";
 import { listMyPantryItems } from "@/src/user/pantry";
 import { getMyprefrences } from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 
 type PantryItem = {
   id: number;
@@ -26,11 +27,25 @@ type UserContextType = {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   updateUserInfo: (
-    patch: Partial<{ name: string; email: string; phone_number: string; location: string; status: string; avatar_path: string;}>
+    patch: Partial<{
+      name: string;
+      email: string;
+      phone_number: string;
+      location: string;
+      status: string;
+      avatar_path: string;
+      age: number | null;
+      height: number | null;
+      weight: number | null;
+      gender: "male" | "female" | null;
+    }>
   ) => Promise<User>;
   prefrences: string[];
   pantryItems:PantryItem[] ;
   loadPantryItems: () => Promise<void>;
+  activeFamilyId: number | null;
+  refreshFamilyMembership: () => Promise<number | null>;
+  setActiveFamilyId: React.Dispatch<React.SetStateAction<number | null>>;
 };
 
 
@@ -41,13 +56,25 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [prefrences, setPrefrences] = useState([]);
-const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
+  const [activeFamilyId, setActiveFamilyId] = useState<number | null>(null);
   useEffect(() => {
     refreshUser();
   }, []);
 
   const updateUserInfo = async (
-    patch: Partial<{ name: string; email: string; phone_number: string ; location: string; status: string; avatar_path: string;}>
+    patch: Partial<{
+      name: string;
+      email: string;
+      phone_number: string;
+      location: string;
+      status: string;
+      avatar_path: string;
+      age: number | null;
+      height: number | null;
+      weight: number | null;
+      gender: "male" | "female" | null;
+    }>
   ) => {
     try {
       const updated = await updateUserInfoApi(patch);
@@ -61,48 +88,76 @@ const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
       throw err;
     }
   };
-useEffect(() => {
-  const userPrefrences = async () => {
-    try {
-      const res = await getMyprefrences();
-      if (res?.ok) setPrefrences(res.data);
-    } catch (err) {
-      console.log(err);
-    }
+  const normalizePantryResponse = (res: any): PantryItem[] => {
+    if (Array.isArray(res)) return res as PantryItem[];
+    if (Array.isArray(res?.data)) return res.data as PantryItem[];
+    if (Array.isArray(res?.items)) return res.items as PantryItem[];
+    return [];
   };
 
-  const loadPantryItems = async () => {
-    try {
-      const res = await listMyPantryItems();
-      // If your API returns { ok, data }, use data:
-      if ((res as any)?.ok) {
-        setPantryItems((res as any).data as PantryItem[]);
-      } else {
-        // If it returns a plain array, this also works:
-        setPantryItems(res as PantryItem[]);
-      }
-    } catch (err) {
-      console.log(err);
-    }
+  const extractFamilyId = (entry: any): number | null => {
+    const raw =
+      entry?.id ??
+      entry?.family_id ??
+      entry?.familyId ??
+      entry?.family?.id ??
+      null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
   };
 
-  loadPantryItems();
-  userPrefrences();
-}, []);
-  const loadPantryItems = async () => {
+  const refreshFamilyMembership = useCallback(async (): Promise<number | null> => {
     try {
-      const res = await listMyPantryItems();
-      // If your API returns { ok, data }, use data:
-      if ((res as any)?.ok) {
-        setPantryItems((res as any).data as PantryItem[]);
-      } else {
-        // If it returns a plain array, this also works:
-        setPantryItems(res as PantryItem[]);
+      const families = await listMyFamilies();
+      if (Array.isArray(families) && families.length > 0) {
+        for (const entry of families) {
+          const id = extractFamilyId(entry);
+          if (id !== null) {
+            setActiveFamilyId(id);
+            return id;
+          }
+        }
       }
+      setActiveFamilyId(null);
+      return null;
     } catch (err) {
       console.log(err);
+      setActiveFamilyId((prev) => prev ?? null);
+      return activeFamilyId ?? null;
     }
-  };
+  }, [activeFamilyId]);
+
+  const loadPantryItems = useCallback(async () => {
+    try {
+      let familyId = activeFamilyId;
+      if (familyId == null) {
+        familyId = await refreshFamilyMembership();
+      }
+      const res = await listMyPantryItems(
+        familyId ? { familyId } : undefined
+      );
+      setPantryItems(normalizePantryResponse(res));
+    } catch (err) {
+      console.log(err);
+      setPantryItems([]);
+    }
+  }, [activeFamilyId, refreshFamilyMembership]);
+
+  useEffect(() => {
+    loadPantryItems();
+  }, [loadPantryItems]);
+
+  useEffect(() => {
+    const userPrefrences = async () => {
+      try {
+        const res = await getMyprefrences();
+        if (res?.ok) setPrefrences(res.data);
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    userPrefrences();
+  }, []);
 
   const refreshUser = async () => {
     try {
@@ -126,7 +181,19 @@ useEffect(() => {
 
   return (
     <UserContext.Provider
-      value={{ user, setUser, logout, refreshUser, updateUserInfo, prefrences, pantryItems, loadPantryItems}}
+      value={{
+        user,
+        setUser,
+        logout,
+        refreshUser,
+        updateUserInfo,
+        prefrences,
+        pantryItems,
+        loadPantryItems,
+        activeFamilyId,
+        refreshFamilyMembership,
+        setActiveFamilyId,
+      }}
     >
       {children}
     </UserContext.Provider>

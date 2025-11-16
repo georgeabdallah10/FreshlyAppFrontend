@@ -4,6 +4,7 @@ import ScanConfirmModal from "@/components/scanConfirmModal";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
+import { listMyFamilies } from "@/src/user/family";
 import {
     deletePantryItem,
     listMyPantryItems,
@@ -144,9 +145,26 @@ const toDateOnly = (d: Date) => {
   return `${y}-${m}-${day}`;
 };
 
+const formatQuantityDisplay = (value: string | number | null | undefined) => {
+  if (value === null || value === undefined) return "—";
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    const trimmed = `${value}`.trim();
+    return trimmed.length > 0 ? trimmed : "—";
+  }
+  const rounded = Math.round(num * 10) / 10;
+  if (Number.isInteger(rounded)) return String(rounded);
+  return rounded.toFixed(1);
+};
+
 const PantryDashboard = () => {
   const router = useRouter();
-  const { loadPantryItems } = useUser();
+  const {
+    loadPantryItems,
+    activeFamilyId: contextFamilyId,
+    refreshFamilyMembership,
+    setActiveFamilyId: setContextFamilyId,
+  } = useUser();
 
   // UI state
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -176,6 +194,13 @@ const PantryDashboard = () => {
   ]);
   const [groceryItems, setGroceryItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [activeScope, setActiveScope] = useState<"personal" | "family">("personal");
+  const [families, setFamilies] = useState<Array<{ id: number; name: string }>>([]);
+  const [familiesLoading, setFamiliesLoading] = useState(false);
+  const [familiesReady, setFamiliesReady] = useState(false);
+  const [scopeManuallySet, setScopeManuallySet] = useState(false);
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(null);
 
   // Rate limiting
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -210,14 +235,17 @@ const PantryDashboard = () => {
     topOffset?: number;
   }>({ visible: false, type: "success", message: "", topOffset: 40 });
 
-  const showToast = (
-    type: "success" | "error" | "info",
-    message: string,
-    duration?: number,
-    topOffset?: number
-  ) => {
-    setToast({ visible: true, type, message, duration, topOffset });
-  };
+  const showToast = useCallback(
+    (
+      type: "success" | "error" | "info",
+      message: string,
+      duration?: number,
+      topOffset?: number
+    ) => {
+      setToast({ visible: true, type, message, duration, topOffset });
+    },
+    []
+  );
 
   const formatExpiration = (dateStr?: string | null) => {
     if (!dateStr) return null;
@@ -239,6 +267,76 @@ const PantryDashboard = () => {
   useEffect(() => {
     loadPantryItems();
   }, []);
+
+  useEffect(() => {
+    refreshFamilyMembership();
+  }, [refreshFamilyMembership]);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchFamilies = async () => {
+      try {
+        setFamiliesLoading(true);
+        const rawFamilies = await listMyFamilies();
+        if (!mounted) return;
+        const normalized = Array.isArray(rawFamilies)
+          ? rawFamilies
+              .map((fam: any) => {
+                const rawId =
+                  fam?.id ??
+                  fam?.family_id ??
+                  fam?.familyId ??
+                  fam?.family?.id ??
+                  null;
+                const id = Number(rawId);
+                if (!Number.isFinite(id)) return null;
+                const name =
+                  fam?.display_name ??
+                  fam?.name ??
+                  fam?.family_name ??
+                  fam?.family?.name ??
+                  `Family ${id}`;
+                return { id, name };
+              })
+              .filter((f): f is { id: number; name: string } => Boolean(f))
+          : [];
+        setFamilies(normalized);
+        if (normalized.length > 0) {
+          const hasCurrent = normalized.some((f) => f.id === contextFamilyId);
+          if (!hasCurrent) {
+            setContextFamilyId(normalized[0].id);
+          }
+        } else {
+          setContextFamilyId(null);
+        }
+      } catch (err) {
+        console.log("listMyFamilies error", err);
+        showToast("error", "Unable to load family list.");
+      } finally {
+        if (mounted) {
+          setFamiliesLoading(false);
+          setFamiliesReady(true);
+        }
+      }
+    };
+    fetchFamilies();
+    return () => {
+      mounted = false;
+    };
+  }, [showToast, contextFamilyId, setContextFamilyId]);
+
+  useEffect(() => {
+    if (contextFamilyId && !scopeManuallySet) {
+      setActiveScope("family");
+    }
+  }, [contextFamilyId, scopeManuallySet]);
+
+  useEffect(() => {
+    if (!contextFamilyId && activeScope === "family") {
+      setActiveScope("personal");
+      setScopeManuallySet(false);
+    }
+  }, [contextFamilyId, activeScope]);
 
   useEffect(() => {
     if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -280,25 +378,44 @@ const PantryDashboard = () => {
     };
   }, [showQRScanner]);
 
-  const mapApiItemToUI = (api: any): PantryItem => ({
-    id: String(api.id),
-    name: api?.ingredient_name ?? api?.name ?? "Unknown",
-    quantity: `${api?.quantity ?? api?.amount ?? ""}`.trim() || "—",
-    image: api?.image ?? getCategoryIcon(api?.category ?? "other"),
-    category: (api?.category ?? "Uncategorized") as string,
-    expires_at: api?.expires_at ?? null,
-    unit: api?.unit ? api?.unit : "units"
-  });
+  const mapApiItemToUI = (api: any): PantryItem => {
+    const fallbackIcon = getCategoryIcon(api?.category ?? "other");
+    const qtyRaw = api?.quantity ?? api?.amount ?? "";
+    return {
+      id: String(api.id),
+      name: api?.ingredient_name ?? api?.name ?? "Unknown",
+      quantity: `${qtyRaw ?? ""}`.trim() || "—",
+      image: api?.image_url ?? api?.image ?? fallbackIcon,
+      category: (api?.category ?? "Uncategorized") as string,
+      expires_at: api?.expires_at ?? null,
+      unit: api?.unit ? api?.unit : "units",
+    };
+  };
 
-  const refreshList = async () => {
+  const effectiveFamilyId =
+    activeScope === "family" ? contextFamilyId ?? null : null;
+  const isFamilyScope = activeScope === "family";
+
+  const refreshList = useCallback(async () => {
+    const familyIdForFetch = effectiveFamilyId;
+    const requiresFamilyId = isFamilyScope;
+    if (requiresFamilyId && !familyIdForFetch) {
+      setGroceryItems([]);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const items = await listMyPantryItems();
+      const items = await listMyPantryItems(
+        familyIdForFetch ? { familyId: familyIdForFetch } : undefined
+      );
       const mapped = (Array.isArray(items) ? items : []).map(mapApiItemToUI);
       setGroceryItems(mapped);
 
       // Gather all category names: default, user-added, and from items
-      const itemCategories = mapped.map((i) => (i.category || "Uncategorized").trim()).filter((n) => n.length > 0);
+      const itemCategories = mapped
+        .map((i) => (i.category || "Uncategorized").trim())
+        .filter((n) => n.length > 0);
       const allCategoryNames = [
         ...DEFAULT_CATEGORIES,
         ...userCategories.map((c) => c.name),
@@ -315,21 +432,27 @@ const PantryDashboard = () => {
         ...Array.from(seen.entries()).map(([id, name]) => ({ id, name })),
       ]);
 
-      const itemNames = mapped.map(item => item.name).filter(Boolean);
+      const itemNames = mapped.map((item) => item.name).filter(Boolean);
       if (itemNames.length > 0) {
         preloadPantryImages(itemNames);
       }
     } catch (err: any) {
       console.log("listMyPantryItems error", err);
-      showToast("error", "Failed to load pantry items.");
+      const isForbidden = typeof err?.message === "string" && err.message.includes("403");
+      if (isForbidden && requiresFamilyId) {
+        showToast("error", "You no longer have access to this family pantry.");
+      } else {
+        showToast("error", "Failed to load pantry items.");
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeScope, effectiveFamilyId, userCategories, showToast, isFamilyScope]);
 
   useEffect(() => {
+    if (!familiesReady) return;
     refreshList();
-  }, []);
+  }, [refreshList, familiesReady]);
 
   useEffect(() => {
     Animated.timing(dropdownAnim, {
@@ -393,6 +516,57 @@ const PantryDashboard = () => {
     }
   };
 
+  const toggleDropdown = (itemId: string) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setExpandedItemId((prev) => (prev === itemId ? null : itemId));
+  };
+
+  const parseQuantityNumber = (qty: string | number | undefined | null) => {
+    if (typeof qty === "number" && Number.isFinite(qty)) return qty;
+    if (typeof qty === "string") {
+      const parsed = parseFloat(qty);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return 0;
+  };
+
+  const handleAdjustQuantity = async (item: PantryItem, delta: number) => {
+    const currentQty = parseQuantityNumber(item.quantity);
+    const nextQty = Math.max(0, currentQty + delta);
+    setQuantityUpdatingId(item.id);
+    try {
+      await updatePantryItem(Number(item.id), {
+        ingredient_name: item.name,
+        quantity: nextQty,
+      });
+      setGroceryItems((prev) =>
+        prev.map((gi) =>
+          gi.id === item.id
+            ? { ...gi, quantity: `${nextQty}` }
+            : gi
+        )
+      );
+    } catch (err) {
+      console.log("adjust quantity error", err);
+      showToast("error", "Could not update quantity.");
+    } finally {
+      setQuantityUpdatingId((prev) => (prev === item.id ? null : prev));
+    }
+  };
+
+  const handleScopeChange = (scope: "personal" | "family") => {
+    if (scope === activeScope) return;
+    if (scope === "family") {
+      if (!families.length || !contextFamilyId) {
+        showToast("info", "Join or select a family to share pantry items.");
+        return;
+      }
+    }
+    setScopeManuallySet(true);
+    setActiveScope(scope);
+    setGroceryItems([]);
+  };
+
   const openCreateSheet = () => {
     setEditingItemId(null);
     setNewProductName("");
@@ -417,6 +591,12 @@ const PantryDashboard = () => {
     const name = newProductName.trim();
     const qtyStr = newProductQuantity.trim();
     const qty = qtyStr === "" ? undefined : Number(qtyStr);
+    const targetFamilyId = isFamilyScope ? effectiveFamilyId : null;
+
+    if (isFamilyScope && !targetFamilyId) {
+      showToast("info", "Select a family to add shared pantry items.");
+      return;
+    }
     if (!name) {
       showToast("error", "Please enter a product name.");
       return;
@@ -459,7 +639,7 @@ const PantryDashboard = () => {
 
       if (editingItemId != null) {
         const updatePayload: any = {
-          name,
+          ingredient_name: name,
           quantity: normalizedQty ?? null,
           category: newProductCategory || null,
           unit: newProductUnit || null,
@@ -470,13 +650,16 @@ const PantryDashboard = () => {
         await updatePantryItem(Number(editingItemId), updatePayload);
         showToast("success", "Item updated.");
       } else {
-        const result = await upsertPantryItemByName({
-          ingredient_name: name,
-          quantity: normalizedQty,
-          category: newProductCategory || null,
-          expires_at: expiresAtValue ?? null,
-          unit: newProductUnit || null,
-        });
+        const result = await upsertPantryItemByName(
+          {
+            ingredient_name: name,
+            quantity: normalizedQty,
+            category: newProductCategory || null,
+            expires_at: expiresAtValue ?? null,
+            unit: newProductUnit || null,
+          },
+          { familyId: targetFamilyId ?? null }
+        );
         showToast(
           "success",
           result.merged ? "Item quantity updated in pantry." : "Item added to pantry."
@@ -546,8 +729,14 @@ const PantryDashboard = () => {
     const inSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
     return inCategory && inSearch;
   });
+  const needsFamilySelection =
+    isFamilyScope && !familiesLoading && !effectiveFamilyId;
 
   const openScanner = async () => {
+    if (isFamilyScope && !effectiveFamilyId) {
+      showToast("info", "Select a family to scan items into.");
+      return;
+    }
     if (!perm) {
       const req = await requestPermission();
       if (!req?.granted) {
@@ -640,6 +829,96 @@ const PantryDashboard = () => {
         </TouchableOpacity>
       </View>
 
+      {isFamilyScope && families.length > 0 && (
+        <View style={styles.familyNote}>
+          <Text style={styles.familyNoteText}>
+            Your pantry is shared with your family.
+          </Text>
+        </View>
+      )}
+
+      {!contextFamilyId && (
+        <View style={styles.scopeToggle}>
+          <TouchableOpacity
+            style={[
+              styles.scopeButton,
+              activeScope === "personal" && styles.scopeButtonActive,
+            ]}
+            onPress={() => handleScopeChange("personal")}
+          >
+            <Text
+              style={[
+                styles.scopeButtonText,
+                activeScope === "personal" && styles.scopeButtonTextActive,
+              ]}
+            >
+              Personal
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.scopeButton,
+              activeScope === "family" && styles.scopeButtonActive,
+              (!families.length || !contextFamilyId) && styles.scopeButtonDisabled,
+            ]}
+            onPress={() => handleScopeChange("family")}
+          >
+            <Text
+              style={[
+                styles.scopeButtonText,
+                activeScope === "family" && styles.scopeButtonTextActive,
+              ]}
+            >
+              Family
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {isFamilyScope && (
+        <View style={styles.familySelectorContainer}>
+          {familiesLoading ? (
+            <View style={styles.familyLoadingRow}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+              <Text style={styles.familyLoadingText}>Loading families…</Text>
+            </View>
+          ) : families.length === 0 ? (
+            <Text style={styles.familySelectorHint}>
+              Join or create a family to start sharing pantry items.
+            </Text>
+          ) : (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.familyPillRow}
+            >
+              {families.map((family) => {
+                const isActive = contextFamilyId === family.id;
+                return (
+                  <TouchableOpacity
+                    key={family.id}
+                    style={[
+                      styles.familyPill,
+                      isActive && styles.familyPillActive,
+                    ]}
+                    onPress={() => setContextFamilyId(family.id)}
+                  >
+                    <Text
+                      style={[
+                        styles.familyPillText,
+                        isActive && styles.familyPillTextActive,
+                      ]}
+                    >
+                      {family.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <TextInput
@@ -723,6 +1002,11 @@ const PantryDashboard = () => {
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={{ marginTop: 8, color: "#999" }}>Loading pantry…</Text>
         </View>
+      ) : needsFamilySelection ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>👨‍👩‍👧‍👦</Text>
+          <Text style={styles.emptyText}>Select a family to view its pantry.</Text>
+        </View>
       ) : filteredItems.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyIcon}>📁🔍</Text>
@@ -737,58 +1021,102 @@ const PantryDashboard = () => {
           renderItem={({ item, index }) => {
             const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
             const accentColor = colors[index % 3];
+            const isDropdownOpen = expandedItemId === item.id;
+            const isAdjusting = quantityUpdatingId === item.id;
             
             return (
-              <View
-                style={[
-                  styles.groceryItem,
-                  {
-                    borderLeftWidth: 4,
-                    borderLeftColor: accentColor,
-                    borderColor: getExpirationColor(item.expires_at),
-                  },
-                ]}
-              >
-                <View style={styles.itemLeft}>
-                  <PantryItemImage
-                    itemName={item.name}
-                    imageUrl={item.image?.startsWith('http') ? item.image : undefined}
-                    size={56}
-                    borderColor={getExpirationColor(item.expires_at)}
-                    borderWidth={2}
-                    onError={(msg) => showToast("error", msg, 4000)}
-                    silent={false}
-                  />
-                  <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemQuantity}>
-                      {item.quantity} {item.unit}
-                      {item.expires_at ? `  –  ${formatExpiration(item.expires_at)}` : ""}
-                    </Text>
+              <View style={styles.itemContainer}>
+                <View
+                  style={[
+                    styles.groceryItem,
+                    {
+                      borderLeftWidth: 4,
+                      borderLeftColor: accentColor,
+                      borderColor: getExpirationColor(item.expires_at),
+                    },
+                  ]}
+                >
+                  <View style={styles.itemLeft}>
+                    <PantryItemImage
+                      itemName={item.name}
+                      imageUrl={item.image?.startsWith('http') ? item.image : undefined}
+                      size={56}
+                      borderColor={getExpirationColor(item.expires_at)}
+                      borderWidth={2}
+                      onError={(msg) => showToast("error", msg, 4000)}
+                      silent={false}
+                    />
+                    <View style={{ marginLeft: 12, flex: 1 }}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemQuantity}>
+                        {formatQuantityDisplay(item.quantity)} {item.unit}
+                        {item.expires_at ? `  –  ${formatExpiration(item.expires_at)}` : ""}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.itemActions}>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: COLORS.primaryLight }]}
+                      onPress={() => openEditSheet(item)}
+                    >
+                      <Image
+                        source={require("../../assets/icons/edit.png")}
+                        style={styles.menuCardIcon}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: "#FFE5E5" }]}
+                      onPress={() => handleDeleteItem(item.id)}
+                    >
+                      <Image
+                        source={require("../../assets/icons/trash.png")}
+                        style={styles.menuCardIcon}
+                        resizeMode="contain"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.actionButton,
+                        styles.dropdownToggleButton,
+                        isDropdownOpen && styles.dropdownToggleButtonActive,
+                      ]}
+                      onPress={() => toggleDropdown(item.id)}
+                    >
+                      <Text style={styles.dropdownToggleText}>
+                        {isDropdownOpen ? "▲" : "▼"}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.itemActions}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: COLORS.primaryLight }]}
-                    onPress={() => openEditSheet(item)}
-                  >
-                    <Image
-                      source={require("../../assets/icons/edit.png")}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: "#FFE5E5" }]}
-                    onPress={() => handleDeleteItem(item.id)}
-                  >
-                    <Image
-                      source={require("../../assets/icons/trash.png")}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                  </TouchableOpacity>
-                </View>
+                {isDropdownOpen && (
+                  <View style={styles.adjustDropdown}>
+                    <TouchableOpacity
+                      style={[
+                        styles.adjustButton,
+                        styles.decrementButton,
+                        isAdjusting && styles.adjustButtonDisabled,
+                      ]}
+                      disabled={isAdjusting}
+                      onPress={() => handleAdjustQuantity(item, -1)}
+                    >
+                      <Text style={styles.adjustButtonText}>-</Text>
+                      <Text style={styles.adjustButtonLabel}>Decrease</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.adjustButton,
+                        styles.incrementButton,
+                        isAdjusting && styles.adjustButtonDisabled,
+                      ]}
+                      disabled={isAdjusting}
+                      onPress={() => handleAdjustQuantity(item, 1)}
+                    >
+                      <Text style={styles.adjustButtonText}>+</Text>
+                      <Text style={styles.adjustButtonLabel}>Increase</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
             );
           }}
@@ -1181,13 +1509,21 @@ const PantryDashboard = () => {
               setNewProductCategory(payload.category || "");
 
               setCurrentScannedProduct(payload);
-              const mergeResult = await upsertPantryItemByName({
-                ingredient_name: payload.ingredient_name,
-                quantity: payload.quantity ?? undefined,
-                expires_at: payload.expires_at ?? null,
-                category: payload.category,
-                unit: (payload as any).unit || null,
-              });
+              const targetFamilyId = isFamilyScope ? effectiveFamilyId : null;
+              if (isFamilyScope && !targetFamilyId) {
+                showToast("info", "Select a family to add scanned items.");
+                return;
+              }
+              const mergeResult = await upsertPantryItemByName(
+                {
+                  ingredient_name: payload.ingredient_name,
+                  quantity: payload.quantity ?? undefined,
+                  expires_at: payload.expires_at ?? null,
+                  category: payload.category,
+                  unit: (payload as any).unit || null,
+                },
+                { familyId: targetFamilyId ?? null }
+              );
               await refreshList();
               console.log("Approved product payload:", payload);
               showToast(
@@ -1271,6 +1607,92 @@ const styles = StyleSheet.create({
   },
   headerIcon: { fontSize: 20, color: COLORS.primary, fontWeight: "600" },
   headerTitle: { fontSize: 24, fontWeight: "700", color: COLORS.text },
+  familyNote: {
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  familyNoteText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  scopeToggle: {
+    flexDirection: "row",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  scopeButton: {
+    flex: 1,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  scopeButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  scopeButtonDisabled: {
+    opacity: 0.5,
+  },
+  scopeButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: COLORS.textMuted,
+  },
+  scopeButtonTextActive: {
+    color: COLORS.white,
+  },
+  familySelectorContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+    paddingBottom: 4,
+  },
+  familyLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  familyLoadingText: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
+  familySelectorHint: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+  },
+  familyPillRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  familyPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  familyPillActive: {
+    backgroundColor: COLORS.primaryLight,
+    borderColor: COLORS.primary,
+  },
+  familyPillText: {
+    fontSize: 14,
+    color: COLORS.text,
+    fontWeight: "600",
+  },
+  familyPillTextActive: {
+    color: COLORS.primary,
+  },
   tooltip: {
     position: "absolute",
     top: 120,
@@ -1321,6 +1743,9 @@ const styles = StyleSheet.create({
   categoryText: { fontSize: 16, fontWeight: "600", color: COLORS.text },
   categoryTextActive: { color: COLORS.white },
   listContent: { padding: 20, paddingBottom: 100 },
+  itemContainer: {
+    marginBottom: 12,
+  },
   groceryItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -1344,10 +1769,61 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   itemQuantity: { fontSize: 14, color: COLORS.textMuted },
-  itemActions: { flexDirection: "row", gap: 8 },
+  itemActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   actionButton: { 
     padding: 10,
     borderRadius: 10,
+  },
+  dropdownToggleButton: {
+    backgroundColor: COLORS.charcoalLight,
+  },
+  dropdownToggleButtonActive: {
+    backgroundColor: COLORS.primary,
+  },
+  dropdownToggleText: {
+    fontSize: 16,
+    color: COLORS.text,
+    fontWeight: "700",
+  },
+  adjustDropdown: {
+    flexDirection: "row",
+    gap: 12,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: -8,
+  },
+  adjustButton: {
+    flex: 1,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  decrementButton: {
+    backgroundColor: "#FFE5E5",
+  },
+  incrementButton: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  adjustButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  adjustButtonLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  adjustButtonDisabled: {
+    opacity: 0.5,
   },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center" },
   emptyIcon: { fontSize: 80, marginBottom: 16, opacity: 0.3 },

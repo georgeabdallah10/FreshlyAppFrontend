@@ -208,41 +208,122 @@ const findFirstUserPrompt = (
   return null;
 };
 
-// Helper to parse ingredient strings into structured data
-function parseIngredientToJson(ingredient: string) {
-  const patterns = [
-    /^(\d+(?:\.\d+)?)\s*(cups?|tbsp|tsp|g|grams?|kg|ml|l|oz|lbs?|pounds?)\s+(.+)$/i,
-    /^(.+?)\s*-\s*(\d+(?:\.\d+)?)\s*(cups?|tbsp|tsp|g|grams?|kg|ml|l|oz|lbs?|pounds?)$/i,
-    /^(\d+(?:\.\d+)?)\s+(.+)$/,
-  ];
+const INGREDIENT_DESCRIPTOR_KEYWORDS = [
+  "chopped",
+  "diced",
+  "minced",
+  "sliced",
+  "shredded",
+  "grated",
+  "crushed",
+  "peeled",
+  "halved",
+  "quartered",
+  "julienned",
+  "rinsed",
+  "drained",
+  "mashed",
+  "pureed",
+  "roasted",
+  "toasted",
+  "steamed",
+  "cooked",
+  "uncooked",
+  "raw",
+  "softened",
+  "melted",
+];
 
-  for (const pattern of patterns) {
-    const match = ingredient.match(pattern);
-    if (match) {
-      if (patterns.indexOf(pattern) === 0) {
-        return {
-          ingredient_name: match[3].trim(),
-          quantity: match[1],
-          unit: match[2].toLowerCase(),
-        };
-      } else if (patterns.indexOf(pattern) === 1) {
-        return {
-          ingredient_name: match[1].trim(),
-          quantity: match[2],
-          unit: match[3].toLowerCase(),
-        };
-      } else {
-        return {
-          ingredient_name: match[2].trim(),
-          quantity: match[1],
-          unit: "",
-        };
-      }
+const descriptorCorePattern = INGREDIENT_DESCRIPTOR_KEYWORDS.join("|");
+const descriptorSuffixPattern = new RegExp(
+  `^(.*)\\s+((?:[a-z-]+\\s+)*(?:${descriptorCorePattern}))$`,
+  "i"
+);
+
+const capitalizeDescriptorPhrase = (phrase: string) =>
+  phrase
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word, idx) =>
+      idx === 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word.toLowerCase()
+    )
+    .join(" ");
+
+const reorderIngredientDescriptor = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const commaParts = trimmed.split(",").map((part) => part.trim()).filter(Boolean);
+  if (commaParts.length > 1) {
+    const ingredientPart = commaParts[0];
+    const descriptorPart = commaParts.slice(1).join(" ").trim();
+    if (ingredientPart && descriptorPart) {
+      return `${capitalizeDescriptorPhrase(descriptorPart)} ${ingredientPart}`.trim();
     }
   }
 
+  const suffixMatch = trimmed.match(descriptorSuffixPattern);
+  if (suffixMatch) {
+    const ingredientPart = suffixMatch[1]?.trim();
+    const descriptorPart = suffixMatch[2]?.trim();
+    if (ingredientPart && descriptorPart) {
+      return `${capitalizeDescriptorPhrase(descriptorPart)} ${ingredientPart}`.trim();
+    }
+  }
+
+  return trimmed;
+};
+
+const normalizeIngredientName = (value: string) =>
+  reorderIngredientDescriptor(value.replace(/^of\s+/i, "").trim());
+
+// Helper to parse ingredient strings into structured data
+function parseIngredientToJson(ingredient: string) {
+  const cleaned = ingredient?.trim() ?? "";
+
+  if (!cleaned) {
+    return { ingredient_name: "", quantity: "", unit: "" };
+  }
+
+  const quantityPattern = "(\\d+(?:\\.\\d+)?|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+)";
+  const unitPattern =
+    "(cups?|cup|tbsp|tablespoons?|tsp|teaspoons?|g|grams?|kg|kilograms?|ml|l|liters?|oz|ounces?|lbs?|pounds?)";
+
+  const patterns = [
+    new RegExp(`^${quantityPattern}\\s*${unitPattern}(?:\\s+of)?\\s+(.+)$`, "i"),
+    new RegExp(`^(.+?)\\s*-\\s*${quantityPattern}\\s*${unitPattern}$`, "i"),
+    new RegExp(`^${quantityPattern}\\s+(.+)$`, "i"),
+  ];
+
+  for (const [index, pattern] of patterns.entries()) {
+    const match = cleaned.match(pattern);
+    if (!match) continue;
+
+    if (index === 0) {
+      return {
+        ingredient_name: normalizeIngredientName(match[3]),
+        quantity: match[1],
+        unit: match[2].toLowerCase(),
+      };
+    }
+
+    if (index === 1) {
+      return {
+        ingredient_name: normalizeIngredientName(match[1]),
+        quantity: match[2],
+        unit: match[3].toLowerCase(),
+      };
+    }
+
+    return {
+      ingredient_name: normalizeIngredientName(match[2]),
+      quantity: match[1],
+      unit: "",
+    };
+  }
+
   return {
-    ingredient_name: ingredient.trim(),
+    ingredient_name: normalizeIngredientName(cleaned),
     quantity: "",
     unit: "",
   };

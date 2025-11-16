@@ -1,15 +1,27 @@
+import BasicBodyInformationScreen from "@/components/preferences/BasicBodyInformationScreen";
+import RecommendedCaloriesScreen from "@/components/preferences/RecommendedCaloriesScreen";
+import { updateUserInfo } from "@/src/auth/auth";
 import { setPrefrences } from "@/src/user/setPrefrences";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
-    Animated,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Animated,
+  Image,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
 
 type PreferenceOption = {
@@ -17,322 +29,672 @@ type PreferenceOption = {
   label: string;
 };
 
+type PreferenceScreenKey = "culturalLifestyle" | "goal";
+
+type PreferenceScreenConfig = {
+  key: PreferenceScreenKey;
+  title: string;
+  options: PreferenceOption[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+  singleSelect?: boolean;
+};
+
+type BasicBodyInformation = {
+  age: number | null;
+  height: number | null;
+  weight: number | null;
+  gender: "male" | "female" | null;
+};
+
+type OnboardingPreferenceState = {
+  culturalLifestyle: string[];
+  allergies: string[];
+  goal: string;
+  body: BasicBodyInformation;
+  calorieTarget: number | null;
+};
+
+const COLORS = {
+  background: "#FFFFFF",
+  lightGray: "#F7F8FA",
+  border: "#EEEFF3",
+  orange: "#FD8100",
+  green: "#00C853",
+  dark: "#111111",
+  muted: "#666666",
+  chipText: "#4C4C4C",
+  grayButton: "#D6D6D6",
+};
+
+const COMMON_ALLERGIES = [
+  "Peanuts",
+  "Tree Nuts",
+  "Milk",
+  "Eggs",
+  "Soy",
+  "Wheat",
+  "Fish",
+  "Shellfish",
+  "Sesame",
+  "Mustard",
+  "Celery",
+  "Sulfites",
+] as const;
+
+const normalizeAllergyValue = (value: string) => value.trim();
+
+const allergyExistsInList = (
+  list: string[],
+  value: string,
+  ignoreIndex?: number
+) => {
+  const target = value.toLowerCase();
+  return list.some(
+    (item, index) => index !== ignoreIndex && item.toLowerCase() === target
+  );
+};
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 const OnboardingPreferences = () => {
   const router = useRouter();
   const { fromProfile } = useLocalSearchParams();
 
   const [currentStep, setCurrentStep] = useState(0);
-  const [medicalRestrictions, setMedicalRestrictions] = useState<string[]>([]);
   const [allergies, setAllergies] = useState<string[]>([]);
   const [allergyInput, setAllergyInput] = useState("");
-  const [editingAllergyIndex, setEditingAllergyIndex] = useState<number | null>(null);
-  const [culturalPreferences, setCulturalPreferences] = useState<string[]>([]);
-  const [lifestylePreferences, setLifestylePreferences] = useState<string[]>(
+  const [editingAllergyIndex, setEditingAllergyIndex] =
+    useState<number | null>(null);
+  const [culturalLifestylePreferences, setCulturalLifestylePreferences] =
+    useState<string[]>([]);
+  const [goal, setGoal] = useState<string>("balanced");
+  const [bodyInformation, setBodyInformation] = useState<BasicBodyInformation>(
+    {
+      age: null,
+      height: null,
+      weight: null,
+      gender: null,
+    }
+  );
+  const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
+  const [bodyErrors, setBodyErrors] = useState<{
+    age: string | null;
+    height: string | null;
+    weight: string | null;
+  }>({
+    age: null,
+    height: null,
+    weight: null,
+  });
+  const handleCalorieTargetChange = useCallback(
+    (value: number) => setCalorieTarget(value),
     []
   );
-  const [dietaryPreferences, setDietaryPreferences] = useState<string[]>([]);
-  const [otherRestrictions, setOtherRestrictions] = useState<string[]>([]);
-  const [goal, setGoal] = useState<string>("balanced");
-  const [calorieTarget, setCalorieTarget] = useState<string>("2200");
-  const [focusedCalorie, setFocusedCalorie] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const optionScaleRefs = useRef<Record<string, Animated.Value>>({});
+  const transitionLockRef = useRef(false);
+  const isSavingRef = useRef(false);
 
-  // Common allergy suggestions
-  const commonAllergies = [
-    "Peanuts", "Tree Nuts", "Milk", "Eggs", "Soy", "Wheat", 
-    "Fish", "Shellfish", "Sesame", "Mustard", "Celery", "Sulfites"
-  ];
+  const preferenceScreens: PreferenceScreenConfig[] = useMemo(
+    () => [
+      {
+        key: "culturalLifestyle",
+        title: "Cultural, Religious & Lifestyle",
+        options: [
+          { id: "halal", label: "Halal" },
+          { id: "kosher", label: "Kosher" },
+          { id: "vegetarian", label: "Vegetarian" },
+          { id: "vegan", label: "Vegan" },
+          { id: "pescatarian", label: "Pescatarian" },
+        ],
+        selectedValues: culturalLifestylePreferences,
+        onChange: setCulturalLifestylePreferences,
+      },
+      {
+        key: "goal",
+        title: "What is your goal?",
+        options: [
+          { id: "lose-weight", label: "Lose Weight" },
+          { id: "weight-gain", label: "Gain Weight" },
+          { id: "muscle-gain", label: "Muscle Gain" },
+          { id: "balanced", label: "Balanced" },
+        ],
+        selectedValues: goal ? [goal] : [],
+        onChange: (value: string[]) => setGoal(value[0] || "balanced"),
+        singleSelect: true,
+      },
+    ],
+    [culturalLifestylePreferences, goal]
+  );
 
-  const screens = [
-    {
-      title: "Medical or Health\nRelated Restrictions",
-      options: [
-        { id: "gluten-free", label: "Gluten-Free" },
-        { id: "lactose-free", label: "Lactose-Free" },
-        { id: "soy-free", label: "Soy-Free" },
-        { id: "egg-free", label: "Egg-Free" },
-        { id: "shellfish-free", label: "Shellfish-Free" },
-        { id: "low-sugar", label: "Low-Sugar" },
-        { id: "nut-free", label: "Nut-Free" },
-      ],
-      state: medicalRestrictions,
-      setState: setMedicalRestrictions,
-    },
-    {
-      title: "Cultural and religious",
-      options: [
-        { id: "halal", label: "Halal" },
-        { id: "kosher", label: "Kosher" },
-      ],
-      state: culturalPreferences,
-      setState: setCulturalPreferences,
-    },
-    {
-      title: "Lifestyle preferences",
-      options: [
-        { id: "vegetarian", label: "Vegetarian" },
-        { id: "vegan", label: "Vegan" },
-        { id: "pescatarian", label: "Pescatarian" },
-      ],
-      state: lifestylePreferences,
-      setState: setLifestylePreferences,
-    },
-    {
-      title: "Dietary preferences",
-      options: [
-        { id: "ketogenic", label: "Ketogenic" },
-        { id: "paleo", label: "Paleo" },
-        { id: "whole30", label: "Whole30" },
-        { id: "low-calorie", label: "Low-Calorie" },
-      ],
-      state: dietaryPreferences,
-      setState: setDietaryPreferences,
-    },
-    {
-      title: "Other Restrictions",
-      options: [
-        { id: "no-spicy", label: "No Spicy Foods" },
-        { id: "allergen-free", label: "Allergen-Free" },
-        { id: "diabetic-friendly", label: "Diabetic-Friendly" },
-      ],
-      state: otherRestrictions,
-      setState: setOtherRestrictions,
-    },
-    {
-      title: "What is your goal?",
-      options: [
-        { id: "lose-weight", label: "Lose Weight" },
-        { id: "weight-gain", label: "Gain Weight" },
-        { id: "muscle-gain", label: "Muscle Gain" },
-        { id: "balanced", label: "Balanced" },
-      ],
-      state: [goal],
-      setState: (value: string[]) => setGoal(value[0] || "balanced"),
-    },
-  ];
+  const stageSequence = useMemo(() => {
+    const preferenceKeys = preferenceScreens.map((screen) => screen.key);
+    return ["welcome", ...preferenceKeys, "allergies", "body", "calories"];
+  }, [preferenceScreens]);
 
-  // Adjust for allergies screen at step 1
-  const currentScreen = currentStep >= 2 ? screens[currentStep - 2] : null;
-  const isLastStep = currentStep === screens.length + 1; // +1 for allergies screen
-  const isCalorieStep = currentStep === screens.length + 2; // +2 for allergies screen
+  const stageCount = stageSequence.length;
 
-  const toggleOption = (id: string) => {
-    if (!currentScreen) return;
-    
-    const { state, setState } = currentScreen;
+  const maxStepIndex = useMemo(
+    () => Math.max(stageCount - 1, 0),
+    [stageCount]
+  );
 
-    // For goal selection, only allow one option (adjusted for allergies screen)
-    if (currentStep === 7) { // Goal is now at step 7 (was 5)
-      setGoal(id);
+  const clampStep = useCallback(
+    (value: number) => Math.min(Math.max(value, 0), maxStepIndex),
+    [maxStepIndex]
+  );
+
+  const safeCurrentStep = useMemo(
+    () => clampStep(currentStep),
+    [clampStep, currentStep]
+  );
+
+  const progressStages = useMemo(
+    () => stageSequence.filter((stage) => stage !== "welcome"),
+    [stageSequence]
+  );
+
+  const currentStageKey = useMemo(() => {
+    return (
+      stageSequence[safeCurrentStep] ??
+      stageSequence[stageSequence.length - 1] ??
+      "welcome"
+    );
+  }, [safeCurrentStep, stageSequence]);
+
+  const stageFlags = useMemo(
+    () => ({
+      isAllergiesStage: currentStageKey === "allergies",
+      isBodyStage: currentStageKey === "body",
+      isCalorieStage: currentStageKey === "calories",
+    }),
+    [currentStageKey]
+  );
+  const { isAllergiesStage, isBodyStage, isCalorieStage } = stageFlags;
+
+  const currentPreferenceScreen = useMemo(
+    () =>
+      preferenceScreens.find((screen) => screen.key === currentStageKey) ?? null,
+    [preferenceScreens, currentStageKey]
+  );
+
+  const currentProgressIndex = useMemo(
+    () => Math.max(progressStages.indexOf(currentStageKey), 0),
+    [progressStages, currentStageKey]
+  );
+
+  const getOptionScale = useCallback((id: string) => {
+    if (!optionScaleRefs.current[id]) {
+      optionScaleRefs.current[id] = new Animated.Value(1);
+    }
+    return optionScaleRefs.current[id];
+  }, []);
+
+  const animateOptionSelection = useCallback(
+    (id: string) => {
+      const scale = getOptionScale(id);
+      Animated.sequence([
+        Animated.timing(scale, {
+          toValue: 0.97,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 120,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    },
+    [getOptionScale]
+  );
+
+  const bodyHasValues = useMemo(
+    () =>
+      bodyInformation.age !== null ||
+      bodyInformation.height !== null ||
+      bodyInformation.weight !== null ||
+      bodyInformation.gender !== null,
+    [bodyInformation]
+  );
+
+  const bodyHasInvalidEntries = useMemo(
+    () =>
+      (bodyErrors.age && bodyInformation.age !== null) ||
+      (bodyErrors.height && bodyInformation.height !== null) ||
+      (bodyErrors.weight && bodyInformation.weight !== null),
+    [bodyErrors, bodyInformation]
+  );
+
+  const allergiesCount = allergies.length;
+
+  const hasSelection = useMemo(() => {
+    if (currentPreferenceScreen) {
+      return currentPreferenceScreen.selectedValues.length > 0;
+    }
+    if (isAllergiesStage) {
+      return allergiesCount > 0;
+    }
+    if (isBodyStage) {
+      return bodyHasValues;
+    }
+    if (isCalorieStage) {
+      return calorieTarget !== null;
+    }
+    return false;
+  }, [
+    currentPreferenceScreen,
+    allergiesCount,
+    bodyHasValues,
+    isAllergiesStage,
+    isBodyStage,
+    isCalorieStage,
+    calorieTarget,
+  ]);
+
+  const nextButtonLabel = useMemo(
+    () => (hasSelection ? "Next" : "Skip for now"),
+    [hasSelection]
+  );
+
+  const optionItems = useMemo(() => {
+    if (!currentPreferenceScreen) return [];
+    return currentPreferenceScreen.options.map((option) => {
+      const isSelected = currentPreferenceScreen.singleSelect
+        ? currentPreferenceScreen.selectedValues[0] === option.id
+        : currentPreferenceScreen.selectedValues.includes(option.id);
+      return {
+        id: option.id,
+        label: option.label,
+        isSelected,
+        scale: getOptionScale(option.id),
+      };
+    });
+  }, [currentPreferenceScreen, getOptionScale]);
+
+  const allergyItems = useMemo(
+    () =>
+      allergies.map((allergy, index) => ({
+        key: `${allergy}-${index}`,
+        allergy,
+        index,
+      })),
+    [allergies]
+  );
+
+  const allergyLookup = useMemo(
+    () => new Set(allergies.map((item) => item.toLowerCase())),
+    [allergies]
+  );
+
+  const commonAllergyChips = useMemo(
+    () =>
+      COMMON_ALLERGIES.map((label) => ({
+        label,
+        isSelected: allergyLookup.has(label.toLowerCase()),
+      })),
+    [allergyLookup]
+  );
+  const nextButtonStyle = useMemo(
+    () => [
+      styles.nextButtonBase,
+      hasSelection ? styles.nextButtonActive : styles.nextButtonInactive,
+    ],
+    [hasSelection]
+  );
+  const nextButtonTextStyle = useMemo(
+    () => [
+      styles.nextButtonText,
+      !hasSelection && styles.nextButtonTextInactive,
+    ],
+    [hasSelection]
+  );
+
+  const toggleOption = useCallback(
+    (id: string) => {
+      if (!currentPreferenceScreen) return;
+      animateOptionSelection(id);
+
+      if (currentPreferenceScreen.singleSelect) {
+        currentPreferenceScreen.onChange([id]);
+        return;
+      }
+
+      const currentValues = currentPreferenceScreen.selectedValues;
+      if (currentValues.includes(id)) {
+        currentPreferenceScreen.onChange(
+          currentValues.filter((value) => value !== id)
+        );
+      } else {
+        currentPreferenceScreen.onChange([...currentValues, id]);
+      }
+    },
+    [animateOptionSelection, currentPreferenceScreen]
+  );
+
+  const handleBodyInputChange = useCallback(
+    (
+      field: "age" | "height" | "weight" | "gender",
+      rawValue: string
+    ) => {
+      if (field === "gender") {
+        setBodyInformation((prev) => ({
+          ...prev,
+          gender: (rawValue as "male" | "female" | null) || null,
+        }));
+        return;
+      }
+
+      const trimmed = rawValue.trim();
+      if (!trimmed) {
+        setBodyInformation((prev) => ({ ...prev, [field]: null }));
+        setBodyErrors((prev) => ({ ...prev, [field]: null }));
+        return;
+      }
+
+      const numeric = Number(trimmed);
+      if (Number.isNaN(numeric)) {
+        setBodyErrors((prev) => ({
+          ...prev,
+          [field]: "Please enter a valid number",
+        }));
+        setBodyInformation((prev) => ({ ...prev, [field]: null }));
+        return;
+      }
+
+      let error: string | null = null;
+      if (field === "age" && (numeric < 10 || numeric > 120)) {
+        error = "Age must be between 10 and 120";
+      } else if (field === "height" && (numeric < 100 || numeric > 250)) {
+        error = "Height must be between 100 cm and 250 cm";
+      } else if (field === "weight" && (numeric < 30 || numeric > 300)) {
+        error = "Weight must be between 30 kg and 300 kg";
+      }
+
+      setBodyInformation((prev) => ({ ...prev, [field]: numeric }));
+      setBodyErrors((prev) => ({ ...prev, [field]: error }));
+    },
+    []
+  );
+
+  const runStageTransition = useCallback(
+    (direction: "forward" | "backward") => {
+      if (transitionLockRef.current) return;
+      if (direction === "backward" && safeCurrentStep === 0) return;
+
+      transitionLockRef.current = true;
+      fadeAnim.stopAnimation();
+      slideAnim.stopAnimation();
+
+      const exitToValue = direction === "forward" ? -50 : 50;
+      const enterStartValue = direction === "forward" ? 50 : -50;
+      const delta = direction === "forward" ? 1 : -1;
+
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: exitToValue,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setCurrentStep((prev) => clampStep(prev + delta));
+        slideAnim.setValue(enterStartValue);
+        fadeAnim.setValue(0);
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          transitionLockRef.current = false;
+        });
+      });
+    },
+    [clampStep, fadeAnim, safeCurrentStep, slideAnim]
+  );
+
+  const handleNext = useCallback(async () => {
+    const stage = currentStageKey;
+
+    if (stage === "body" && bodyHasInvalidEntries) {
+      alert("Please fix the highlighted body information before continuing.");
       return;
     }
 
-    if (state.includes(id)) {
-      setState(state.filter((item: string) => item !== id));
-    } else {
-      setState([...state, id]);
-    }
-  };
+    if (stage === "calories") {
+      if (calorieTarget === null) {
+        alert("Please set your calorie target before continuing.");
+        return;
+      }
+      if (isSavingRef.current) {
+        return;
+      }
 
-  const handleNext = async () => {
-    if (isCalorieStep) {
-      // Submit all preferences
+      isSavingRef.current = true;
       try {
-        const allDietCodes = [
-          ...dietaryPreferences,
-          ...lifestylePreferences,
-          ...culturalPreferences,
-          ...otherRestrictions,
-          ...medicalRestrictions,
-        ];
+        const preferenceCodes = [...culturalLifestylePreferences];
+        const allergyCodes = allergies.map((allergy) =>
+          `allergy-${allergy.toLowerCase().replace(/\s+/g, "-")}`
+        );
 
-        // Convert allergies to a format the backend can use
-        // For now, we'll store them as part of diet_codes with a prefix
-        const allergyDietCodes = allergies.map(allergy => `allergy-${allergy.toLowerCase().replace(/\s+/g, '-')}`);
-
-        console.log("Submitting preferences:", {
-          diet_codes: [...allDietCodes, ...allergyDietCodes],
-          allergen_ingredient_ids: [],
-          disliked_ingredient_ids: [],
-          goal: goal,
-          calorie_target: parseInt(calorieTarget) || 2200,
-          allergies: allergies, // Store raw allergies list
+        await updateUserInfo({
+          age: bodyInformation.age,
+          height: bodyInformation.height,
+          weight: bodyInformation.weight,
+          gender: bodyInformation.gender,
         });
 
         const result = await setPrefrences({
-          diet_codes: [...allDietCodes, ...allergyDietCodes],
+          diet_codes: [...preferenceCodes, ...allergyCodes],
           allergen_ingredient_ids: [],
           disliked_ingredient_ids: [],
           goal: goal,
-          calorie_target: parseInt(calorieTarget) || 2200,
+          calorie_target: calorieTarget ?? 0,
         });
 
         if (result.ok) {
-          console.log("Preferences saved successfully!");
           if (fromProfile === "true") {
             router.replace("/(home)/profile");
           } else {
             router.replace("/(user)/getLocation");
           }
         } else {
-          alert(`Error: ${result.message}`);
-          console.log(result);
+          alert(
+            "Something went wrong while saving your preferences. Please try again."
+          );
         }
       } catch (error) {
         console.error("Error saving preferences:", error);
-        alert("Failed to save preferences. Please try again.");
+        alert(
+          "Something went wrong while saving your preferences. Please try again."
+        );
+      } finally {
+        isSavingRef.current = false;
       }
-    } else if (isLastStep) {
-      // Go to calorie target screen
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: -50,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setCurrentStep(currentStep + 1);
-        slideAnim.setValue(50);
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    } else {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: -50,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setCurrentStep(currentStep + 1);
-        slideAnim.setValue(50);
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
+      return;
     }
-  };
 
-  const handleBack = () => {
-    if (currentStep > 0) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 50,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        setCurrentStep(currentStep - 1);
-        slideAnim.setValue(-50);
-        Animated.parallel([
-          Animated.timing(fadeAnim, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnim, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      });
-    }
-  };
+    runStageTransition("forward");
+  }, [
+    allergies,
+    bodyHasInvalidEntries,
+    bodyInformation.age,
+    bodyInformation.gender,
+    bodyInformation.height,
+    bodyInformation.weight,
+    calorieTarget,
+    currentStageKey,
+    culturalLifestylePreferences,
+    fromProfile,
+    goal,
+    router,
+    runStageTransition,
+  ]);
 
-  // Allergy Management Functions
-  const addAllergy = () => {
-    const trimmed = allergyInput.trim();
+  const handleBack = useCallback(() => {
+    runStageTransition("backward");
+  }, [runStageTransition]);
+
+  const addAllergy = useCallback(() => {
+    const trimmed = normalizeAllergyValue(allergyInput);
     if (!trimmed) return;
-    
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+
     if (editingAllergyIndex !== null) {
-      // Update existing allergy
-      const updated = [...allergies];
-      updated[editingAllergyIndex] = trimmed;
-      setAllergies(updated);
-      setEditingAllergyIndex(null);
-    } else {
-      // Add new allergy
-      if (!allergies.includes(trimmed)) {
-        setAllergies([...allergies, trimmed]);
+      if (
+        editingAllergyIndex < 0 ||
+        editingAllergyIndex >= allergies.length
+      ) {
+        setEditingAllergyIndex(null);
+        setAllergyInput("");
+        return;
       }
-    }
-    setAllergyInput("");
-  };
 
-  const editAllergy = (index: number) => {
-    setAllergyInput(allergies[index]);
-    setEditingAllergyIndex(index);
-  };
+      if (allergyExistsInList(allergies, trimmed, editingAllergyIndex)) {
+        setAllergyInput("");
+        setEditingAllergyIndex(null);
+        return;
+      }
 
-  const deleteAllergy = (index: number) => {
-    setAllergies(allergies.filter((_, i) => i !== index));
-    if (editingAllergyIndex === index) {
-      setAllergyInput("");
+      setAllergies((prev) => {
+        if (
+          editingAllergyIndex === null ||
+          editingAllergyIndex < 0 ||
+          editingAllergyIndex >= prev.length
+        ) {
+          return prev;
+        }
+        const updated = [...prev];
+        updated[editingAllergyIndex] = trimmed;
+        return updated;
+      });
       setEditingAllergyIndex(null);
+      setAllergyInput("");
+      return;
     }
-  };
 
-  const selectCommonAllergy = (allergy: string) => {
-    if (!allergies.includes(allergy)) {
-      setAllergies([...allergies, allergy]);
+    if (allergyExistsInList(allergies, trimmed)) {
+      setAllergyInput("");
+      return;
     }
-  };
 
-  // Welcome Screen
-  if (currentStep === 0) {
+    setAllergies((prev) => [...prev, trimmed]);
+    setAllergyInput("");
+  }, [allergies, allergyInput, editingAllergyIndex]);
+
+  const editAllergy = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= allergies.length) return;
+      setAllergyInput(allergies[index]);
+      setEditingAllergyIndex(index);
+    },
+    [allergies]
+  );
+
+  const deleteAllergy = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= allergies.length) return;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setAllergies((prev) => prev.filter((_, i) => i !== index));
+      if (editingAllergyIndex === index) {
+        setAllergyInput("");
+        setEditingAllergyIndex(null);
+      }
+    },
+    [editingAllergyIndex]
+  );
+
+  const selectCommonAllergy = useCallback(
+    (allergy: string) => {
+      const trimmed = normalizeAllergyValue(allergy);
+      if (!trimmed || allergyExistsInList(allergies, trimmed)) return;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      setAllergies((prev) => [...prev, trimmed]);
+    },
+    [allergies]
+  );
+
+  useEffect(() => {
+    return () => {
+      fadeAnim.stopAnimation();
+      slideAnim.stopAnimation();
+      progressAnim.stopAnimation();
+      Object.values(optionScaleRefs.current).forEach((value) => {
+        value.stopAnimation && value.stopAnimation();
+      });
+    };
+  }, [fadeAnim, slideAnim, progressAnim]);
+
+  useEffect(() => {
+    Animated.timing(progressAnim, {
+      toValue: currentProgressIndex,
+      duration: 240,
+      useNativeDriver: false,
+    }).start();
+    return () => {
+      progressAnim.stopAnimation();
+    };
+  }, [currentProgressIndex, progressAnim]);
+
+  const renderProgressBar = useCallback(
+    () => (
+      <View style={styles.progressContainer}>
+        {progressStages.map((stage, index) => (
+          <ProgressDot key={stage} index={index} progressAnim={progressAnim} />
+        ))}
+      </View>
+    ),
+    [progressAnim, progressStages]
+  );
+
+  const renderNextButton = useCallback(
+    (label?: string) => (
+      <TouchableOpacity
+        style={nextButtonStyle}
+        onPress={handleNext}
+        activeOpacity={0.9}
+      >
+        <Text style={nextButtonTextStyle}>{label ?? nextButtonLabel}</Text>
+      </TouchableOpacity>
+    ),
+    [handleNext, nextButtonLabel, nextButtonStyle, nextButtonTextStyle]
+  );
+
+  if (currentStageKey === "welcome") {
     return (
       <View style={styles.container}>
         <View style={styles.welcomeContainer}>
-          {fromProfile === "true" ? (
+          {fromProfile === "true" && (
             <TouchableOpacity
               style={styles.backButton}
               onPress={() => router.replace("/(home)/profile")}
-              activeOpacity={0.6}
             >
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
-          ) : null}
+          )}
           <Text style={styles.welcomeTitle}>
             Now let's{"\n"}set up{"\n"}your{"\n"}preferences
           </Text>
-
           <View style={styles.logoContainer}>
             <Image
               source={require("../../assets/images/logo.png")}
@@ -340,9 +702,8 @@ const OnboardingPreferences = () => {
               resizeMode="contain"
             />
           </View>
-
           <TouchableOpacity
-            style={styles.nextButton}
+            style={[styles.nextButtonBase, styles.nextButtonActive]}
             onPress={handleNext}
             activeOpacity={0.9}
           >
@@ -353,8 +714,51 @@ const OnboardingPreferences = () => {
     );
   }
 
-  // Allergies Screen (Step 1)
-  if (currentStep === 1) {
+  if (currentPreferenceScreen) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={handleBack}
+            activeOpacity={0.6}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+
+          <Animated.View
+            style={{
+              opacity: fadeAnim,
+              transform: [{ translateX: slideAnim }],
+            }}
+          >
+            <Text style={styles.title}>{currentPreferenceScreen.title}</Text>
+            {renderProgressBar()}
+
+            <View style={styles.optionsContainer}>
+              {optionItems.map((option) => (
+                <PreferenceOptionItem
+                  key={option.id}
+                  id={option.id}
+                  label={option.label}
+                  isSelected={option.isSelected}
+                  scale={option.scale}
+                  onSelect={toggleOption}
+                />
+              ))}
+            </View>
+          </Animated.View>
+
+          {renderNextButton()}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  if (isAllergiesStage) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -376,11 +780,11 @@ const OnboardingPreferences = () => {
             }}
           >
             <Text style={styles.title}>Food Allergies</Text>
+            {renderProgressBar()}
             <Text style={styles.subtitle}>
               Let us know about any food allergies you have
             </Text>
 
-            {/* Custom Input */}
             <View style={styles.allergyInputSection}>
               <Text style={styles.sectionLabel}>Add Custom Allergy</Text>
               <View style={styles.inputRow}>
@@ -400,7 +804,7 @@ const OnboardingPreferences = () => {
                   ]}
                   onPress={addAllergy}
                   disabled={!allergyInput.trim()}
-                  activeOpacity={0.7}
+                  activeOpacity={0.8}
                 >
                   <Text style={styles.addButtonText}>
                     {editingAllergyIndex !== null ? "Update" : "Add"}
@@ -409,84 +813,48 @@ const OnboardingPreferences = () => {
               </View>
             </View>
 
-            {/* User's Allergies List */}
             {allergies.length > 0 && (
               <View style={styles.allergiesListSection}>
                 <Text style={styles.sectionLabel}>Your Allergies</Text>
                 <View style={styles.allergiesList}>
-                  {allergies.map((allergy, index) => (
-                    <View
-                      key={index}
-                      style={[
-                        styles.allergyTag,
-                        editingAllergyIndex === index && styles.allergyTagEditing,
-                      ]}
-                    >
-                      <Text style={styles.allergyTagText}>{allergy}</Text>
-                      <View style={styles.allergyActions}>
-                        <TouchableOpacity
-                          onPress={() => editAllergy(index)}
-                          style={styles.allergyActionButton}
-                          activeOpacity={0.6}
-                        >
-                          <Text style={styles.allergyEditIcon}>✎</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => deleteAllergy(index)}
-                          style={styles.allergyActionButton}
-                          activeOpacity={0.6}
-                        >
-                          <Text style={styles.allergyDeleteIcon}>×</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
+                  {allergyItems.map(({ key, allergy, index }) => (
+                    <AllergyTag
+                      key={key}
+                      index={index}
+                      label={allergy}
+                      isEditing={editingAllergyIndex === index}
+                      onEdit={editAllergy}
+                      onDelete={deleteAllergy}
+                    />
                   ))}
                 </View>
               </View>
             )}
 
-            {/* Common Allergies Quick Select */}
             <View style={styles.commonAllergiesSection}>
-              <Text style={styles.sectionLabel}>Common Allergies (Tap to Add)</Text>
+              <Text style={styles.sectionLabel}>
+                Common Allergies (Tap to add)
+              </Text>
               <View style={styles.commonAllergiesGrid}>
-                {commonAllergies.map((allergy) => (
-                  <TouchableOpacity
-                    key={allergy}
-                    style={[
-                      styles.commonAllergyChip,
-                      allergies.includes(allergy) && styles.commonAllergyChipSelected,
-                    ]}
-                    onPress={() => selectCommonAllergy(allergy)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.commonAllergyText,
-                        allergies.includes(allergy) && styles.commonAllergyTextSelected,
-                      ]}
-                    >
-                      {allergy}
-                    </Text>
-                  </TouchableOpacity>
+                {commonAllergyChips.map(({ label, isSelected }) => (
+                  <CommonAllergyChip
+                    key={label}
+                    label={label}
+                    selected={isSelected}
+                    onSelect={selectCommonAllergy}
+                  />
                 ))}
               </View>
             </View>
           </Animated.View>
 
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={handleNext}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.nextButtonText}>Next</Text>
-          </TouchableOpacity>
+          {renderNextButton()}
         </ScrollView>
       </View>
     );
   }
 
-  // Calorie Target Screen
-  if (isCalorieStep) {
+  if (isBodyStage) {
     return (
       <View style={styles.container}>
         <ScrollView
@@ -500,73 +868,30 @@ const OnboardingPreferences = () => {
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-
-          <Animated.View
-            style={{
-              opacity: fadeAnim,
-              transform: [{ translateX: slideAnim }],
-            }}
-          >
-            <Text style={styles.title}>Daily Calorie Target</Text>
-
-            <View style={styles.calorieCard}>
-              <View style={styles.calorieIconContainer}>
-                <Text style={styles.calorieIcon}>🎯</Text>
-              </View>
-
-              <Text style={styles.calorieSubtitle}>
-                Set your daily calorie goal{"\n"}or use the default (2200 cal)
-              </Text>
-
-              <View
-                style={[
-                  styles.calorieInputContainer,
-                  focusedCalorie && styles.calorieInputFocused,
-                ]}
-              >
-                <TextInput
-                  style={styles.calorieInput}
-                  placeholder="2200"
-                  placeholderTextColor="#B0B0B0"
-                  value={calorieTarget}
-                  onChangeText={setCalorieTarget}
-                  onFocus={() => setFocusedCalorie(true)}
-                  onBlur={() => setFocusedCalorie(false)}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.calorieUnit}>cal/day</Text>
-              </View>
-
-              <Text style={styles.calorieHint}>
-                💡 Recommended: 1800-2400 calories per day
-              </Text>
-            </View>
-          </Animated.View>
-
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={handleNext}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.nextButtonText}>Complete Setup</Text>
-          </TouchableOpacity>
+          {renderProgressBar()}
+          <BasicBodyInformationScreen
+            age={bodyInformation.age}
+            height={bodyInformation.height}
+            weight={bodyInformation.weight}
+            gender={bodyInformation.gender}
+            ageError={bodyErrors.age}
+            heightError={bodyErrors.height}
+            weightError={bodyErrors.weight}
+            onChange={handleBodyInputChange}
+          />
+          {renderNextButton()}
         </ScrollView>
       </View>
     );
   }
 
-  // Regular Preference Screens
-  if (!currentScreen) {
-    return null; // Safety check
-  }
-
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {currentStep > 1 && (
+  if (isCalorieStage) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           <TouchableOpacity
             style={styles.backButton}
             onPress={handleBack}
@@ -574,67 +899,29 @@ const OnboardingPreferences = () => {
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
-        )}
+          {renderProgressBar()}
+          <RecommendedCaloriesScreen
+            age={bodyInformation.age}
+            height={bodyInformation.height}
+            weight={bodyInformation.weight}
+            gender={bodyInformation.gender}
+            goal={goal}
+            calorieTarget={calorieTarget}
+            onCalorieTargetChange={handleCalorieTargetChange}
+          />
+          {renderNextButton("Complete Setup")}
+        </ScrollView>
+      </View>
+    );
+  }
 
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateX: slideAnim }],
-          }}
-        >
-          <Text style={styles.title}>{currentScreen.title}</Text>
-
-          <View style={styles.progressContainer}>
-            {screens.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressDot,
-                  currentStep - 2 === index && styles.progressDotActive,
-                ]}
-              />
-            ))}
-          </View>
-
-          <View style={styles.optionsContainer}>
-            {currentScreen.options.map((option) => (
-              <TouchableOpacity
-                key={option.id}
-                style={styles.optionItem}
-                onPress={() => toggleOption(option.id)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.optionLabel}>{option.label}</Text>
-                <View style={styles.radioOuter}>
-                  {(currentStep === 7
-                    ? goal === option.id
-                    : currentScreen.state.includes(option.id)) && (
-                    <View style={styles.radioInner} />
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Animated.View>
-
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={handleNext}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.nextButtonText}>
-            {isLastStep ? "Next" : "Next"}
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
+  return null;
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.background,
     paddingTop: 40,
   },
   welcomeContainer: {
@@ -647,7 +934,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 36,
     fontWeight: "700",
-    color: "#111111",
+    color: COLORS.dark,
     lineHeight: 44,
   },
   logoContainer: {
@@ -660,201 +947,176 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 20,
     paddingBottom: 40,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F7F8FA",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.lightGray,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 24,
   },
   backIcon: {
     fontSize: 20,
-    color: "#111111",
+    color: COLORS.dark,
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#111111",
+    color: COLORS.dark,
     textAlign: "center",
-    marginBottom: 24,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: COLORS.muted,
+    textAlign: "center",
+    marginBottom: 16,
   },
   progressContainer: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 8,
-    marginBottom: 30,
+    marginBottom: 24,
   },
   progressDot: {
-    width: 50,
-    height: 3,
-    backgroundColor: "#E0E0E0",
+    width: 48,
+    height: 4,
     borderRadius: 2,
-  },
-  progressDotActive: {
-    backgroundColor: "#FF8C00",
+    backgroundColor: "#E0E0E0",
   },
   optionsContainer: {
-    marginBottom: 40,
+    marginBottom: 32,
+    gap: 12,
   },
   optionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#F7F8FA",
-    borderRadius: 12,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 16,
     paddingHorizontal: 20,
     paddingVertical: 18,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#EEEFF3",
+    borderColor: COLORS.border,
+  },
+  optionItemSelected: {
+    borderColor: COLORS.orange,
+    backgroundColor: "#FFF4EC",
   },
   optionLabel: {
     fontSize: 16,
-    color: "#111111",
-    fontWeight: "400",
+    color: COLORS.dark,
+    fontWeight: "500",
+  },
+  optionLabelSelected: {
+    color: COLORS.orange,
   },
   radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 25,
+    height: 25,
+    borderRadius: 13,
     borderWidth: 2,
-    borderColor: "#00C853",
+    borderColor: COLORS.green,
     justifyContent: "center",
     alignItems: "center",
+  },
+  radioOuterActive: {
+    borderColor: COLORS.orange,
   },
   radioInner: {
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: "#00C853",
+    backgroundColor: COLORS.orange,
   },
-  nextButton: {
-    backgroundColor: "#00C853",
-    borderRadius: 12,
+  nextButtonBase: {
+    borderRadius: 14,
     paddingVertical: 18,
     justifyContent: "center",
     alignItems: "center",
     marginTop: 20,
+  },
+  nextButtonActive: {
+    backgroundColor: COLORS.green,
+    shadowColor: COLORS.green,
+    shadowOpacity: 0.2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  nextButtonInactive: {
+    backgroundColor: COLORS.orange,
+    shadowColor: COLORS.orange,
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 8,
+    elevation: 2,
   },
   nextButtonText: {
     fontSize: 18,
     fontWeight: "600",
     color: "#FFFFFF",
   },
-  calorieCard: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: 20,
-    padding: 30,
-    alignItems: "center",
-    marginBottom: 30,
+  nextButtonTextInactive: {
+    color: "#FFFFFF",
   },
-  calorieIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#E8F8F2",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  calorieIcon: {
-    fontSize: 40,
-  },
-  calorieSubtitle: {
-    fontSize: 16,
-    color: "#666666",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 30,
-  },
-  calorieInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: "#EEEFF3",
-    width: "100%",
-    marginBottom: 20,
-  },
-  calorieInputFocused: {
-    borderColor: "#00C853",
-  },
-  calorieInput: {
-    flex: 1,
-    fontSize: 32,
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-  },
-  calorieUnit: {
-    fontSize: 16,
-    color: "#666666",
-    fontWeight: "600",
-  },
-  calorieHint: {
-    fontSize: 14,
-    color: "#888888",
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#666666",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  // Allergy Management Styles
   allergyInputSection: {
-    marginBottom: 24,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 32,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   sectionLabel: {
     fontSize: 14,
+    color: COLORS.muted,
     fontWeight: "600",
-    color: "#111111",
     marginBottom: 12,
   },
   inputRow: {
     flexDirection: "row",
-    gap: 8,
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
   },
   allergyInput: {
     flex: 1,
-    backgroundColor: "#F7F8FA",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
     fontSize: 16,
-    color: "#111111",
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
+    color: COLORS.dark,
   },
   addButton: {
-    backgroundColor: "#00A86B",
-    borderRadius: 12,
-    paddingHorizontal: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 80,
+    backgroundColor: COLORS.green,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    marginLeft: 10,
   },
   addButtonDisabled: {
-    backgroundColor: "#D1D5DB",
-    opacity: 0.6,
+    backgroundColor: "#B0EAC0",
   },
   addButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
     color: "#FFFFFF",
+    fontWeight: "600",
+    fontSize: 14,
   },
   allergiesListSection: {
-    marginBottom: 24,
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+    marginBottom: 30,
   },
   allergiesList: {
     gap: 10,
@@ -863,73 +1125,214 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#FFF5F0",
+    backgroundColor: COLORS.lightGray,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: "#FD8100",
+    borderColor: COLORS.border,
   },
   allergyTagEditing: {
-    backgroundColor: "#E8F8F2",
-    borderColor: "#00A86B",
+    borderColor: COLORS.orange,
   },
   allergyTagText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111111",
-    flex: 1,
+    fontSize: 14,
+    color: COLORS.dark,
+    fontWeight: "500",
   },
   allergyActions: {
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
   },
   allergyActionButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.background,
     justifyContent: "center",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   allergyEditIcon: {
+    color: COLORS.green,
     fontSize: 16,
-    color: "#00A86B",
   },
   allergyDeleteIcon: {
-    fontSize: 22,
-    color: "#FF4444",
-    fontWeight: "600",
+    color: "#FF3B30",
+    fontSize: 18,
+    fontWeight: "700",
   },
   commonAllergiesSection: {
-    marginBottom: 24,
+    backgroundColor: COLORS.background,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 20,
+    marginBottom: 30,
   },
   commonAllergiesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 10,
   },
   commonAllergyChip: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: 20,
-    paddingHorizontal: 16,
     paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: COLORS.lightGray,
     borderWidth: 1,
-    borderColor: "#EEEFF3",
+    borderColor: COLORS.border,
   },
   commonAllergyChipSelected: {
-    backgroundColor: "#E8F8F2",
-    borderColor: "#00A86B",
+    backgroundColor: "#FFF4EC",
+    borderColor: COLORS.orange,
   },
   commonAllergyText: {
     fontSize: 14,
+    color: COLORS.chipText,
     fontWeight: "500",
-    color: "#666666",
   },
   commonAllergyTextSelected: {
-    color: "#00A86B",
-    fontWeight: "600",
+    color: COLORS.orange,
   },
 });
+
+type PreferenceOptionItemProps = {
+  id: string;
+  label: string;
+  isSelected: boolean;
+  scale: Animated.Value;
+  onSelect: (id: string) => void;
+};
+
+const PreferenceOptionItem = React.memo(
+  ({ id, label, isSelected, scale, onSelect }: PreferenceOptionItemProps) => {
+    const handlePress = useCallback(() => onSelect(id), [id, onSelect]);
+
+    return (
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <TouchableOpacity
+          style={[
+            styles.optionItem,
+            isSelected && styles.optionItemSelected,
+          ]}
+          onPress={handlePress}
+          activeOpacity={0.85}
+        >
+          <Text
+            style={[
+              styles.optionLabel,
+              isSelected && styles.optionLabelSelected,
+            ]}
+          >
+            {label}
+          </Text>
+          <View
+            style={[
+              styles.radioOuter,
+              isSelected && styles.radioOuterActive,
+            ]}
+          >
+            {isSelected && <View style={styles.radioInner} />}
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  }
+);
+
+type AllergyTagProps = {
+  index: number;
+  label: string;
+  isEditing: boolean;
+  onEdit: (index: number) => void;
+  onDelete: (index: number) => void;
+};
+
+const AllergyTag = React.memo(
+  ({ index, label, isEditing, onEdit, onDelete }: AllergyTagProps) => {
+    const handleEdit = useCallback(() => onEdit(index), [index, onEdit]);
+    const handleDelete = useCallback(() => onDelete(index), [index, onDelete]);
+
+    return (
+      <View
+        style={[
+          styles.allergyTag,
+          isEditing && styles.allergyTagEditing,
+        ]}
+      >
+        <Text style={styles.allergyTagText}>{label}</Text>
+        <View style={styles.allergyActions}>
+          <TouchableOpacity
+            onPress={handleEdit}
+            style={styles.allergyActionButton}
+          >
+            <Text style={styles.allergyEditIcon}>✎</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleDelete}
+            style={styles.allergyActionButton}
+          >
+            <Text style={styles.allergyDeleteIcon}>×</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+);
+
+type CommonAllergyChipProps = {
+  label: string;
+  selected: boolean;
+  onSelect: (value: string) => void;
+};
+
+const CommonAllergyChip = React.memo(
+  ({ label, selected, onSelect }: CommonAllergyChipProps) => {
+    const handleSelect = useCallback(() => onSelect(label), [label, onSelect]);
+    return (
+      <TouchableOpacity
+        style={[
+          styles.commonAllergyChip,
+          selected && styles.commonAllergyChipSelected,
+        ]}
+        onPress={handleSelect}
+        activeOpacity={0.8}
+      >
+        <Text
+          style={[
+            styles.commonAllergyText,
+            selected && styles.commonAllergyTextSelected,
+          ]}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+);
+
+type ProgressDotProps = {
+  index: number;
+  progressAnim: Animated.Value;
+};
+
+const ProgressDot = React.memo(
+  ({ index, progressAnim }: ProgressDotProps) => (
+    <Animated.View
+      style={[
+        styles.progressDot,
+        {
+          backgroundColor: progressAnim.interpolate({
+            inputRange: [index - 0.5, index + 0.5],
+            outputRange: ["#E0E0E0", COLORS.orange],
+            extrapolate: "clamp",
+          }),
+        },
+      ]}
+    />
+  )
+);
 
 export default OnboardingPreferences;

@@ -105,6 +105,103 @@ export async function deletePantryItem(itemId: number): Promise<void> {
     throw new Error(`Delete pantry item failed (${res.status}): ${text}`);
   }
 }
+
+type PantryMergeItem = PantryItem & {
+  name?: string | null;
+  amount?: number | string | null;
+};
+
+const normalizePantryItemName = (name?: string | null) =>
+  (name ?? "").toString().trim().toLowerCase();
+
+const resolveItemName = (item?: PantryMergeItem | null) =>
+  normalizePantryItemName(item?.ingredient_name ?? item?.name ?? "");
+
+const parseQuantityValue = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return 0;
+};
+
+export type UpsertPantryItemOptions = {
+  existingItems?: PantryMergeItem[];
+  strategy?: "increment" | "replace";
+};
+
+export type UpsertPantryItemResult = {
+  item: PantryItem;
+  merged: boolean;
+  snapshot: PantryMergeItem[];
+};
+
+export async function upsertPantryItemByName(
+  input: CreatePantryItemInput,
+  options: UpsertPantryItemOptions = {}
+): Promise<UpsertPantryItemResult> {
+  const normalizedIncoming = normalizePantryItemName(input.ingredient_name);
+  if (!normalizedIncoming) {
+    throw new Error("Ingredient name is required to add pantry items.");
+  }
+
+  const snapshot: PantryMergeItem[] = options.existingItems
+    ? [...options.existingItems]
+    : await listMyPantryItems();
+
+  const matchIndex = snapshot.findIndex(
+    (item) => resolveItemName(item) === normalizedIncoming
+  );
+
+  if (matchIndex >= 0) {
+    const match = snapshot[matchIndex];
+    const matchId = Number(match?.id);
+
+    if (Number.isFinite(matchId)) {
+      const baseQuantity =
+        parseQuantityValue(match.quantity ?? match.amount ?? 0) ?? 0;
+      const incomingQuantity = parseQuantityValue(input.quantity ?? 0);
+      const delta =
+        options.strategy === "replace"
+          ? incomingQuantity
+          : baseQuantity + incomingQuantity;
+      const nextQuantity = Number.isFinite(delta) ? delta : baseQuantity;
+
+      const updatePayload: UpdatePantryItemInput = {
+        name:
+          match.ingredient_name ??
+          match.name ??
+          input.ingredient_name ??
+          undefined,
+        quantity: nextQuantity,
+        unit: input.unit ?? match.unit ?? null,
+        category: input.category ?? match.category ?? null,
+      };
+
+      if (Object.prototype.hasOwnProperty.call(input, "expires_at")) {
+        updatePayload.expires_at = input.expires_at ?? null;
+      }
+
+      const updated = await updatePantryItem(matchId, updatePayload);
+      snapshot[matchIndex] = {
+        ...match,
+        ...updated,
+        quantity: nextQuantity,
+        unit: updated.unit ?? updatePayload.unit ?? match.unit,
+        category: updated.category ?? updatePayload.category ?? match.category,
+      };
+
+      return { item: updated, merged: true, snapshot };
+    }
+  }
+
+  const created = await createMyPantryItem(input);
+  snapshot.push(created);
+  return { item: created, merged: false, snapshot };
+}
 /*export async function GetItemByBarcode(barcode_number: any) {
   try {
     const res = await fetch(

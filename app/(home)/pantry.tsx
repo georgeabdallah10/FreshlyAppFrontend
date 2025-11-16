@@ -5,10 +5,10 @@ import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
 import {
-    createMyPantryItem,
     deletePantryItem,
     listMyPantryItems,
     updatePantryItem,
+    upsertPantryItemByName,
 } from "@/src/user/pantry";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
@@ -455,10 +455,12 @@ const PantryDashboard = () => {
 
       const expiresAtValue = buildExpiresAt();
 
+      const normalizedQty = qtyStr === "" ? undefined : qty;
+
       if (editingItemId != null) {
         const updatePayload: any = {
           name,
-          quantity: qty,
+          quantity: normalizedQty ?? null,
           category: newProductCategory || null,
           unit: newProductUnit || null,
         };
@@ -468,14 +470,17 @@ const PantryDashboard = () => {
         await updatePantryItem(Number(editingItemId), updatePayload);
         showToast("success", "Item updated.");
       } else {
-        await createMyPantryItem({
+        const result = await upsertPantryItemByName({
           ingredient_name: name,
-          quantity: qty,
+          quantity: normalizedQty,
           category: newProductCategory || null,
           expires_at: expiresAtValue ?? null,
           unit: newProductUnit || null,
         });
-        showToast("success", "Item added to pantry.");
+        showToast(
+          "success",
+          result.merged ? "Item quantity updated in pantry." : "Item added to pantry."
+        );
       }
 
       await refreshList();
@@ -1176,16 +1181,19 @@ const PantryDashboard = () => {
               setNewProductCategory(payload.category || "");
 
               setCurrentScannedProduct(payload);
-              await createMyPantryItem({
+              const mergeResult = await upsertPantryItemByName({
                 ingredient_name: payload.ingredient_name,
-                quantity: payload.quantity,
-                expires_at: payload.expires_at,
+                quantity: payload.quantity ?? undefined,
+                expires_at: payload.expires_at ?? null,
                 category: payload.category,
                 unit: (payload as any).unit || null,
               });
               await refreshList();
               console.log("Approved product payload:", payload);
-              showToast("success", "Item added from scan.");
+              showToast(
+                "success",
+                mergeResult.merged ? "Item quantity updated from scan." : "Item added from scan."
+              );
             }}
             onCancel={() => {
               setConfirmVisible(false);

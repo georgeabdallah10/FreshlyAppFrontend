@@ -1,6 +1,7 @@
 import { queryClient } from '@/src/config/queryClient';
 import SplashScreen from "@/components/loadingpage";
 import { UserProvider } from "@/context/usercontext";
+import { FamilyProvider } from "@/context/familycontext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
     DarkTheme,
@@ -39,9 +40,11 @@ if (showSplash) {
       <StatusBar hidden={true} />
       <QueryClientProvider client={queryClient}>
         <UserProvider>
-          <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-            <Slot /> 
-          </ThemeProvider>
+          <FamilyProvider>
+            <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+              <Slot /> 
+            </ThemeProvider>
+          </FamilyProvider>
         </UserProvider>
       </QueryClientProvider>
     </>

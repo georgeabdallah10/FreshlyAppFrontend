@@ -875,49 +875,6 @@ const PantryDashboard = () => {
         </View>
       )}
 
-      {isFamilyScope && (
-        <View style={styles.familySelectorContainer}>
-          {familiesLoading ? (
-            <View style={styles.familyLoadingRow}>
-              <ActivityIndicator size="small" color={COLORS.primary} />
-              <Text style={styles.familyLoadingText}>Loading families…</Text>
-            </View>
-          ) : families.length === 0 ? (
-            <Text style={styles.familySelectorHint}>
-              Join or create a family to start sharing pantry items.
-            </Text>
-          ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.familyPillRow}
-            >
-              {families.map((family) => {
-                const isActive = contextFamilyId === family.id;
-                return (
-                  <TouchableOpacity
-                    key={family.id}
-                    style={[
-                      styles.familyPill,
-                      isActive && styles.familyPillActive,
-                    ]}
-                    onPress={() => setContextFamilyId(family.id)}
-                  >
-                    <Text
-                      style={[
-                        styles.familyPillText,
-                        isActive && styles.familyPillTextActive,
-                      ]}
-                    >
-                      {family.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
-        </View>
-      )}
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>

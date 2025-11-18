@@ -2,10 +2,10 @@
 import MemberView from "@/components/familyMangment/MemberView";
 import OwnerView from "@/components/familyMangment/OwnerView";
 import { useUser } from "@/context/usercontext";
+import { useFamilyContext } from "@/context/familycontext";
 import {
   leaveFamily,
   listFamilyMembers,
-  listMyFamilies,
   regenerateInviteCode,
   removeFamilyMember,
 } from "@/src/user/family";
@@ -14,7 +14,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import FamilyMemberFlow from "../(auth)/familyAuth";
 
-type UserRole = "owner" | "member" | "user";
+type UserRole = "owner" | "admin" | "member" | "user";
 type MemberStatus = "active" | "pending" | "inactive";
 
 export interface FamilyMember {
@@ -25,6 +25,7 @@ export interface FamilyMember {
   status: MemberStatus;
   role: UserRole;
   joinedAt: string;
+  avatar_path?: string | null;
 }
 
 export interface FamilyData {
@@ -38,40 +39,43 @@ export interface FamilyData {
 const FamilyManagementScreen = () => {
   const router = useRouter();
   const {user} = useUser();
+  const {
+    families,
+    loading: familiesLoading,
+    selectedFamily,
+    setSelectedFamilyId,
+    refreshFamilies,
+  } = useFamilyContext();
   
   const [isLoading, setIsLoading] = useState(true);
-  const [currentUserRole, setCurrentUserRole] = useState(user?.status);
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole>("user");
   const [currentUserId, setCurrentUserId] = useState<string>(user?.id ? String(user.id) : "");
-  const [familyData, setFamilyData] = useState<FamilyData | null>(null);
   const [members, setMembers] = useState<FamilyMember[]>([]);
 
-  useEffect(() => {
-    fetchUserRoleAndFamily();
-  }, []);
+  const familyData: FamilyData | null = selectedFamily
+    ? {
+        id: selectedFamily.id,
+        name: selectedFamily.name,
+        inviteCode: selectedFamily.inviteCode,
+        createdAt: selectedFamily.createdAt,
+        memberCount: members.length || selectedFamily.memberCount,
+      }
+    : null;
 
-  const fetchUserRoleAndFamily = async () => {
-    try {
-      setIsLoading(true);
-      const families = await listMyFamilies();
-      if (!families || families.length === 0) {
-        setCurrentUserRole("user");
-        setFamilyData(null);
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!selectedFamily?.id) {
+        setCurrentUserRole(families.length ? "member" : "user");
         setMembers([]);
+        setIsLoading(false);
         return;
       }
-      const fam = families[0];
-      const rawMembers = await listFamilyMembers(Number(fam.id));
-      const membersList = rawMembers ?? [];
-      
-      const normalizedFamily: FamilyData = {
-        id: String(fam.id),
-        name: fam.display_name ?? fam.name ?? "My Family",
-        inviteCode: fam.invite_code ?? fam.inviteCode ?? "",
-        createdAt: fam.created_at ?? fam.createdAt ?? "",
-        memberCount: membersList.length, // Use actual members count instead of API field
-      };
-      setFamilyData(normalizedFamily);
-      const normalizedMembers: FamilyMember[] = membersList.map((m: any) => {
+      try {
+        setIsLoading(true);
+        const rawMembers = await listFamilyMembers(Number(selectedFamily.id));
+        const membersList = rawMembers ?? [];
+
+        const normalizedMembers: FamilyMember[] = membersList.map((m: any) => {
         // Try multiple paths for user data (nested object or flat structure)
         const u = m.user ?? {};
         
@@ -102,24 +106,36 @@ const FamilyManagementScreen = () => {
           status: (m.status ?? "active") as MemberStatus,
           role: (m.role ?? (m.is_owner ? "owner" : "member")) as UserRole,
           joinedAt: m.created_at ?? m.joined_at ?? "",
+          avatar_path: u.avatar_path ?? m.avatar_path ?? null,
         };
       });
-      setMembers(normalizedMembers);
-      const meRow = normalizedMembers.find((m) => m.id === String(user?.id));
-      setCurrentUserRole(meRow?.role === "owner" ? "owner" : "member");
-    } catch (error) {
-      console.error("Error fetching family data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+        setMembers(normalizedMembers);
+        const meRow = normalizedMembers.find((m) => m.id === String(user?.id));
+        if (
+          meRow?.role === "owner" ||
+          meRow?.role === "admin" ||
+          meRow?.role === "member"
+        ) {
+          setCurrentUserRole(meRow.role);
+        } else {
+          setCurrentUserRole("member");
+        }
+      } catch (error) {
+        console.error("Error fetching family data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, [families.length, selectedFamily, user?.email, user?.id, user?.name]);
 
   const handleRegenerateCode = async () => {
     if (!familyData) return;
     try {
       const updated = await regenerateInviteCode(Number(familyData.id));
       const newCode = updated?.invite_code ?? updated?.inviteCode ?? "";
-      setFamilyData((prev) => (prev ? { ...prev, inviteCode: newCode } : prev));
+      await refreshFamilies();
       return newCode;
     } catch (error) {
       console.error("Error regenerating code:", error);
@@ -161,10 +177,7 @@ const FamilyManagementScreen = () => {
         };
       });
       setMembers(normalizedMembers);
-      // Update family data with new member count
-      setFamilyData((prev) => 
-        prev ? { ...prev, memberCount: normalizedMembers.length } : prev
-      );
+      await refreshFamilies();
     } catch (error) {
       console.error("Error kicking member:", error);
       throw error;
@@ -175,9 +188,10 @@ const FamilyManagementScreen = () => {
     if (!familyData) return;
     try {
       await leaveFamily(Number(familyData.id), Number(user?.id));
-      setFamilyData(null);
       setMembers([]);
       setCurrentUserRole("user");
+      setSelectedFamilyId(null);
+      await refreshFamilies();
       router.replace("/(auth)/familyAuth");
     } catch (error) {
       console.error("Error leaving family:", error);
@@ -185,7 +199,7 @@ const FamilyManagementScreen = () => {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || familiesLoading) {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -199,18 +213,19 @@ const FamilyManagementScreen = () => {
     <View style={styles.container}>
       {currentUserRole === "owner" ? (
         <OwnerView
-          familyData={familyData!}
+          familyData={familyData ?? undefined}
           members={members}
           currentUserId={currentUserId}
           onBack={() => router.back()}
           onRegenerateCode={handleRegenerateCode}
           onKickMember={handleKickMember}
         />
-      ) : currentUserRole === "member" ?  (
+      ) : currentUserRole === "member" || currentUserRole === "admin" ?  (
         <MemberView
-          familyData={familyData!}
+          familyData={familyData ?? undefined}
           members={members}
           currentUserId={currentUserId}
+          viewerRole={currentUserRole === "admin" ? "admin" : "member"}
           onBack={() => router.back()}
           onLeaveFamily={handleLeaveFamily}
         />
@@ -220,7 +235,7 @@ const FamilyManagementScreen = () => {
           onBack={() => router.back()}
           onComplete={async () => {
             // Refresh family data after creating/joining
-            await fetchUserRoleAndFamily();
+            await refreshFamilies();
           }}
         />
       )}

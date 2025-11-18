@@ -171,17 +171,20 @@ export async function removeFamilyMember(familyId: number, userId: number) {
       } else if (res.status === 403) {
         errorMessage = "You don't have permission to remove this member.";
       } else if (res.status === 404) {
-        errorMessage = "Member not found or already removed.";
+        // Treat as already removed
+        return true;
       } else if (res.status === 429) {
         errorMessage = "Too many requests. Please wait before trying again.";
       } else if (res.status >= 500) {
         errorMessage = "Server error. Please try again later.";
-      } else if (errorText) {
+      }
+      
+      if (errorText) {
         try {
           const errorData = JSON.parse(errorText);
           errorMessage = errorData.message || errorData.detail || errorMessage;
         } catch {
-          errorMessage = errorText.substring(0, 100);
+          errorMessage = errorText.substring(0, 120) || errorMessage;
         }
       }
       
@@ -201,6 +204,61 @@ export async function removeFamilyMember(familyId: number, userId: number) {
 export async function leaveFamily(familyId: number, userId: number) {
   // Reuse same endpoint as remove — the backend will check permissions
   return await removeFamilyMember(familyId, userId);
+}
+
+// 🔁 Update a member's role
+export async function updateFamilyMemberRole(
+  familyId: number,
+  userId: number,
+  role: "owner" | "admin" | "member"
+) {
+  const headers = await getAuthHeader();
+
+  try {
+    const res = await fetch(
+      `${API_URL}/families/${familyId}/members/${userId}/role`,
+      {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ role }),
+      }
+    );
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      let errorMessage = "Failed to update member role";
+
+      if (res.status === 401) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (res.status === 403) {
+        errorMessage = "You don't have permission to change this role.";
+      } else if (res.status === 404) {
+        errorMessage = "Member not found.";
+      } else if (res.status === 429) {
+        errorMessage = "Too many requests. Please wait before trying again.";
+      } else if (res.status >= 500) {
+        errorMessage = "Server error. Please try again later.";
+      }
+
+      if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.detail || errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText.substring(0, 120) || errorMessage;
+        }
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    return await res.json();
+  } catch (error: any) {
+    if (error.message?.toLowerCase().includes("fetch")) {
+      throw new Error("Network error. Please check your internet connection.");
+    }
+    throw error;
+  }
 }
 
 // 🔁 Regenerate family invite code (admin/owner)

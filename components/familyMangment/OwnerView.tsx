@@ -1,18 +1,29 @@
 // ==================== OwnerView.tsx ====================
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
+import { useFamilyContext } from "@/context/familycontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
+import MemberActionModal from "@/components/familyMangment/MemberActionModal";
+import IconButton from "@/components/iconComponent";
 import {
   listFamilyMembers,
   regenerateInviteCode,
-  removeFamilyMember
+  removeFamilyMember,
+  updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Animated,
   Clipboard,
+  Image,
   Modal,
   ScrollView,
   Share,
@@ -25,7 +36,7 @@ import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
 
 
 interface OwnerViewProps {
-  familyData: FamilyData;
+  familyData?: FamilyData;
   members?: FamilyMember[];
   currentUserId: string;
   onBack: () => void;
@@ -43,9 +54,31 @@ const OwnerView: React.FC<OwnerViewProps> = ({
 }) => {
   const router = useRouter();
   const {user} = useUser(); // Get user context first
+  const { selectedFamily } = useFamilyContext();
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [localInviteCode, setLocalInviteCode] = useState(familyData.inviteCode);
+  const resolvedFamilyData = useMemo(() => {
+    if (familyData) return familyData;
+    if (selectedFamily) {
+      return {
+        id: selectedFamily.id,
+        name: selectedFamily.name,
+        inviteCode: selectedFamily.inviteCode,
+        createdAt: selectedFamily.createdAt,
+        memberCount: selectedFamily.memberCount,
+      } as FamilyData;
+    }
+    return null;
+  }, [familyData, selectedFamily]);
+
+  const [localInviteCode, setLocalInviteCode] = useState(
+    resolvedFamilyData?.inviteCode ?? ""
+  );
+  useEffect(() => {
+    if (resolvedFamilyData?.inviteCode) {
+      setLocalInviteCode(resolvedFamilyData.inviteCode);
+    }
+  }, [resolvedFamilyData?.inviteCode]);
 
   // Normalize raw API members to the UI shape expected here
   const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
@@ -80,21 +113,49 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         status: (m.status ?? "active") as FamilyMember["status"],
         role: (m.role ?? (m.is_owner ? "owner" : "member")) as FamilyMember["role"],
         joinedAt: m.created_at ?? m.joined_at ?? "",
+        avatar_path: u.avatar_path ?? m.avatar_path ?? null,
       } as FamilyMember;
     });
   }, [user]);
 
-  const [localMembers, setLocalMembers] = useState<FamilyMember[]>(
-    members ?? []
+  const sortMembers = useCallback((list: FamilyMember[]) => {
+    return [...list].sort((a, b) => {
+      const priority = (role: FamilyMember["role"]) => {
+        if (role === "owner") return 0;
+        if (role === "admin") return 1;
+        return 2;
+      };
+      const diff = priority(a.role) - priority(b.role);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name);
+    });
+  }, []);
+
+  const [localMembers, setLocalMembers] = useState<FamilyMember[]>(() =>
+    members ? sortMembers(members) : []
   );
   const [loadingMembers, setLoadingMembers] = useState(false);
+  const [roleActionMemberId, setRoleActionMemberId] = useState<string | null>(null);
+  const [removeActionMemberId, setRemoveActionMemberId] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
   
   // Keep local list in sync when parent provides normalized members
   useEffect(() => {
     if (members && members.length) {
-      setLocalMembers(members);
+      setLocalMembers(sortMembers(members));
     }
-  }, [members]);
+  }, [members, sortMembers]);
+
+  const ownerCount = useMemo(
+    () => localMembers.filter((member) => member.role === "owner").length,
+    [localMembers]
+  );
+
+  const canManageMember = useCallback(
+    (member: FamilyMember) => String(member.id) !== String(currentUserId),
+    [currentUserId]
+  );
   
   // Get pending meal share request count
   const { data: pendingCount = 0 } = usePendingRequestCount();
@@ -130,18 +191,19 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   };
 
   const loadMembers = useCallback(async () => {
+    if (!resolvedFamilyData?.id) return;
     try {
       setLoadingMembers(true);
-      const fetched = await listFamilyMembers(Number(familyData.id));
+      const fetched = await listFamilyMembers(Number(resolvedFamilyData.id));
       // Normalize backend shape -> UI shape
-      setLocalMembers(normalizeMembers(fetched));
+      setLocalMembers(sortMembers(normalizeMembers(fetched)));
     } catch (e) {
       console.error("Failed to load members:", e);
       showToast("error", "Couldn't load members");
     } finally {
       setLoadingMembers(false);
     }
-  }, [familyData.id, normalizeMembers]);
+  }, [normalizeMembers, resolvedFamilyData?.id, sortMembers]);
 
   useEffect(() => {
     // Load on mount and when family changes
@@ -149,21 +211,187 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   }, [loadMembers]);
 
   const apiRegenerateCode = useCallback(async (): Promise<string> => {
+    if (!resolvedFamilyData?.id) return "";
     // Backend returns FamilyOut; use snake or camel defensively
-    const fam = await regenerateInviteCode(Number(familyData.id));
+    const fam = await regenerateInviteCode(Number(resolvedFamilyData.id));
     const next = (fam as any).inviteCode ?? (fam as any).invite_code ?? "";
     return String(next);
-  }, [familyData.id]);
+  }, [resolvedFamilyData?.id]);
 
   const apiKickMember = useCallback(
     async (memberId: string) => {
-      await removeFamilyMember(Number(familyData.id), Number(memberId));
+      if (!resolvedFamilyData?.id) return;
+      await removeFamilyMember(Number(resolvedFamilyData.id), Number(memberId));
     },
-    [familyData.id]
+    [resolvedFamilyData?.id]
   );
 
   const runRegenerateCode = onRegenerateCode ?? apiRegenerateCode;
   const runKickMember = onKickMember ?? apiKickMember;
+  const mapMembership = useCallback(
+    (entry: any) => normalizeMembers(entry ? [entry] : [])[0],
+    [normalizeMembers]
+  );
+
+  const ensureOwnerCount = useCallback(
+    (member: FamilyMember, nextRole: FamilyMember["role"]) => {
+      if (!canManageMember(member)) {
+        showToast("error", "You cannot change your own role.");
+        return false;
+      }
+      if (
+        member.role === "owner" &&
+        nextRole !== "owner" &&
+        ownerCount <= 1
+      ) {
+        showToast(
+          "error",
+          "At least one owner is required. Promote another member before demoting."
+        );
+        return false;
+      }
+      return true;
+    },
+    [ownerCount, showToast]
+  );
+
+  const handleRoleChange = useCallback(
+    async (member: FamilyMember, nextRole: FamilyMember["role"]) => {
+      if (!resolvedFamilyData?.id || member.role === nextRole) return;
+      if (!ensureOwnerCount(member, nextRole)) return;
+
+      try {
+        setRoleActionMemberId(member.id);
+        const updated = await updateFamilyMemberRole(
+          Number(resolvedFamilyData.id),
+          Number(member.id),
+          nextRole as "owner" | "admin" | "member"
+        );
+        const normalized = mapMembership(updated);
+        if (normalized) {
+          setLocalMembers((prev) =>
+            sortMembers(prev.map((m) => (m.id === member.id ? normalized : m)))
+          );
+          const roleLabel =
+            nextRole === "owner"
+              ? "Owner"
+              : nextRole === "admin"
+              ? "Admin"
+              : "Member";
+          showToast(
+            "success",
+            `${member.name || "Member"} is now ${roleLabel}.`
+          );
+        } else {
+          loadMembers();
+        }
+      } catch (error: any) {
+        showToast("error", error?.message || "Failed to update role");
+      } finally {
+        setRoleActionMemberId(null);
+      }
+    },
+    [
+      resolvedFamilyData?.id,
+      ensureOwnerCount,
+      mapMembership,
+      loadMembers,
+      showToast,
+      sortMembers,
+    ]
+  );
+
+  const canRemoveMember = useCallback(
+    (member: FamilyMember) => {
+      if (!canManageMember(member)) return false;
+      if (member.role === "owner" && ownerCount <= 1) return false;
+      return true;
+    },
+    [canManageMember, ownerCount]
+  );
+
+  const handleRemoveMember = useCallback(
+    async (member: FamilyMember) => {
+      if (!resolvedFamilyData?.id) return;
+      if (!canRemoveMember(member)) {
+        showToast(
+          "error",
+          "You must keep at least one owner in the family."
+        );
+        return;
+      }
+
+      try {
+        setRemoveActionMemberId(member.id);
+        await runKickMember(member.id);
+        setLocalMembers((prev) => prev.filter((m) => m.id !== member.id));
+        showToast("success", `${member.name} has been removed from the family`);
+      } catch (error: any) {
+        showToast("error", error?.message || "Failed to remove member");
+      } finally {
+        setRemoveActionMemberId(null);
+      }
+    },
+    [resolvedFamilyData?.id, canRemoveMember, runKickMember, showToast]
+  );
+
+  const handleKickMember = useCallback(
+    (member: FamilyMember) => {
+      showToast(
+        "confirm",
+        `Are you sure you want to remove ${member.name} from the family?`,
+        "Remove Member",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+            onPress: () => setToast({ ...toast, visible: false }),
+          },
+          {
+            text: "Remove",
+            style: "destructive",
+            onPress: async () => {
+              setToast({ ...toast, visible: false });
+              await handleRemoveMember(member);
+            },
+          },
+        ]
+      );
+    },
+    [handleRemoveMember, showToast, toast]
+  );
+
+  const openActionModal = useCallback(
+    (member: FamilyMember) => {
+      if (!canManageMember(member)) return;
+      setSelectedMember(member);
+      setActionModalVisible(true);
+    },
+    [canManageMember]
+  );
+
+  const closeActionModal = useCallback(() => {
+    setSelectedMember(null);
+    setActionModalVisible(false);
+  }, []);
+
+  const handlePromoteSelected = useCallback(async () => {
+    if (!selectedMember || selectedMember.role !== "member") return;
+    await handleRoleChange(selectedMember, "admin");
+    closeActionModal();
+  }, [closeActionModal, handleRoleChange, selectedMember]);
+
+  const handleDemoteSelected = useCallback(async () => {
+    if (!selectedMember || selectedMember.role === "member") return;
+    await handleRoleChange(selectedMember, "member");
+    closeActionModal();
+  }, [closeActionModal, handleRoleChange, selectedMember]);
+
+  const handleRemoveSelected = useCallback(async () => {
+    if (!selectedMember) return;
+    closeActionModal();
+    handleKickMember(selectedMember);
+  }, [closeActionModal, handleKickMember, selectedMember]);
 
   const inviteSlideAnim = useRef(new Animated.Value(0)).current;
   const inviteFadeAnim = useRef(new Animated.Value(0)).current;
@@ -216,7 +444,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const handleShareCode = async () => {
     try {
       await Share.share({
-        message: `Join our family on Freshly!\n\nFamily: ${familyData.name}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
+        message: `Join our family on Freshly!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
       });
     } catch (error) {
       console.error("Error sharing:", error);
@@ -234,65 +462,9 @@ const OwnerView: React.FC<OwnerViewProps> = ({
     }
   };
 
-  const handleKickMember = (member: FamilyMember) => {
-    showToast(
-      "confirm",
-      `Are you sure you want to remove ${member.name} from the family?`,
-      "Remove Member",
-      [
-        { 
-          text: "Cancel", 
-          style: "cancel",
-          onPress: () => setToast({ ...toast, visible: false })
-        },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            setToast({ ...toast, visible: false });
-            try {
-              await runKickMember(member.id);
-              // Optimistically remove from UI, then refresh in background
-              setLocalMembers((prev) => prev.filter((m) => m.id !== member.id));
-              loadMembers();
-              showToast(
-                "success",
-                `${member.name} has been removed from the family`
-              );
-            } catch (error) {
-              console.error("Kick member error:", error);
-              showToast(
-                "error",
-                "Failed to remove member. Please try again."
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const getStatusColor = (status: FamilyMember["status"]) => {
-    switch (status) {
-      case "active":
-        return "#10B981";
-      case "pending":
-        return "#F59E0B";
-      case "inactive":
-        return "#EF4444";
-    }
-  };
-
-  const getStatusText = (status: FamilyMember["status"]) => {
-    switch (status) {
-      case "active":
-        return "Active";
-      case "pending":
-        return "Pending";
-      case "inactive":
-        return "Inactive";
-    }
-  };
+  if (!resolvedFamilyData) {
+    return null;
+  }
 
   return (
     <>
@@ -313,9 +485,9 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           <View style={styles.familyIconContainer}>
             <Ionicons name="home" size={32} color="#10B981" />
           </View>
-          <Text style={styles.familyName}>{familyData.name}</Text>
+          <Text style={styles.familyName}>{resolvedFamilyData?.name ?? "My Family"}</Text>
           <Text style={styles.familyMemberCount}>
-            {familyData.memberCount} Members
+            {resolvedFamilyData?.memberCount ?? localMembers.length} Members
           </Text>
 
           <View style={styles.buttonRow}>
@@ -335,58 +507,125 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           {loadingMembers ? (
             <Text style={{ color: "#9CA3AF", marginBottom: 8 }}>Loading…</Text>
           ) : null}
-          {localMembers.map((member) => (
-            <View key={member.id} style={styles.memberCard}>
-              <View style={styles.memberLeft}>
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberInitial}>
-                    {(member.name?.trim?.()?.[0] ?? "?").toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <View style={styles.memberNameRow}>
-                    <Text style={styles.memberName}>{member.name || "Unknown"}</Text>
-                    {member.role === "owner" && (
-                      <View style={styles.ownerBadge}>
-                        <Ionicons name="create" size={12} color="#F59E0B" />
-                        <Text style={styles.ownerBadgeText}>Owner</Text>
-                      </View>
+          {localMembers.map((member) => {
+            const isCurrentUser = String(member.id) === String(currentUserId);
+            const isOwner = member.role === "owner";
+            const isAdmin = member.role === "admin";
+            return (
+              <View
+                key={member.id}
+                style={[
+                  styles.memberCard,
+                  isCurrentUser && styles.currentUserCard,
+                  !isCurrentUser && isOwner && styles.ownerCardHighlight,
+                  !isCurrentUser && isAdmin && styles.adminCardHighlight,
+                ]}
+              >
+                <View style={styles.memberLeft}>
+                  <View style={styles.memberAvatar}>
+                    {member.avatar_path ? (
+                      <Image
+                        source={{ uri: member.avatar_path }}
+                        style={styles.memberImage}
+                      />
+                    ) : (
+                      <Text style={styles.memberInitial}>
+                        {(member.name?.trim?.()?.[0] ?? "?").toUpperCase()}
+                      </Text>
                     )}
                   </View>
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.email || "—"}</Text>
-                  </View>
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="call-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.phone || "—"}</Text>
-                  </View>
-                  <View style={styles.memberDetail}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: getStatusColor(member.status) },
-                      ]}
-                    />
-                    <Text style={styles.statusText}>
-                      {getStatusText(member.status)}
-                    </Text>
+                  <View style={styles.memberInfo}>
+                    <View style={styles.memberNameRow}>
+                      <Text style={styles.memberName}>
+                        {member.name || "Unknown"}
+                      </Text>
+                      {member.role === "owner" && (
+                        <View style={styles.ownerBadge}>
+                          <Ionicons name="create" size={12} color="#F59E0B" />
+                          <Text style={styles.ownerBadgeText}>Owner</Text>
+                        </View>
+                      )}
+                      {member.role === "admin" && (
+                        <View style={styles.adminBadge}>
+                          <Ionicons
+                            name="shield-checkmark"
+                            size={12}
+                            color="#2563EB"
+                          />
+                          <Text style={styles.adminBadgeText}>Admin</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.memberDetail}>
+                      <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
+                      <Text style={styles.detailText}>
+                        {member.email || "—"}
+                      </Text>
+                    </View>
+                    <View style={styles.memberDetail}>
+                      <Ionicons name="call-outline" size={14} color="#9CA3AF" />
+                      <Text style={styles.detailText}>
+                        {member.phone || "—"}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
 
-              {member.role !== "owner" && (
-                <TouchableOpacity
-                  style={styles.kickButton}
-                  onPress={() => handleKickMember(member)}
-                >
-                  <Ionicons name="close-circle" size={24} color="#EF4444" />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+                {canManageMember(member) && (
+                  <IconButton
+                    iconName="settings-outline"
+                    iconColor="#6B7280"
+                    iconSize={20}
+                    containerSize={36}
+                    backgroundColor="#F3F4F6"
+                    borderRadius={18}
+                    onPress={() => openActionModal(member)}
+                    style={styles.actionTrigger}
+                  />
+                )}
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
+
+      <MemberActionModal
+        visible={actionModalVisible && !!selectedMember}
+        memberName={selectedMember?.name ?? ""}
+        memberRole={(selectedMember?.role ?? "member") as "owner" | "admin" | "member"}
+        onClose={closeActionModal}
+        canPromote={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          selectedMember.role === "member"
+        }
+        canDemote={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          (selectedMember.role === "admin" || selectedMember.role === "owner")
+        }
+        canRemove={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          canRemoveMember(selectedMember)
+        }
+        onPromote={handlePromoteSelected}
+        onDemote={handleDemoteSelected}
+        onRemove={handleRemoveSelected}
+        isPromoting={
+          !!selectedMember &&
+          roleActionMemberId === selectedMember.id &&
+          selectedMember.role === "member"
+        }
+        isDemoting={
+          !!selectedMember &&
+          roleActionMemberId === selectedMember.id &&
+          selectedMember.role !== "member"
+        }
+        isRemoving={
+          !!selectedMember && removeActionMemberId === selectedMember.id
+        }
+      />
 
       {/* Invite Code Modal */}
       <Modal
@@ -601,6 +840,38 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  roleActionsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 12,
+  },
+  actionTrigger: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  currentUserCard: {
+    borderColor: "#FD8100",
+    shadowColor: "#FD8100",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  ownerCardHighlight: {
+    borderColor: "#F59E0B",
+    shadowColor: "#F59E0B",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  adminCardHighlight: {
+    borderColor: "#2563EB",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
   memberLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -614,6 +885,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  memberImage: {
+    width: "100%",
+    height: "100%",
   },
   memberInitial: {
     fontSize: 20,
@@ -649,6 +925,20 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#F59E0B",
   },
+  adminBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: "#DBEAFE",
+    borderRadius: 8,
+  },
+  adminBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2563EB",
+  },
   memberDetail: {
     flexDirection: "row",
     alignItems: "center",
@@ -657,19 +947,6 @@ const styles = StyleSheet.create({
   detailText: {
     fontSize: 13,
     color: "#6B7280",
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
-  },
-  kickButton: {
-    padding: 8,
   },
   modalOverlay: {
     flex: 1,

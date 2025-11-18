@@ -3,7 +3,7 @@ import {
   loginUser,
   registerUser,
   sendVerificationCode,
-  signupWithOAuth,
+  authenticateWithOAuth,
   type OAuthProvider,
 } from "../../src/auth/auth";
 import { supabase } from "@/src/supabase/client";
@@ -27,7 +27,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
-import { useAuthRequest } from "expo-auth-session";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -429,15 +428,6 @@ export default function CreateAccountScreen(): React.JSX.Element {
     });
   };
 
-  const [request, response, promptAsync] = useAuthRequest(
-    {
-      clientId: "YOUR_CLIENT_ID",
-      redirectUri: AuthSession.makeRedirectUri({ scheme: "myapp" }),
-      scopes: ["profile", "email"],
-    },
-    { authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth" }
-  );
-
   const handleSignIn = () => {
     console.log("Navigate to sign in");
     router.replace("/(auth)/Login");
@@ -478,15 +468,48 @@ export default function CreateAccountScreen(): React.JSX.Element {
         throw new Error("Unable to open provider login page.");
       }
 
-      const authResult = await promptAsync();
+      console.log("[Signup] Opening OAuth URL in browser...");
+      const authResult = await WebBrowser.openAuthSessionAsync(
+        data.url,
+        redirectTo
+      );
 
       if (authResult.type !== "success") {
         throw new Error(
-          authResult.type === "dismiss"
+          authResult.type === "cancel"
             ? "Authentication cancelled."
             : "Authentication failed. Please try again."
         );
       }
+
+      console.log("[Signup] OAuth browser session completed");
+
+      // Extract and process the redirect URL to establish Supabase session
+      if (authResult.url) {
+        console.log("[Signup] Processing redirect URL...");
+        const url = new URL(authResult.url);
+        const params = url.searchParams;
+
+        // Check if we have the necessary tokens in the URL
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          console.log("[Signup] Setting Supabase session from redirect tokens...");
+          const { error: setSessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (setSessionError) {
+            console.error("[Signup] Error setting session:", setSessionError);
+            throw new Error("Failed to establish session. Please try again.");
+          }
+        }
+      }
+
+      // Give Supabase a moment to fully establish the session
+      await new Promise(resolve => setTimeout(resolve, 500));
 
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
@@ -502,31 +525,37 @@ export default function CreateAccountScreen(): React.JSX.Element {
       const supabaseToken = sessionData.session?.access_token;
 
       if (!supabaseToken) {
-        throw new Error("Missing Supabase session after authentication.");
+        console.error("[Signup] No access token in session:", sessionData);
+        throw new Error("Missing authentication token. Please try again.");
       }
 
       console.log(
-        "[Signup] Supabase OAuth successful, creating user in backend..."
+        "[Signup] Supabase OAuth successful, authenticating with backend..."
       );
-      const backend = await signupWithOAuth(supabaseToken, provider);
+
+      // Use unified OAuth flow (tries signup first, then login on 409)
+      const backend = await authenticateWithOAuth(supabaseToken, provider);
 
       if (!backend.ok) {
-        if (backend.status === 409) {
-          showToast("error", "Account already exists. Please log in instead.");
+        if (backend.status === 400) {
+          showToast(
+            "error",
+            "Provider mismatch. Please use the same method you used previously."
+          );
         } else if (backend.status === 401) {
           showToast("error", "Authentication failed. Please try again.");
         } else {
           showToast(
             "error",
-            backend.message || "Unable to create account. Please try again."
+            backend.message || "Unable to complete signup. Please try again."
           );
         }
         return;
       }
 
       await Storage.setItem("access_token", backend.data.access_token);
-      console.log("[Signup] User created successfully in backend");
-      showToast("success", "Signed up successfully! Welcome to Freshly!");
+      console.log("[Signup] User authenticated successfully in backend");
+      showToast("success", "Welcome to Freshly!");
       router.replace("/(user)/setPfp");
     } catch (error: any) {
       console.error("[Signup] OAuth signup error:", error);

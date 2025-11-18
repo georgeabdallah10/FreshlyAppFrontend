@@ -1,16 +1,20 @@
 // ==================== MemberView.tsx ====================
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
+import { useFamilyContext } from "@/context/familycontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
+import MemberActionModal from "@/components/familyMangment/MemberActionModal";
+import IconButton from "@/components/iconComponent";
 import {
   leaveFamily,
   listFamilyMembers,
-  listMyFamilies,
+  removeFamilyMember,
+  updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Modal,
@@ -23,9 +27,10 @@ import {
 import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
 
 interface MemberViewProps {
-  familyData: FamilyData;
+  familyData?: FamilyData;
   members?: FamilyMember[];
   currentUserId: string;
+  viewerRole: "admin" | "member";
   onBack: () => void;
   onLeaveFamily?: () => Promise<void>;
 }
@@ -34,12 +39,27 @@ const MemberView: React.FC<MemberViewProps> = ({
   familyData,
   members,
   currentUserId,
+  viewerRole,
   onBack,
   onLeaveFamily,
 }) => {
   const router = useRouter();
   const {user} = useUser(); // Get user context first
+  const { selectedFamily } = useFamilyContext();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const resolvedFamilyData = useMemo(() => {
+    if (familyData) return familyData;
+    if (selectedFamily) {
+      return {
+        id: selectedFamily.id,
+        name: selectedFamily.name,
+        inviteCode: selectedFamily.inviteCode,
+        createdAt: selectedFamily.createdAt,
+        memberCount: selectedFamily.memberCount,
+      } as FamilyData;
+    }
+    return null;
+  }, [familyData, selectedFamily]);
   
   // Normalize members - Backend now returns consistent nested user structure
   const normalizeMembers = useCallback((raw: any[]): FamilyMember[] => {
@@ -61,13 +81,39 @@ const MemberView: React.FC<MemberViewProps> = ({
         status: (m.status ?? "active") as FamilyMember["status"],
         role: isOwner ? "owner" : "member",
         joinedAt: m.joined_at ?? m.created_at ?? "",
+        avatar_path: u.avatar_path ?? m.avatar_path ?? null,
       } as FamilyMember;
     });
   }, [user]);
   
+  const sortMembers = useCallback((list: FamilyMember[]) => {
+    return [...list].sort((a, b) => {
+      const priority = (role: FamilyMember["role"]) => {
+        if (role === "owner") return 0;
+        if (role === "admin") return 1;
+        return 2;
+      };
+      const diff = priority(a.role) - priority(b.role);
+      if (diff !== 0) return diff;
+      return a.name.localeCompare(b.name);
+    });
+  }, []);
+
   const [localMembers, setLocalMembers] = useState<FamilyMember[]>([]);
   const [loading, setLoading] = useState(false);
-  const [inviteCode, setInviteCode] = useState<string | null>(familyData?.inviteCode ?? (familyData as any)?.invite_code ?? null);
+  const [inviteCode, setInviteCode] = useState<string | null>(
+    resolvedFamilyData?.inviteCode ?? null
+  );
+  const [roleActionMemberId, setRoleActionMemberId] = useState<string | null>(null);
+  const [removeActionMemberId, setRemoveActionMemberId] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (resolvedFamilyData?.inviteCode) {
+      setInviteCode(resolvedFamilyData.inviteCode);
+    }
+  }, [resolvedFamilyData?.inviteCode]);
   
   // Get pending meal share request count
   const { data: pendingCount = 0 } = usePendingRequestCount();
@@ -89,6 +135,28 @@ const MemberView: React.FC<MemberViewProps> = ({
     message: "",
   });
 
+  const isAdminViewer = viewerRole === "admin";
+
+  const canManageMember = useCallback(
+    (member: FamilyMember) =>
+      isAdminViewer && String(member.id) !== String(currentUserId),
+    [isAdminViewer, currentUserId]
+  );
+
+  const openActionModal = useCallback(
+    (member: FamilyMember) => {
+      if (!canManageMember(member)) return;
+      setSelectedMember(member);
+      setActionModalVisible(true);
+    },
+    [canManageMember]
+  );
+
+  const closeActionModal = useCallback(() => {
+    setActionModalVisible(false);
+    setSelectedMember(null);
+  }, []);
+
   const showToast = (
     type: "success" | "error" | "confirm" | "info",
     message: string,
@@ -106,13 +174,13 @@ const MemberView: React.FC<MemberViewProps> = ({
   const leaveFadeAnim = useRef(new Animated.Value(0)).current;
 
   const fetchMembers = async () => {
-    if (!familyData?.id) return;
+    if (!resolvedFamilyData?.id) return;
     try {
       setLoading(true);
-      const data = await listFamilyMembers(Number(familyData.id));
+      const data = await listFamilyMembers(Number(resolvedFamilyData.id));
       console.log(data)
       const normalized = normalizeMembers(data || []);
-      setLocalMembers(normalized);
+      setLocalMembers(sortMembers(normalized));
     } catch (e) {
       console.warn("Failed to load members:", e);
     } finally {
@@ -120,30 +188,96 @@ const MemberView: React.FC<MemberViewProps> = ({
     }
   };
 
-  const fetchInviteCode = async () => {
-    try {
-      const families = await listMyFamilies();
-      const current = families?.find((f: any) => f.id === familyData.id);
-      if (current) {
-        setInviteCode(current.inviteCode ?? current.invite_code ?? null);
+  const mapMembership = useCallback(
+    (entry: any) => normalizeMembers(entry ? [entry] : [])[0],
+    [normalizeMembers]
+  );
+
+  const handleRoleChange = useCallback(
+    async (member: FamilyMember, nextRole: FamilyMember["role"]) => {
+      if (!isAdminViewer || member.role === nextRole) return;
+      try {
+        setRoleActionMemberId(member.id);
+        const updated = await updateFamilyMemberRole(
+          Number(resolvedFamilyData?.id),
+          Number(member.id),
+          nextRole as "owner" | "admin" | "member"
+        );
+        const normalized = mapMembership(updated);
+        if (normalized) {
+          setLocalMembers((prev) =>
+            sortMembers(prev.map((m) => (m.id === member.id ? normalized : m)))
+          );
+          showToast("success", `${member.name} is now ${nextRole}.`);
+        }
+      } catch (error: any) {
+        showToast("error", error?.message || "Failed to update role.");
+      } finally {
+        setRoleActionMemberId(null);
       }
-    } catch (e) {
-      console.warn("Failed to load invite code:", e);
-    }
-  };
+    },
+    [
+      resolvedFamilyData?.id,
+      isAdminViewer,
+      mapMembership,
+      showToast,
+    ]
+  );
+
+  const canRemoveMember = useCallback(
+    (member: FamilyMember) =>
+      isAdminViewer &&
+      member.role !== "owner" &&
+      String(member.id) !== String(currentUserId),
+    [isAdminViewer, currentUserId]
+  );
+
+  const handleRemoveMember = useCallback(
+    async (member: FamilyMember) => {
+      if (!canRemoveMember(member)) return;
+      try {
+        setRemoveActionMemberId(member.id);
+        await removeFamilyMember(Number(resolvedFamilyData?.id), Number(member.id));
+        setLocalMembers((prev) => prev.filter((m) => m.id !== member.id));
+        showToast("success", `${member.name} has been removed.`);
+      } catch (error: any) {
+        showToast("error", error?.message || "Failed to remove member.");
+      } finally {
+        setRemoveActionMemberId(null);
+      }
+    },
+    [canRemoveMember, resolvedFamilyData?.id, showToast]
+  );
+
+  const handlePromoteSelected = useCallback(async () => {
+    if (!selectedMember) return;
+    await handleRoleChange(selectedMember, "admin");
+    closeActionModal();
+  }, [closeActionModal, handleRoleChange, selectedMember]);
+
+  const handleDemoteSelected = useCallback(async () => {
+    if (!selectedMember) return;
+    await handleRoleChange(selectedMember, "member");
+    closeActionModal();
+  }, [closeActionModal, handleRoleChange, selectedMember]);
+
+  const handleRemoveSelected = useCallback(async () => {
+    if (!selectedMember) return;
+    await handleRemoveMember(selectedMember);
+    closeActionModal();
+  }, [closeActionModal, handleRemoveMember, selectedMember]);
 
   // Initialize members from props on mount
   useEffect(() => {
     if (members && members.length > 0) {
-      setLocalMembers(normalizeMembers(members));
+      setLocalMembers(sortMembers(normalizeMembers(members)));
     }
-  }, [members, normalizeMembers]);
+  }, [members, normalizeMembers, sortMembers]);
 
   useEffect(() => {
     fetchMembers();
-    fetchInviteCode();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [familyData?.id]);
+  }, [resolvedFamilyData?.id]);
 
   useEffect(() => {
     if (showLeaveModal) {
@@ -181,7 +315,7 @@ const MemberView: React.FC<MemberViewProps> = ({
       if (onLeaveFamily) {
         await onLeaveFamily();
       } else {
-        await leaveFamily(Number(familyData.id), Number(user?.id));
+        await leaveFamily(Number(resolvedFamilyData?.id), Number(user?.id));
       }
       showToast("success", "You have successfully left the family");
       setShowLeaveModal(false);
@@ -191,21 +325,9 @@ const MemberView: React.FC<MemberViewProps> = ({
     }
   };
 
-  const getStatusColor = (status: FamilyMember["status"]) => {
-    switch (status) {
-      case "active": return "#10B981";
-      case "pending": return "#F59E0B";
-      case "inactive": return "#EF4444";
-    }
-  };
-
-  const getStatusText = (status: FamilyMember["status"]) => {
-    switch (status) {
-      case "active": return "Active";
-      case "pending": return "Pending";
-      case "inactive": return "Inactive";
-    }
-  };
+  if (!resolvedFamilyData) {
+    return null;
+  }
 
   return (
     <>
@@ -226,9 +348,9 @@ const MemberView: React.FC<MemberViewProps> = ({
           <View style={styles.familyIconContainer}>
             <Ionicons name="home" size={32} color="#10B981" />
           </View>
-          <Text style={styles.familyName}>{familyData.name}</Text>
+          <Text style={styles.familyName}>{resolvedFamilyData.name}</Text>
           <Text style={styles.familyMemberCount}>
-            {familyData.memberCount} Members
+            {resolvedFamilyData.memberCount} Members
           </Text>
         </View>
 
@@ -260,47 +382,67 @@ const MemberView: React.FC<MemberViewProps> = ({
           {loading ? (
             <Text style={{ color: "#6B7280", marginBottom: 8 }}>Loading members...</Text>
           ) : null}
-          {localMembers.map((member) => (
-            <View key={member.id} style={styles.memberCard}>
-              <View style={styles.memberLeft}>
-                <View style={styles.memberAvatar}>
-                  <Text style={styles.memberInitial}>
-                    {member.name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <View style={styles.memberNameRow}>
-                    <Text style={styles.memberName}>{member.name}</Text>
-                    {member.role === "owner" && (
-                      <View style={styles.ownerBadge}>
-                        <Ionicons name="star" size={12} color="#F59E0B" />
-                        <Text style={styles.ownerBadgeText}>Owner</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.email || "No email"}</Text>
-                  </View>
-                  <View style={styles.memberDetail}>
-                    <Ionicons name="call-outline" size={14} color="#9CA3AF" />
-                    <Text style={styles.detailText}>{member.phone}</Text>
-                  </View>
-                  <View style={styles.memberDetail}>
-                    <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: getStatusColor(member.status) },
-                      ]}
-                    />
-                    <Text style={styles.statusText}>
-                      {getStatusText(member.status)}
+          {localMembers.map((member) => {
+            const isCurrentUser = String(member.id) === String(currentUserId);
+            const isOwner = member.role === "owner";
+            const isAdmin = member.role === "admin";
+            return (
+              <View
+                key={member.id}
+                style={[
+                  styles.memberCard,
+                  isCurrentUser && styles.currentUserCard,
+                  !isCurrentUser && isOwner && styles.ownerCardHighlight,
+                  !isCurrentUser && isAdmin && styles.adminCardHighlight,
+                ]}
+              >
+                <View style={styles.memberLeft}>
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberInitial}>
+                      {member.name.charAt(0).toUpperCase()}
                     </Text>
                   </View>
+                  <View style={styles.memberInfo}>
+                    <View style={styles.memberNameRow}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      {member.role === "owner" && (
+                        <View style={styles.ownerBadge}>
+                          <Ionicons name="star" size={12} color="#F59E0B" />
+                          <Text style={styles.ownerBadgeText}>Owner</Text>
+                        </View>
+                      )}
+                      {member.role === "admin" && (
+                        <View style={styles.adminBadge}>
+                          <Ionicons name="shield-checkmark" size={12} color="#2563EB" />
+                          <Text style={styles.adminBadgeText}>Admin</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.memberDetail}>
+                      <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
+                      <Text style={styles.detailText}>{member.email || "No email"}</Text>
+                    </View>
+                    <View style={styles.memberDetail}>
+                      <Ionicons name="call-outline" size={14} color="#9CA3AF" />
+                      <Text style={styles.detailText}>{member.phone}</Text>
+                    </View>
+                  </View>
                 </View>
+                {canManageMember(member) && (
+                  <IconButton
+                    iconName="settings-outline"
+                    iconColor="#6B7280"
+                    iconSize={18}
+                    containerSize={34}
+                    backgroundColor="#F3F4F6"
+                    borderRadius={17}
+                    onPress={() => openActionModal(member)}
+                    style={styles.actionTrigger}
+                  />
+                )}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         <TouchableOpacity
@@ -360,7 +502,7 @@ const MemberView: React.FC<MemberViewProps> = ({
 
               <Text style={styles.modalTitle}>Leave Family?</Text>
               <Text style={styles.modalSubtitle}>
-                Are you sure you want to leave {familyData.name}? You'll need a new invite code to rejoin.
+                Are you sure you want to leave {resolvedFamilyData.name}? You'll need a new invite code to rejoin.
               </Text>
 
               <View style={styles.modalButtonsColumn}>
@@ -384,6 +526,44 @@ const MemberView: React.FC<MemberViewProps> = ({
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
+
+      <MemberActionModal
+        visible={actionModalVisible && !!selectedMember}
+        memberName={selectedMember?.name ?? ""}
+        memberRole={(selectedMember?.role ?? "member") as "owner" | "admin" | "member"}
+        onClose={closeActionModal}
+        canPromote={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          selectedMember.role === "member"
+        }
+        canDemote={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          selectedMember.role === "admin"
+        }
+        canRemove={
+          !!selectedMember &&
+          canManageMember(selectedMember) &&
+          canRemoveMember(selectedMember)
+        }
+        onPromote={handlePromoteSelected}
+        onDemote={handleDemoteSelected}
+        onRemove={handleRemoveSelected}
+        isPromoting={
+          !!selectedMember &&
+          roleActionMemberId === selectedMember.id &&
+          selectedMember.role === "member"
+        }
+        isDemoting={
+          !!selectedMember &&
+          roleActionMemberId === selectedMember.id &&
+          selectedMember.role === "admin"
+        }
+        isRemoving={
+          !!selectedMember && removeActionMemberId === selectedMember.id
+        }
+      />
 
       <ToastBanner
         visible={toast.visible}
@@ -502,6 +682,18 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
+  actionTrigger: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  currentUserCard: {
+    borderColor: "#FD8100",
+    shadowColor: "#FD8100",
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
   memberLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -559,15 +751,33 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#6B7280",
   },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  ownerCardHighlight: {
+    borderColor: "#F59E0B",
+    shadowColor: "#F59E0B",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  statusText: {
-    fontSize: 13,
-    color: "#6B7280",
-    fontWeight: "500",
+  adminCardHighlight: {
+    borderColor: "#2563EB",
+    shadowColor: "#2563EB",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  adminBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: "#DBEAFE",
+    borderRadius: 8,
+  },
+  adminBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#2563EB",
   },
   kickButton: {
     padding: 8,

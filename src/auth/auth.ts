@@ -99,6 +99,48 @@ export async function loginWithOAuth(accessToken: string, provider: OAuthProvide
   }
 }
 
+/**
+ * Unified OAuth flow: tries signup first, falls back to login on 409.
+ * This is the recommended approach to handle both new and existing users seamlessly.
+ */
+export async function authenticateWithOAuth(accessToken: string, provider: OAuthProvider): Promise<ApiResult<OAuthSignupResponse>> {
+  try {
+    console.log(`[OAuth] Starting unified OAuth flow for ${provider}`);
+
+    // Step 1: Try signup first
+    console.log('[OAuth] Attempting signup...');
+    const signupResult = await signupWithOAuth(accessToken, provider);
+
+    // If signup succeeds, we're done
+    if (signupResult.ok) {
+      console.log('[OAuth] Signup successful');
+      return signupResult;
+    }
+
+    // Step 2: If we get 409 (user already exists), try login instead
+    if (signupResult.status === 409) {
+      console.log('[OAuth] User already exists (409), attempting login...');
+      const loginResult = await loginWithOAuth(accessToken, provider);
+
+      if (loginResult.ok) {
+        console.log('[OAuth] Login successful');
+        return loginResult;
+      }
+
+      // Login failed after 409 from signup
+      console.error('[OAuth] Login failed after 409:', loginResult.message);
+      return loginResult;
+    }
+
+    // Step 3: Signup failed for reasons other than 409
+    console.error('[OAuth] Signup failed:', signupResult.message);
+    return signupResult;
+  } catch (error: any) {
+    console.error('[OAuth] Unified flow error:', error);
+    return { ok: false, status: -1, message: error?.message || 'OAuth authentication failed' };
+  }
+}
+
 export async function registerUser(
   input: RegisterInput
 ): Promise<ApiResult<UserOut>> {

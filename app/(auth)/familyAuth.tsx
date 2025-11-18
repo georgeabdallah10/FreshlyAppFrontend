@@ -1,5 +1,6 @@
 // ==================== FamilyMemberFlow.tsx ====================
 import { useUser } from "@/context/usercontext";
+import { useFamilyContext } from "@/context/familycontext";
 import {
   createFamily,
   joinFamilyByCode,
@@ -40,6 +41,7 @@ interface FamilyMemberFlowProps {
 const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: FamilyMemberFlowProps = {}) => {
   const router = useRouter();
   const {user, updateUserInfo} = useUser();
+  const { refreshFamilies, setSelectedFamilyId } = useFamilyContext();
   const [currentScreen, setCurrentScreen] = useState<Screen>("initial");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -196,6 +198,9 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
         status:"owner"
       })
 
+      await refreshFamilies();
+      setSelectedFamilyId(fid ? String(fid) : null);
+
       setGeneratedInviteCode(invite);
       setCurrentFamilyId(fid);
       setFamilyName("");
@@ -293,9 +298,11 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
           { 
             text: "OK", 
             onPress: () => {
-              if (onComplete) {
-                onComplete();
-              }
+             if (onComplete) {
+               onComplete();
+             }
+              refreshFamilies();
+              setSelectedFamilyId(fid ? String(fid) : null);
             }
           }
         ]

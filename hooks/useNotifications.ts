@@ -178,3 +178,187 @@ export function useHandleNotificationClick() {
     },
   };
 }
+
+// ============================================
+// PUSH NOTIFICATION HOOKS
+// ============================================
+
+import { useEffect, useState, useCallback } from 'react';
+import {
+  registerForPushNotifications,
+  getStoredPushToken,
+  isPushNotificationEnabled,
+  setupNotificationHandler,
+  setBadgeCount,
+} from '../src/notifications/registerForPush';
+import {
+  setupNotificationResponseListener,
+  setupNotificationReceivedListener,
+} from '../src/notifications/handleIncomingNotifications';
+import {
+  schedulePantryExpirationNotifications,
+} from '../src/notifications/schedulePantryNotifications';
+
+/**
+ * Complete notification system hook with push notifications and pantry alerts
+ */
+export function useNotificationSystem() {
+  const queryClient = useQueryClient();
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [permissionsGranted, setPermissionsGranted] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
+
+  // Use existing hooks
+  const notificationsQuery = useNotifications();
+  const unreadCountQuery = useUnreadCount();
+
+  // Register for push notifications mutation
+  const registerPushMutation = useMutation({
+    mutationFn: registerForPushNotifications,
+    onSuccess: (token) => {
+      if (token) {
+        setExpoPushToken(token);
+        setPermissionsGranted(true);
+        console.log('[useNotificationSystem] Push notifications registered');
+      }
+    },
+    onError: (error) => {
+      console.error('[useNotificationSystem] Error registering for push:', error);
+      setPermissionsGranted(false);
+    },
+  });
+
+  // Initialize notification system
+  useEffect(() => {
+    let responseSubscription: (() => void) | undefined;
+    let receivedSubscription: (() => void) | undefined;
+
+    async function initialize() {
+      try {
+        // Setup notification handler
+        setupNotificationHandler();
+
+        // Check stored push token
+        const storedToken = await getStoredPushToken();
+        if (storedToken) {
+          setExpoPushToken(storedToken);
+        }
+
+        // Check permission status
+        const hasPermission = await isPushNotificationEnabled();
+        setPermissionsGranted(hasPermission);
+
+        // Setup notification listeners
+        responseSubscription = setupNotificationResponseListener();
+        receivedSubscription = setupNotificationReceivedListener();
+
+        // Schedule pantry notifications
+        await schedulePantryExpirationNotifications();
+
+        setIsInitialized(true);
+        console.log('[useNotificationSystem] Initialized successfully');
+      } catch (error) {
+        console.error('[useNotificationSystem] Initialization error:', error);
+        setIsInitialized(true); // Set to true anyway to prevent infinite loading
+      }
+    }
+
+    initialize();
+
+    // Cleanup
+    return () => {
+      responseSubscription?.();
+      receivedSubscription?.();
+    };
+  }, []);
+
+  // Update badge count when unread count changes
+  useEffect(() => {
+    const count = unreadCountQuery.data?.count ?? 0;
+    if (typeof count === 'number') {
+      setBadgeCount(count);
+    }
+  }, [unreadCountQuery.data]);
+
+  // Register for push
+  const registerForPush = useCallback(() => {
+    registerPushMutation.mutate();
+  }, [registerPushMutation]);
+
+  // Refresh all notification data
+  const refresh = useCallback(async () => {
+    await Promise.all([
+      notificationsQuery.refetch(),
+      unreadCountQuery.refetch(),
+      schedulePantryExpirationNotifications(),
+    ]);
+  }, [notificationsQuery, unreadCountQuery]);
+
+  return {
+    // Notification data
+    notifications: notificationsQuery.data ?? [],
+    unreadCount: unreadCountQuery.data?.count ?? 0,
+
+    // Loading states
+    isLoading: notificationsQuery.isLoading || unreadCountQuery.isLoading || !isInitialized,
+    isLoadingNotifications: notificationsQuery.isLoading,
+    isLoadingUnreadCount: unreadCountQuery.isLoading,
+    isInitialized,
+
+    // Error states
+    error: notificationsQuery.error || unreadCountQuery.error,
+
+    // Push notification
+    expoPushToken,
+    permissionsGranted,
+    registerForPush,
+    isRegisteringPush: registerPushMutation.isPending,
+
+    // Actions
+    refresh,
+  };
+}
+
+/**
+ * Hook for notification permissions only
+ */
+export function useNotificationPermissions() {
+  const [permissionsGranted, setPermissionsGranted] = useState<boolean>(false);
+  const [isChecking, setIsChecking] = useState<boolean>(true);
+
+  useEffect(() => {
+    async function checkPermissions() {
+      try {
+        const hasPermission = await isPushNotificationEnabled();
+        setPermissionsGranted(hasPermission);
+      } catch (error) {
+        console.error('[useNotificationPermissions] Error checking permissions:', error);
+      } finally {
+        setIsChecking(false);
+      }
+    }
+
+    checkPermissions();
+  }, []);
+
+  const requestPermissions = useCallback(async () => {
+    try {
+      const token = await registerForPushNotifications();
+      setPermissionsGranted(!!token);
+      return !!token;
+    } catch (error) {
+      console.error('[useNotificationPermissions] Error requesting permissions:', error);
+      setPermissionsGranted(false);
+      return false;
+    }
+  }, []);
+
+  return {
+    permissionsGranted,
+    isChecking,
+    requestPermissions,
+  };
+}
+
+// Fix missing import
+import type { NotificationType } from '@/src/services/notification.service';

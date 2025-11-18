@@ -14,6 +14,8 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import "../global.css";
+import { setupNotificationHandler, setupNotificationCategories } from "@/src/notifications/registerForPush";
+import { setupNotificationResponseListener, setupNotificationReceivedListener, handlePendingNotification } from "@/src/notifications/handleIncomingNotifications";
 
 export const unstable_settings = {
   initialRouteName: "(tabs)",
@@ -30,6 +32,43 @@ useEffect(() => {
   }, 2000);
 
   return () => clearTimeout(timer);
+}, []);
+
+// Initialize notification system
+useEffect(() => {
+  let responseListener: (() => void) | undefined;
+  let receivedListener: (() => void) | undefined;
+
+  async function initializeNotifications() {
+    try {
+      console.log('[App] Initializing notification system...');
+
+      // Setup notification handler for foreground behavior
+      setupNotificationHandler();
+
+      // Setup notification categories (iOS action buttons)
+      await setupNotificationCategories();
+
+      // Setup listeners for notification events
+      responseListener = setupNotificationResponseListener();
+      receivedListener = setupNotificationReceivedListener();
+
+      // Handle any pending notification that opened the app
+      await handlePendingNotification();
+
+      console.log('[App] Notification system initialized successfully');
+    } catch (error) {
+      console.error('[App] Error initializing notifications:', error);
+    }
+  }
+
+  initializeNotifications();
+
+  // Cleanup listeners on unmount
+  return () => {
+    responseListener?.();
+    receivedListener?.();
+  };
 }, []);
 
 if (showSplash) {

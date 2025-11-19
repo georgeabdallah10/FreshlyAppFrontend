@@ -822,7 +822,7 @@ const PantryDashboard = () => {
         <Text style={styles.headerTitle}>My Pantry</Text>
         <TouchableOpacity style={styles.headerButton} onPress={openScanner}>
           <Image
-            source={require("../../assets/icons/barcode.png")}
+            source={require("../../../assets/icons/barcode.png")}
             style={[styles.menuCardIcon, { marginBottom: 0 }]}
             resizeMode="contain"
           />
@@ -1017,7 +1017,7 @@ const PantryDashboard = () => {
                       onPress={() => openEditSheet(item)}
                     >
                       <Image
-                        source={require("../../assets/icons/edit.png")}
+                        source={require("../../../assets/icons/edit.png")}
                         style={styles.menuCardIcon}
                         resizeMode="contain"
                       />
@@ -1027,7 +1027,7 @@ const PantryDashboard = () => {
                       onPress={() => handleDeleteItem(item.id)}
                     >
                       <Image
-                        source={require("../../assets/icons/trash.png")}
+                        source={require("../../../assets/icons/trash.png")}
                         style={styles.menuCardIcon}
                         resizeMode="contain"
                       />
@@ -1111,7 +1111,7 @@ const PantryDashboard = () => {
               <Text style={styles.modalTitle}>Add Category</Text>
               <View style={styles.modalInput}>
                 <Image
-                  source={require("../../assets/icons/category.png")}
+                  source={require("../../../assets/icons/category.png")}
                   style={styles.menuCardIcon}
                   resizeMode="contain"
                 />
@@ -1172,7 +1172,7 @@ const PantryDashboard = () => {
                 onPress={() => setShowCategoryDropdown((prev) => !prev)}
               >
                 <Image
-                  source={require("../../assets/icons/category.png")}
+                  source={require("../../../assets/icons/category.png")}
                   style={styles.menuCardIcon}
                   resizeMode="contain"
                 />
@@ -1246,7 +1246,7 @@ const PantryDashboard = () => {
 
               <View style={styles.modalInput}>
                 <Image
-                  source={require("../../assets/icons/bag.png")}
+                  source={require("../../../assets/icons/bag.png")}
                   style={styles.menuCardIcon}
                   resizeMode="contain"
                 />
@@ -1262,7 +1262,7 @@ const PantryDashboard = () => {
               <View style={styles.qRow}>
                 <View style={[styles.modalInput, styles.qInput]}>
                   <Image
-                    source={require("../../assets/icons/box.png")}
+                    source={require("../../../assets/icons/box.png")}
                     style={styles.menuCardIcon}
                     resizeMode="contain"
                   />
@@ -1376,7 +1376,7 @@ const PantryDashboard = () => {
 
               <View style={styles.modalInput}>
                 <Image
-                  source={require("../../assets/icons/calendar.png")}
+                  source={require("../../../assets/icons/calendar.png")}
                   style={styles.menuCardIcon}
                   resizeMode="contain"
                 />
@@ -1493,7 +1493,7 @@ const PantryDashboard = () => {
               setPendingProduct(null);
               canScanRef.current = true;
               setScanned(false);
-              router.push("/(home)/main");
+              router.push("/(main)/(home)/main");
               showToast("error", "Scan canceled.");
             }}
           />

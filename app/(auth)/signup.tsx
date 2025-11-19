@@ -242,7 +242,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         await Storage.setItem("access_token", login.data.access_token);
         showToast(
           "success",
-          "Account created successfully! Welcome to Freshly!"
+          "Account created successfully! Welcome to Savr!"
         );
 
         // Send verification code (non-blocking)
@@ -555,7 +555,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
       await Storage.setItem("access_token", backend.data.access_token);
       console.log("[Signup] User authenticated successfully in backend");
-      showToast("success", "Welcome to Freshly!");
+      showToast("success", "Welcome to Savr!");
       router.replace("/(user)/setPfp");
     } catch (error: any) {
       console.error("[Signup] OAuth signup error:", error);
@@ -595,7 +595,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-              <Text style={styles.brandName}>Freshly</Text>
+              <Text style={styles.brandName}>Savr</Text>
               <Text style={{ color: "#00A86B", fontSize: 20 }}>
                 Smarter Shopping.
               </Text>

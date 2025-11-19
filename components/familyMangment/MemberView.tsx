@@ -1,30 +1,30 @@
 // ==================== MemberView.tsx ====================
-import ToastBanner from "@/components/generalMessage";
-import { useUser } from "@/context/usercontext";
-import { useFamilyContext } from "@/context/familycontext";
-import { usePendingRequestCount } from "@/hooks/useMealShare";
 import MemberActionModal from "@/components/familyMangment/MemberActionModal";
+import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
+import { useFamilyContext } from "@/context/familycontext";
+import { useUser } from "@/context/usercontext";
+import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-  leaveFamily,
-  listFamilyMembers,
-  removeFamilyMember,
-  updateFamilyMemberRole,
+    leaveFamily,
+    listFamilyMembers,
+    removeFamilyMember,
+    updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Modal,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
+import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 
 interface MemberViewProps {
   familyData?: FamilyData;

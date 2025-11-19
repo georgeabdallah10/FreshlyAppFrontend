@@ -414,7 +414,7 @@ export default function LoginScreen(): React.JSX.Element {
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-              <Text style={styles.brandName}>Freshly</Text>
+              <Text style={styles.brandName}>Savr</Text>
               <Text style={styles.welcomeText}>
                 <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text>
                 {"\n"}

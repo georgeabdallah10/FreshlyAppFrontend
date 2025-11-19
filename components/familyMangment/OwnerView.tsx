@@ -1,38 +1,38 @@
 // ==================== OwnerView.tsx ====================
-import ToastBanner from "@/components/generalMessage";
-import { useUser } from "@/context/usercontext";
-import { useFamilyContext } from "@/context/familycontext";
-import { usePendingRequestCount } from "@/hooks/useMealShare";
 import MemberActionModal from "@/components/familyMangment/MemberActionModal";
+import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
+import { useFamilyContext } from "@/context/familycontext";
+import { useUser } from "@/context/usercontext";
+import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-  listFamilyMembers,
-  regenerateInviteCode,
-  removeFamilyMember,
-  updateFamilyMemberRole,
+    listFamilyMembers,
+    regenerateInviteCode,
+    removeFamilyMember,
+    updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  Clipboard,
-  Image,
-  Modal,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Clipboard,
+    Image,
+    Modal,
+    ScrollView,
+    Share,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import type { FamilyData, FamilyMember } from "../../app/(home)/MyFamily";
+import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 
 
 interface OwnerViewProps {
@@ -444,7 +444,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const handleShareCode = async () => {
     try {
       await Share.share({
-        message: `Join our family on Freshly!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
+        message: `Join our family on Savr!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
       });
     } catch (error) {
       console.error("Error sharing:", error);

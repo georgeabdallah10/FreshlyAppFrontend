@@ -34,7 +34,7 @@ type FAQCategory = {
 
 const FAQ_DATA: FAQCategory[] = [
   {
-    title: "Basics of Freshly",
+    title: "Basics of Savr",
     icon: "information-circle",
     color: "#00A86B",
     items: [
@@ -243,7 +243,7 @@ const FAQScreen = () => {
         <View style={styles.heroSection}>
           <Text style={styles.title}>Frequently Asked Questions</Text>
           <Text style={styles.subtitle}>
-            Find answers to common questions about Freshly
+            Find answers to common questions about Savr
           </Text>
         </View>
 
@@ -271,7 +271,7 @@ const FAQScreen = () => {
             onPress={() => console.log("Email sent")}
           >
             <Ionicons name="mail" size={18} color="#FFF" />
-            <Text style={styles.contactButtonText}>david@joinfreshly.com</Text>
+            <Text style={styles.contactButtonText}>david@joinsavr.com</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

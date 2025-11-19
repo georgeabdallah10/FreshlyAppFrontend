@@ -829,7 +829,7 @@ export default function ChatAIScreen() {
   };
 
   const system_prompt = `
-You are Freshly, an advanced meal-planning and cooking assistant. You generate complete, structured, easy-to-read outputs with precise formatting and clear section breaks. Use a calm, friendly, and helpful tone.
+You are Savr, an advanced meal-planning and cooking assistant. You generate complete, structured, easy-to-read outputs with precise formatting and clear section breaks. Use a calm, friendly, and helpful tone.
 
 Here are the inputs:
 User prefrences: ${prefrences}
@@ -1021,7 +1021,7 @@ Rules:
           
           // Filter out system prompts (messages with 3+ system markers)
           const systemMarkers = [
-            'you are freshly',
+            'you are savr',
             'output format (required)',
             'inputs you will receive',
             'global rules (never violate)',
@@ -1038,7 +1038,7 @@ Rules:
           
           // Filter out very long system-like messages
           if (content.length > 1000 && (
-            contentLower.startsWith('you are freshly') ||
+            contentLower.startsWith('you are savr') ||
             contentLower.includes('user prefrences:') ||
             contentLower.includes('user preferences:') ||
             contentLower.includes('user\'s pantry items:')
@@ -1486,7 +1486,7 @@ Rules:
       setSavingMealId(messageId);
       await createMealForSignleUser(payload);
       showToast('success', 'Meal saved to your collection! Redirecting...');
-      router.push("/(home)/meals");
+      router.push("/(main)/(home)/meals");
     } catch (error: any) {
       console.error('[ChatAI] Failed to save meal:', error);
       const errorMessage =
@@ -1521,7 +1521,7 @@ Rules:
 
     // Navigate to Match My Grocery screen with actual recipe data and pantry items
     router.push({
-      pathname: "/(home)/matchMyGrocery",
+      pathname: "/(main)/(home)/matchMyGrocery",
       params: {
         groceryData: JSON.stringify(groceryList),
         pantryData: JSON.stringify(pantryItems),
@@ -1541,7 +1541,7 @@ Rules:
         >
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Freshly AI</Text>
+        <Text style={styles.headerTitle}>Savr AI</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}

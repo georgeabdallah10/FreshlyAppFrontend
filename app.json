@@ -21,17 +21,26 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs your location to find nearby grocery stores.",
-        "NSCameraUsageDescription": "Allow Freshly to use the camera for barcode scanning."
+        "NSCameraUsageDescription": "Allow Savr to use the camera for barcode scanning.",
+        "UIBackgroundModes": ["remote-notification"]
       },
       "plugins": [
         [
           "expo-camera",
           {
-            "cameraPermission": "Allow Freshly to use the camera for barcode scanning."
+            "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/logo.png",
+            "color": "#FD8100"
           }
         ]
       ],
-      "bundleIdentifier": "com.george.MyApp"
+      "bundleIdentifier": "com.george.MyApp",
+      "UIBackgroundModes": ["remote-notification"]
     },
     "android": {
       "adaptiveIcon": {
@@ -48,8 +57,7 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "package": "com.george.MyApp"
     },
@@ -59,7 +67,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Freshly to use the camera for barcode scanning."
+          "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logo.png",
+          "color": "#FD8100"
         }
       ]
     ],

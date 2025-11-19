@@ -66,18 +66,18 @@ const BottomNavigation = ({
       if (segmants.includes("home")) {
         console.log("You are currently at home");
       } else {
-        router.replace("/(home)/main");
+        router.replace("/(main)/(home)/main");
       }
     } else if (button == "+") {
       console.log("Quick add product");
       setQuickAddModal(true);
     } else if (button == "chat") {
       console.log("Go to chat");
-      router.push("/(home)/chat");
+      router.push("/(main)/(home)/chat");
     } else if ((button = "family")) {
-      router.push("/(home)/MyFamily");
+      router.push("/(main)/(home)/MyFamily");
     } else if ((button = "profile")) {
-      router.push("/(home)/profile");
+      router.push("/(main)/(home)/profile");
     }
   };
 
@@ -156,7 +156,7 @@ const BottomNavigation = ({
 
           <TouchableOpacity
             style={styles.navItem}
-            onPress={() => router.push("/(home)/profile")}
+            onPress={() => router.push("/(main)/(home)/profile")}
             activeOpacity={0.8}
           >
             <View style={styles.navIconContainer}>
@@ -180,37 +180,37 @@ const HomeDashboard = () => {
       id: "grocery",
       title: "Pantry",
       subtitle: "Track what you have",
-      iconSource: require("../../assets/icons/groceryIcon.png"),
+      iconSource: require("../../../assets/icons/groceryIcon.png"),
       bgColor: "#D6F0FF",
-      onPress: () => router.push("/(home)/pantry"),
+      onPress: () => router.push("/(main)/(home)/pantry"),
     },
     {
       id: "mealPlans",
       title: "Meal Plans",
       subtitle: "Your favorite meals",
-      iconSource: require("../../assets/icons/mealPlans.png"),
+      iconSource: require("../../../assets/icons/mealPlans.png"),
       bgColor: "#F5E6FF",
-      onPress: () => router.push("/(home)/meals"),
+      onPress: () => router.push("/(main)/(home)/meals"),
     },
     {
       id: "newchat",
       title: "Grocery",
       subtitle: "Upload All Grocery",
-      iconSource: require("../../assets/icons/grocery.png"),
+      iconSource: require("../../../assets/icons/grocery.png"),
       bgColor: "#F0F0F0",
-      onPress: () => router.push("/(home)/allGrocery"),
+      onPress: () => router.push("/(main)/(home)/allGrocery"),
     },
     {
       id: "Mealplanner",
       title: "Quick Meals",
       subtitle: "Whip it up!",
-      iconSource: require("../../assets/icons/qm2.png"),
+      iconSource: require("../../../assets/icons/qm2.png"),
       bgColor: "#D3F0E3",
-      onPress: () => router.push("/(home)/quickMeals"),
+      onPress: () => router.push("/(main)/(home)/quickMeals"),
     },
   ];
 
-  const chatIconSource = require("../../assets/icons/element.png");
+  const chatIconSource = require("../../../assets/icons/element.png");
 
   const handleMenuPress = (item: MenuItem) => {
     item.onPress();
@@ -218,7 +218,7 @@ const HomeDashboard = () => {
 
   const handleStartChat = () => {
     console.log("Start new chat");
-    router.push("/(home)/allFeatures");
+    router.push("/(main)/(home)/allFeatures");
   };
 
   const handleTabPress = (tab: string) => {
@@ -237,11 +237,11 @@ const HomeDashboard = () => {
         <TouchableOpacity
           style={styles.menuButton}
           activeOpacity={0.6}
-          onPress={() => router.push("/(home)/faq")}
+          onPress={() => router.push("/(main)/(home)/faq")}
         >
           <View style={styles.menuIcon}>
             <Image
-              source={require("../../assets/icons/q&a.png")}
+              source={require("../../../assets/icons/q&a.png")}
               style={styles.menuCardIcon}
               resizeMode="contain"
             />
@@ -249,7 +249,7 @@ const HomeDashboard = () => {
         </TouchableOpacity>
         <View style={styles.logoContainer}>
           <Image
-            source={require("../../assets/images/logo.png")} // Update with your image path
+            source={require("../../../assets/images/logo.png")} // Update with your image path
             style={styles.logoImage}
             resizeMode="contain"
           />
@@ -258,7 +258,7 @@ const HomeDashboard = () => {
           iconSize={24}
           iconColor="#1F2937"
           badgeColor="#FF3B30"
-          onPress={() => router.push("/(home)/notifications")}
+          onPress={() => router.push("/(main)/(home)/notifications")}
           extraCount={pendingShareCount}
           containerStyle={styles.notificationButton}
         />

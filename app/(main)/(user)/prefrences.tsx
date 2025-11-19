@@ -514,9 +514,9 @@ const OnboardingPreferences = () => {
 
         if (result.ok) {
           if (fromProfile === "true") {
-            router.replace("/(home)/profile");
+            router.replace("/(main)/(home)/profile");
           } else {
-            router.replace("/(user)/getLocation");
+            router.replace("/(main)/(home)/profile");
           }
         } else {
           alert(
@@ -687,7 +687,7 @@ const OnboardingPreferences = () => {
           {fromProfile === "true" && (
             <TouchableOpacity
               style={styles.backButton}
-              onPress={() => router.replace("/(home)/profile")}
+              onPress={() => router.replace("/(main)/(home)/profile")}
             >
               <Text style={styles.backIcon}>←</Text>
             </TouchableOpacity>
@@ -697,7 +697,7 @@ const OnboardingPreferences = () => {
           </Text>
           <View style={styles.logoContainer}>
             <Image
-              source={require("../../assets/images/logo.png")}
+              source={require("../../../assets/images/logo.png")}
               style={styles.logoImage}
               resizeMode="contain"
             />

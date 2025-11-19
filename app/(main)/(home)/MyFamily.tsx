@@ -1,18 +1,18 @@
 // ==================== FamilyManagementScreen.tsx ====================
 import MemberView from "@/components/familyMangment/MemberView";
 import OwnerView from "@/components/familyMangment/OwnerView";
-import { useUser } from "@/context/usercontext";
 import { useFamilyContext } from "@/context/familycontext";
+import { useUser } from "@/context/usercontext";
 import {
-  leaveFamily,
-  listFamilyMembers,
-  regenerateInviteCode,
-  removeFamilyMember,
+    leaveFamily,
+    listFamilyMembers,
+    regenerateInviteCode,
+    removeFamilyMember,
 } from "@/src/user/family";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import FamilyMemberFlow from "../(auth)/familyAuth";
+import FamilyMemberFlow from "../../(auth)/familyAuth";
 
 type UserRole = "owner" | "admin" | "member" | "user";
 type MemberStatus = "active" | "pending" | "inactive";

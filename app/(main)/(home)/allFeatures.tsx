@@ -184,16 +184,15 @@ const Hero = () => {
         style={styles.titleContainer}
       >
         <Text style={styles.h1}>
-          Freshly <Text style={styles.h1Accent}>Features</Text>
+          Savr <Text style={styles.h1Accent}>Features</Text>
         </Text>
       </Animated.View>
 
       <Animated.View entering={FadeInUp.delay(200).duration(600)}>
         <Text style={styles.subtitle}>
-          Your AI-powered meal planning and grocery assistant. Freshly learns
-          your tastes, plans your week, builds a smart shopping list, and helps
-          you cook with what you already have—saving time, money, and food
-          waste.
+          Your AI-powered meal planning and grocery assistant. Savr learns your
+          tastes, plans your week, builds a smart shopping list, and helps you
+          cook with what you already have—saving time, money, and food waste.
         </Text>
       </Animated.View>
       
@@ -345,7 +344,7 @@ const CTAButton = ({ onPress }: { onPress: () => void }) => {
   );
 };
 
-export default function FreshlyFeaturesScreen() {
+export default function SavrFeaturesScreen() {
   const featureList = useMemo(() => features, []);
   return (
     <SafeAreaView style={styles.safe}>
@@ -373,10 +372,10 @@ export default function FreshlyFeaturesScreen() {
 
         {/* How to Use */}
         <View style={styles.section}>
-          <Text style={styles.h2}>How to Use Freshly</Text>
+          <Text style={styles.h2}>How to Use Savr</Text>
           <Text style={styles.sectionBlurb}>
-            Get set up in minutes—Freshly handles the planning so you can focus
-            on living.
+            Get set up in minutes—Savr handles the planning so you can focus on
+            living.
           </Text>
           <View style={styles.stepsWrap}>
             {steps.map((s, i) => (
@@ -397,7 +396,7 @@ export default function FreshlyFeaturesScreen() {
 
         {/* Closing + CTA */}
         <View style={[styles.section, styles.closing]}>
-          <Text style={styles.h2}>Why People Love Freshly</Text>
+          <Text style={styles.h2}>Why People Love Savr</Text>
           <Text style={styles.sectionBlurb}>
             A simpler way to plan, shop, and eat—personal to you, powered by AI.
             Less stress, less waste, more time back every week.
@@ -405,7 +404,7 @@ export default function FreshlyFeaturesScreen() {
           <CTAButton
             onPress={() => {
               // Example: open a marketing page or navigate to onboarding
-              Linking.openURL("https://example.com/freshly"); // replace with your deep link or route
+              Linking.openURL("https://example.com/savr"); // replace with your deep link or route
             }}
           />
         </View>

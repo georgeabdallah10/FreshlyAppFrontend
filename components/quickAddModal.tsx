@@ -278,8 +278,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         <View style={styles.optionTextContainer}>
           <Text style={styles.optionTitle}>Add many products to pantry</Text>
           <Text style={styles.optionDescription}>
-            Just take a picture of all your grocery and Freshly AI will add all
-            of them to your pantry
+            Just take a picture of all your grocery and Savr AI will add all of
+            them to your pantry
           </Text>
         </View>
         <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />

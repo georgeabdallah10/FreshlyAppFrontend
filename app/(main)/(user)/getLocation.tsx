@@ -146,7 +146,7 @@ const LocationScreens = () => {
     });
     await refreshUser();
     alert("Locatoin was succesfully set");
-    router.replace("/(home)/main");
+    router.replace("/(main)/(home)/main");
   };
 
   const handleClearSearch = () => {
@@ -178,7 +178,7 @@ const LocationScreens = () => {
       });
       await refreshUser();
       alert("Location was successfully set");
-      router.replace("/(home)/main");
+      router.replace("/(main)/(home)/main");
     } catch (error) {
       console.error("Error updating location:", error);
       alert("Failed to update location. Please try again.");

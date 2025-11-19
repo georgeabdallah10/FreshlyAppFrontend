@@ -13,7 +13,7 @@ export default function Index() {
       // Defer to next tick to ensure router is mounted
       const t = setTimeout(() => {
         if (!navigated) {
-          router.replace("/(tabs)");
+          router.replace("/(main)/(tabs)");
           setNavigated(true);
         }
       }, 0);

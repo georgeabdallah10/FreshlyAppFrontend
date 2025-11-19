@@ -1,13 +1,13 @@
 #!/bin/bash
 
 # ==================================================================
-# FRESHLY NOTIFICATION SYSTEM - INSTALLATION SCRIPT
+# SAVR NOTIFICATION SYSTEM - INSTALLATION SCRIPT
 # ==================================================================
 # This script helps you set up the notification system quickly
 # ==================================================================
 
 echo ""
-echo "🍊 Freshly Notification System Setup"
+echo "🍊 Savr Notification System Setup"
 echo "===================================="
 echo ""
 

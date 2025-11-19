@@ -179,9 +179,9 @@ const NotificationsScreen = () => {
       
       // Navigate based on notification type
       if (notification.type === 'meal_share_request') {
-        router.push('/(home)/mealShareRequests');
+        router.push('/(main)/(home)/mealShareRequests');
       } else if (notification.type === 'meal_share_accepted' || notification.type === 'meal_share_declined') {
-        router.push('/(home)/mealShareRequests');
+        router.push('/(main)/(home)/mealShareRequests');
       }
     } catch (error: any) {
       setToast({

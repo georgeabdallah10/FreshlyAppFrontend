@@ -344,6 +344,7 @@ const PantryDashboard = () => {
     }
   }, []);
 
+  // TODO: make it check if the user is in a family or not before fetching any pnatry items and after that fetch the pantry items accordongily
   useEffect(() => {
     Animated.timing(unitDropdownAnim, {
       toValue: showUnitDropdown ? 1 : 0,
@@ -837,43 +838,7 @@ const PantryDashboard = () => {
         </View>
       )}
 
-      {!contextFamilyId && (
-        <View style={styles.scopeToggle}>
-          <TouchableOpacity
-            style={[
-              styles.scopeButton,
-              activeScope === "personal" && styles.scopeButtonActive,
-            ]}
-            onPress={() => handleScopeChange("personal")}
-          >
-            <Text
-              style={[
-                styles.scopeButtonText,
-                activeScope === "personal" && styles.scopeButtonTextActive,
-              ]}
-            >
-              Personal
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.scopeButton,
-              activeScope === "family" && styles.scopeButtonActive,
-              (!families.length || !contextFamilyId) && styles.scopeButtonDisabled,
-            ]}
-            onPress={() => handleScopeChange("family")}
-          >
-            <Text
-              style={[
-                styles.scopeButtonText,
-                activeScope === "family" && styles.scopeButtonTextActive,
-              ]}
-            >
-              Family
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      
 
 
       {/* Search Bar */}

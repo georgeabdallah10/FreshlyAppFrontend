@@ -55,6 +55,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
       age === null ||
       height === null ||
       weight === null ||
+      gender === null ||
       Number.isNaN(age) ||
       Number.isNaN(height) ||
       Number.isNaN(weight)
@@ -62,9 +63,11 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
       return null;
     }
 
+    // Mifflin-St Jeor Equation for BMR
+    // Men: BMR = 10W + 6.25H - 5A + 5
+    // Women: BMR = 10W + 6.25H - 5A - 161
     const bmrBase = 10 * weight + 6.25 * height - 5 * age;
-    const genderOffset =
-      gender === "male" ? 5 : gender === "female" ? -161 : -78;
+    const genderOffset = gender === "male" ? 5 : -161;
     const bmr = bmrBase + genderOffset;
 
     const goalMultiplier = (() => {
@@ -81,7 +84,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
     })();
 
     return Math.round(bmr * goalMultiplier);
-  }, [age, height, weight, goal]);
+  }, [age, height, weight, gender, goal]);
 
   const { minCalories, maxCalories } = useMemo(() => {
     if (!recommendedCalories) {

@@ -6,7 +6,9 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { listMyFamilies } from "@/src/user/family";
+import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
+import { useRouter } from "expo-router";
+import { useUser } from "./usercontext";
 
 export type FamilySummary = {
   id: string;
@@ -29,17 +31,13 @@ type FamilyContextType = {
 
 const FamilyContext = createContext<FamilyContextType | undefined>(undefined);
 
-const normalizeFamily = (entry: any): FamilySummary => {
-  const id = entry?.id ?? entry?.family_id ?? entry?.familyId;
+const normalizeFamily = (entry: FamilyResponse): FamilySummary => {
   return {
-    id: id ? String(id) : "",
-    name: entry?.display_name ?? entry?.name ?? "My Family",
-    inviteCode: entry?.invite_code ?? entry?.inviteCode ?? "",
-    memberCount:
-      entry?.member_count ??
-      entry?.memberCount ??
-      (Array.isArray(entry?.members) ? entry.members.length : 0),
-    createdAt: entry?.created_at ?? entry?.createdAt ?? "",
+    id: String(entry.id),
+    name: entry.display_name,
+    inviteCode: entry.invite_code,
+    memberCount: entry.count,
+    createdAt: "",
     raw: entry,
   };
 };
@@ -47,10 +45,22 @@ const normalizeFamily = (entry: any): FamilySummary => {
 export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const router = useRouter();
+  const { logout } = useUser();
   const [families, setFamilies] = useState<FamilySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedFamilyId, setSelectedFamilyId] = useState<string | null>(null);
+  const [authRedirected, setAuthRedirected] = useState(false);
+
+  const handleUnauthorized = useCallback(async (message?: string) => {
+    if (authRedirected) return true;
+    setAuthRedirected(true);
+    await logout();
+    router.replace("/(auth)/Login");
+    setError(message ?? "Session expired. Please log in again.");
+    return true;
+  }, [authRedirected, logout, router]);
 
   const fetchFamilies = useCallback(async () => {
     setLoading(true);
@@ -69,12 +79,23 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       setError(null);
     } catch (err: any) {
+      const msg = err?.message || "";
+      if (
+        err?.status === 401 ||
+        msg.toLowerCase().includes("session expired") ||
+        msg.includes("401") ||
+        msg.toLowerCase().includes("unauthorized")
+      ) {
+        await handleUnauthorized(msg);
+        setLoading(false);
+        return;
+      }
       setError(err?.message || "Failed to load families");
       setFamilies([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedFamilyId]);
+  }, [selectedFamilyId, handleUnauthorized]);
 
   useEffect(() => {
     fetchFamilies();

@@ -1,18 +1,25 @@
 {
   "expo": {
-    "name": "MyApp",
-    "slug": "MyApp",
+    "name": "SAVR",
+    "slug": "savr",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "myapp",
+    "scheme": "SAVR",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "backgroundColor": "#ffffff"
     },
+    "updates": {
+      "url": "https://u.expo.dev/5637140e-4fed-4b3e-8a6d-d841702c21d0"
+    },
     "extra": {
-      "googlePlacesApiKey": "AIzaSyCttuyIMlRBmklrtWrclMWCpiX8fV78pFs"
+      "googlePlacesApiKey": "AIzaSyCttuyIMlRBmklrtWrclMWCpiX8fV78pFs",
+      "router": {},
+      "eas": {
+        "projectId": "5637140e-4fed-4b3e-8a6d-d841702c21d0"
+      }
     },
     "ios": {
       "supportsTablet": true,
@@ -22,9 +29,26 @@
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs your location to find nearby grocery stores.",
         "NSCameraUsageDescription": "Allow Savr to use the camera for barcode scanning.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       },
       "plugins": [
+        [
+          "expo-camera",
+          {
+            "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/logo.png",
+            "color": "#FD8100"
+          }
+        ],
         [
           "expo-camera",
           {
@@ -40,7 +64,10 @@
         ]
       ],
       "bundleIdentifier": "com.george.MyApp",
-      "UIBackgroundModes": ["remote-notification"]
+      "UIBackgroundModes": [
+        "remote-notification",
+        "remote-notification"
+      ]
     },
     "android": {
       "adaptiveIcon": {
@@ -67,7 +94,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+          "cameraPermission": "Allow SAVR to use the camera for barcode scanning."
         }
       ],
       [
@@ -81,6 +108,7 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "owner": "abdallah08"
   }
 }

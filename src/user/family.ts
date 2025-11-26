@@ -2,6 +2,21 @@
 import { BASE_URL as API_URL } from "../env/baseUrl";
 import { Storage } from "../utils/storage";
 
+export type FamilyResponse = {
+  display_name: string;
+  id: number;
+  invite_code: string;
+  count: number; // Number of members in the family
+};
+
+type HttpError = Error & { status?: number };
+
+const buildError = (message: string, status?: number): HttpError => {
+  const err = new Error(message) as HttpError;
+  err.status = status;
+  return err;
+};
+
 async function getAuthHeader() {
   const token = await Storage.getItem("access_token");
   return {
@@ -59,20 +74,20 @@ export async function createFamily(display_name: string) {
 // 👨‍👩‍👧‍👦 Get all families the user is part of
 export async function listMyFamilies() {
   const headers = await getAuthHeader();
-  
-  try {
-    console.log('[family.ts] Fetching user families...');
-    
-    const res = await fetch(`${API_URL}/families`, { headers });
 
-    console.log('[family.ts] Response status:', res.status);
-    
+  try {
+    const res = await fetch(`${API_URL}/families`, {
+      headers,
+      cache: 'no-store' // Disable caching to ensure fresh data
+    });
+
     if (!res.ok) {
       const errorText = await res.text().catch(() => "");
       let errorMessage = "Failed to fetch families";
-      
+
       if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
+        // Expected when user is logged out or token expired
+        throw buildError("Session expired. Please log in again.", 401);
       } else if (res.status === 429) {
         errorMessage = "Too many requests. Please wait before trying again.";
       } else if (res.status >= 500) {
@@ -85,18 +100,24 @@ export async function listMyFamilies() {
           errorMessage = errorText.substring(0, 100);
         }
       }
-      
-      console.error('[family.ts] Error response:', { status: res.status, errorMessage });
-      throw new Error(errorMessage);
+
+      console.warn("[family.ts] Fetch families failed", {
+        status: res.status,
+        message: errorMessage,
+      });
+      throw buildError(errorMessage, res.status);
     }
-    
+
     const data = await res.json();
-    console.log('[family.ts] Families fetched successfully:', JSON.stringify(data, null, 2));
     return data;
   } catch (error: any) {
-    console.error('[family.ts] Exception:', error);
+    if (error?.status === 401) {
+      // Quietly bubble up unauthorized; handled by caller to redirect
+      throw error;
+    }
+    console.warn("[family.ts] Exception", { message: error?.message });
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      throw buildError("Network error. Please check your internet connection.");
     }
     throw error;
   }

@@ -1,5 +1,5 @@
 import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
-import { listMyFamilies } from "@/src/user/family";
+import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
 import { listMyPantryItems } from "@/src/user/pantry";
 import { getMyprefrences } from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
@@ -42,10 +42,12 @@ type UserContextType = {
   ) => Promise<User>;
   prefrences: string[];
   pantryItems:PantryItem[] ;
-  loadPantryItems: () => Promise<void>;
+  loadPantryItems: (force?: boolean) => Promise<void>;
   activeFamilyId: number | null;
   refreshFamilyMembership: () => Promise<number | null>;
   setActiveFamilyId: React.Dispatch<React.SetStateAction<number | null>>;
+  isInFamily: boolean;
+  families: FamilyResponse[];
 };
 
 
@@ -58,6 +60,10 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const [prefrences, setPrefrences] = useState([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [activeFamilyId, setActiveFamilyId] = useState<number | null>(null);
+  const [families, setFamilies] = useState<FamilyResponse[]>([]);
+  const [isInFamily, setIsInFamily] = useState<boolean>(false);
+  const [pantryLoaded, setPantryLoaded] = useState(false);
+
   useEffect(() => {
     refreshUser();
   }, []);
@@ -95,57 +101,63 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
     return [];
   };
 
-  const extractFamilyId = (entry: any): number | null => {
-    const raw =
-      entry?.id ??
-      entry?.family_id ??
-      entry?.familyId ??
-      entry?.family?.id ??
-      null;
-    const parsed = Number(raw);
+  const extractFamilyId = (entry: FamilyResponse): number | null => {
+    const parsed = Number(entry?.id);
     return Number.isFinite(parsed) ? parsed : null;
   };
 
   const refreshFamilyMembership = useCallback(async (): Promise<number | null> => {
     try {
-      const families = await listMyFamilies();
-      if (Array.isArray(families) && families.length > 0) {
-        for (const entry of families) {
+      const familiesData = await listMyFamilies();
+      setFamilies(familiesData || []);
+
+      if (Array.isArray(familiesData) && familiesData.length > 0) {
+        setIsInFamily(true);
+        for (const entry of familiesData) {
           const id = extractFamilyId(entry);
           if (id !== null) {
             setActiveFamilyId(id);
+            // Load family pantry items after setting family ID
             return id;
           }
         }
       }
+      setIsInFamily(false);
       setActiveFamilyId(null);
+      // Load personal pantry items when not in family
       return null;
     } catch (err) {
-      console.log(err);
+      console.log('[UserContext] refreshFamilyMembership error:', err);
+      setIsInFamily(false);
+      setFamilies([]);
       setActiveFamilyId((prev) => prev ?? null);
       return activeFamilyId ?? null;
     }
   }, [activeFamilyId]);
 
-  const loadPantryItems = useCallback(async () => {
+  const loadPantryItems = useCallback(async (force: boolean = false) => {
+    // If already loaded and not forcing reload, skip
+    if (pantryLoaded && !force) {
+      return;
+    }
+
     try {
-      let familyId = activeFamilyId;
-      if (familyId == null) {
-        familyId = await refreshFamilyMembership();
-      }
+      // If user is in a family, fetch family pantry items
+      // Otherwise, fetch personal pantry items
+      const shouldFetchFamily = isInFamily && activeFamilyId;
+
       const res = await listMyPantryItems(
-        familyId ? { familyId } : undefined
+        shouldFetchFamily ? { familyId: activeFamilyId } : undefined
       );
       setPantryItems(normalizePantryResponse(res));
+      setPantryLoaded(true);
     } catch (err) {
-      console.log(err);
+      console.log('[UserContext] loadPantryItems error:', err);
       setPantryItems([]);
     }
-  }, [activeFamilyId, refreshFamilyMembership]);
+  }, [isInFamily, activeFamilyId, pantryLoaded]);
 
-  useEffect(() => {
-    loadPantryItems();
-  }, [loadPantryItems]);
+  // Don't auto-load pantry items on mount - let the component request them when ready
 
   useEffect(() => {
     const userPrefrences = async () => {
@@ -157,6 +169,12 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
     userPrefrences();
+  }, []);
+
+  // Load family membership on mount - only run once
+  useEffect(() => {
+    refreshFamilyMembership();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const refreshUser = async () => {
@@ -177,6 +195,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = async () => {
     await Storage.deleteItem("access_token");
     setUser(null);
+    setActiveFamilyId(null);
+    setIsInFamily(false);
+    setFamilies([]);
+    setPantryItems([]);
+    setPantryLoaded(false);
   };
 
   return (
@@ -193,6 +216,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         activeFamilyId,
         refreshFamilyMembership,
         setActiveFamilyId,
+        isInFamily,
+        families,
       }}
     >
       {children}

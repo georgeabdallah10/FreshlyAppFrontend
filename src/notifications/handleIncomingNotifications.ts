@@ -24,12 +24,9 @@ export function setupNotificationResponseListener(): () => void {
     handleNotificationResponse
   );
 
-  console.log('[NotificationHandler] Response listener registered');
-
   // Return cleanup function
   return () => {
     subscription.remove();
-    console.log('[NotificationHandler] Response listener removed');
   };
 }
 
@@ -42,12 +39,9 @@ export function setupNotificationReceivedListener(): () => void {
     handleNotificationReceived
   );
 
-  console.log('[NotificationHandler] Received listener registered');
-
   // Return cleanup function
   return () => {
     subscription.remove();
-    console.log('[NotificationHandler] Received listener removed');
   };
 }
 
@@ -64,15 +58,8 @@ async function handleNotificationReceived(
   try {
     const { title, body, data } = notification.request.content;
 
-    console.log('[NotificationHandler] Notification received in foreground:', {
-      title,
-      body,
-      data,
-    });
-
     // Handle daily pantry check silently
     if (data?.type === 'daily_check') {
-      console.log('[NotificationHandler] Daily pantry check triggered');
       // Import and run pantry check
       const { schedulePantryExpirationNotifications } = await import('./schedulePantryNotifications');
       await schedulePantryExpirationNotifications();
@@ -104,12 +91,6 @@ async function handleNotificationResponse(
     const { notification } = response;
     const { data, title, body } = notification.request.content;
 
-    console.log('[NotificationHandler] User tapped notification:', {
-      title,
-      body,
-      data,
-    });
-
     // Clear badge when user interacts with notification
     await clearBadgeCount();
 
@@ -140,8 +121,6 @@ async function routeNotification(
   category: NotificationCategory,
   data: Record<string, any>
 ): Promise<void> {
-  console.log('[NotificationHandler] Routing notification:', category, data);
-
   switch (category) {
     case 'meal_request':
       await handleMealRequestNotification(data);
@@ -173,8 +152,6 @@ async function routeNotification(
  * Route based on notification type (for backward compatibility)
  */
 async function routeByType(type: string, data: Record<string, any>): Promise<void> {
-  console.log('[NotificationHandler] Routing by type:', type, data);
-
   if (type === 'daily_check') {
     // Silent background task, don't navigate
     return;
@@ -361,7 +338,6 @@ export async function setupNotificationCategories(): Promise<void> {
       },
     ]);
 
-    console.log('[NotificationHandler] Notification categories configured');
   } catch (error) {
     console.error('[NotificationHandler] Error setting up notification categories:', error);
   }
@@ -391,7 +367,6 @@ export async function checkAndPromptForPermissions(): Promise<boolean> {
         return newStatus === 'granted';
       } else {
         // User has denied, prompt to go to settings
-        console.log('[NotificationHandler] Permission denied, cannot ask again');
         return false;
       }
     }
@@ -430,7 +405,6 @@ export async function handlePendingNotification(): Promise<void> {
     const lastResponse = await getLastNotificationResponse();
 
     if (lastResponse) {
-      console.log('[NotificationHandler] Handling pending notification');
       await handleNotificationResponse(lastResponse);
     }
   } catch (error) {

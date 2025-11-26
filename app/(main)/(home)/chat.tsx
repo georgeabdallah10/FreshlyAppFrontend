@@ -700,7 +700,7 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
 const RecipeCardView = React.memo(RecipeCardViewBase);
 
 export default function ChatAIScreen() {
-  const { prefrences } = useUser();
+  const { prefrences, isInFamily, families } = useUser();
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [message, setMessage] = useState("");
   const [showActionSheet, setShowActionSheet] = useState(false);
@@ -1529,6 +1529,16 @@ Rules:
     });
   };
 
+  const handleFamilyContextPress = () => {
+    if (!isInFamily || !families || families.length === 0) return;
+
+    const family = families[0];
+    const memberCount = family?.count ?? 2;
+
+    const familyText = ` serving my family of ${memberCount}`;
+    setMessage((prev) => prev + familyText);
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -1687,6 +1697,18 @@ Rules:
       </ScrollView>
 
       <View style={styles.inputContainer}>
+        {/* Floating Family Context Button */}
+        {isInFamily && families && families.length > 0 && (
+          <TouchableOpacity
+            style={styles.familyContextButton}
+            onPress={handleFamilyContextPress}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="people" size={16} color="#FFF" />
+            <Text style={styles.familyContextButtonText}>For My Family</Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.inputWrapper}>
           <TextInput
             style={styles.input}
@@ -2006,7 +2028,8 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
     backgroundColor: "#FFF",
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
@@ -2322,5 +2345,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#111827",
+  },
+  familyContextButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FD8100",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    shadowColor: "#FD8100",
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
+    gap: 6,
+    marginBottom: 12,
+    alignSelf: "flex-start",
+  },
+  familyContextButtonText: {
+    color: "#FFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

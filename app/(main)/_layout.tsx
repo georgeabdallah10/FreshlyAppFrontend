@@ -17,8 +17,6 @@ export default function MainLayout() {
     let receivedListener: (() => void) | undefined;
 
     async function init() {
-      console.log("[Notifications] Initializing in (main)/_layout.tsx...");
-
       // 1. iOS notification categories (actions)
       await setupNotificationCategories();
 
@@ -31,7 +29,6 @@ export default function MainLayout() {
 
       // 4. Register Expo push token once user is available
       if (user?.id) {
-        console.log("[Notifications] Registering push token for user:", user.id);
         await registerForPushNotifications(user.id);
       }
     }

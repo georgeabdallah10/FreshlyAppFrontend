@@ -4,10 +4,8 @@ import ScanConfirmModal from "@/components/scanConfirmModal";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
-import { listMyFamilies } from "@/src/user/family";
 import {
     deletePantryItem,
-    listMyPantryItems,
     updatePantryItem,
     upsertPantryItemByName,
 } from "@/src/user/pantry";
@@ -160,10 +158,13 @@ const formatQuantityDisplay = (value: string | number | null | undefined) => {
 const PantryDashboard = () => {
   const router = useRouter();
   const {
-    loadPantryItems,
     activeFamilyId: contextFamilyId,
     refreshFamilyMembership,
-    setActiveFamilyId: setContextFamilyId,
+    logout,
+    isInFamily,
+    families,
+    pantryItems: contextPantryItems,
+    loadPantryItems,
   } = useUser();
 
   // UI state
@@ -194,13 +195,9 @@ const PantryDashboard = () => {
   ]);
   const [groceryItems, setGroceryItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [activeScope, setActiveScope] = useState<"personal" | "family">("personal");
-  const [families, setFamilies] = useState<Array<{ id: number; name: string }>>([]);
-  const [familiesLoading, setFamiliesLoading] = useState(false);
-  const [familiesReady, setFamiliesReady] = useState(false);
-  const [scopeManuallySet, setScopeManuallySet] = useState(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(null);
+  const [familyStatusChecked, setFamilyStatusChecked] = useState(false);
 
   // Rate limiting
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -225,6 +222,7 @@ const PantryDashboard = () => {
   const canScanRef = useRef(true);
   const lastCodeRef = useRef<string | null>(null);
   const lastScanAtRef = useRef(0);
+  const authRedirectedRef = useRef(false);
 
   // Toast
   const [toast, setToast] = useState<{
@@ -247,6 +245,28 @@ const PantryDashboard = () => {
     []
   );
 
+  const handleAuthFailure = useCallback(
+    async (err: any, message?: string) => {
+      const statusCode = typeof err?.status === "number" ? err.status : null;
+      const errorMessage = typeof err?.message === "string" ? err.message : "";
+      const isUnauthorized =
+        statusCode === 401 ||
+        errorMessage.includes("(401)") ||
+        errorMessage.toLowerCase().includes("401") ||
+        errorMessage.toLowerCase().includes("unauthorized");
+
+      if (!isUnauthorized) return false;
+      if (authRedirectedRef.current) return true;
+
+      authRedirectedRef.current = true;
+      await logout();
+      showToast("error", message || "Session expired. Please log in again.");
+      router.replace("/(auth)/Login");
+      return true;
+    },
+    [logout, router, showToast]
+  );
+
   const formatExpiration = (dateStr?: string | null) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
@@ -265,78 +285,13 @@ const PantryDashboard = () => {
   };
 
   useEffect(() => {
-    loadPantryItems();
-  }, []);
-
-  useEffect(() => {
-    refreshFamilyMembership();
+    const checkFamilyStatus = async () => {
+      await refreshFamilyMembership();
+      setFamilyStatusChecked(true);
+    };
+    checkFamilyStatus();
   }, [refreshFamilyMembership]);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchFamilies = async () => {
-      try {
-        setFamiliesLoading(true);
-        const rawFamilies = await listMyFamilies();
-        if (!mounted) return;
-        const normalized = Array.isArray(rawFamilies)
-          ? rawFamilies
-              .map((fam: any) => {
-                const rawId =
-                  fam?.id ??
-                  fam?.family_id ??
-                  fam?.familyId ??
-                  fam?.family?.id ??
-                  null;
-                const id = Number(rawId);
-                if (!Number.isFinite(id)) return null;
-                const name =
-                  fam?.display_name ??
-                  fam?.name ??
-                  fam?.family_name ??
-                  fam?.family?.name ??
-                  `Family ${id}`;
-                return { id, name };
-              })
-              .filter((f): f is { id: number; name: string } => Boolean(f))
-          : [];
-        setFamilies(normalized);
-        if (normalized.length > 0) {
-          const hasCurrent = normalized.some((f) => f.id === contextFamilyId);
-          if (!hasCurrent) {
-            setContextFamilyId(normalized[0].id);
-          }
-        } else {
-          setContextFamilyId(null);
-        }
-      } catch (err) {
-        console.log("listMyFamilies error", err);
-        showToast("error", "Unable to load family list.");
-      } finally {
-        if (mounted) {
-          setFamiliesLoading(false);
-          setFamiliesReady(true);
-        }
-      }
-    };
-    fetchFamilies();
-    return () => {
-      mounted = false;
-    };
-  }, [showToast, contextFamilyId, setContextFamilyId]);
-
-  useEffect(() => {
-    if (contextFamilyId && !scopeManuallySet) {
-      setActiveScope("family");
-    }
-  }, [contextFamilyId, scopeManuallySet]);
-
-  useEffect(() => {
-    if (!contextFamilyId && activeScope === "family") {
-      setActiveScope("personal");
-      setScopeManuallySet(false);
-    }
-  }, [contextFamilyId, activeScope]);
 
   useEffect(() => {
     if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -393,67 +348,63 @@ const PantryDashboard = () => {
     };
   };
 
-  const effectiveFamilyId =
-    activeScope === "family" ? contextFamilyId ?? null : null;
-  const isFamilyScope = activeScope === "family";
+  const effectiveFamilyId = isInFamily ? contextFamilyId ?? null : null;
+  const isFamilyScope = isInFamily;
 
-  const refreshList = useCallback(async () => {
-    const familyIdForFetch = effectiveFamilyId;
-    const requiresFamilyId = isFamilyScope;
-    if (requiresFamilyId && !familyIdForFetch) {
-      setGroceryItems([]);
-      setLoading(false);
-      return;
-    }
+  const refreshList = useCallback(async (force: boolean = false) => {
     try {
       setLoading(true);
-      const items = await listMyPantryItems(
-        familyIdForFetch ? { familyId: familyIdForFetch } : undefined
-      );
-      const mapped = (Array.isArray(items) ? items : []).map(mapApiItemToUI);
-      setGroceryItems(mapped);
-
-      // Gather all category names: default, user-added, and from items
-      const itemCategories = mapped
-        .map((i) => (i.category || "Uncategorized").trim())
-        .filter((n) => n.length > 0);
-      const allCategoryNames = [
-        ...DEFAULT_CATEGORIES,
-        ...userCategories.map((c) => c.name),
-        ...itemCategories,
-      ];
-      // Deduplicate by normalized key, but preserve display name
-      const seen = new Map<string, string>();
-      for (const name of allCategoryNames) {
-        const norm = categoryIdFromName(name);
-        if (!seen.has(norm)) seen.set(norm, name);
-      }
-      setCategories([
-        { id: "all", name: "All" },
-        ...Array.from(seen.entries()).map(([id, name]) => ({ id, name })),
-      ]);
-
-      const itemNames = mapped.map((item) => item.name).filter(Boolean);
-      if (itemNames.length > 0) {
-        preloadPantryImages(itemNames);
-      }
+      await loadPantryItems(force);
     } catch (err: any) {
-      console.log("listMyPantryItems error", err);
-      const isForbidden = typeof err?.message === "string" && err.message.includes("403");
-      if (isForbidden && requiresFamilyId) {
-        showToast("error", "You no longer have access to this family pantry.");
-      } else {
-        showToast("error", "Failed to load pantry items.");
+      console.log("loadPantryItems error", err);
+      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+        return;
       }
+      showToast("error", "Failed to load pantry items.");
     } finally {
       setLoading(false);
     }
-  }, [activeScope, effectiveFamilyId, userCategories, showToast, isFamilyScope]);
+  }, [loadPantryItems, showToast, handleAuthFailure]);
+
+  // Sync context pantry items to local state and update categories
+  useEffect(() => {
+    const mapped = (Array.isArray(contextPantryItems) ? contextPantryItems : []).map(mapApiItemToUI);
+    setGroceryItems(mapped);
+
+    // Gather all category names: default, user-added, and from items
+    const itemCategories = mapped
+      .map((i) => (i.category || "Uncategorized").trim())
+      .filter((n) => n.length > 0);
+    const allCategoryNames = [
+      ...DEFAULT_CATEGORIES,
+      ...userCategories.map((c) => c.name),
+      ...itemCategories,
+    ];
+    // Deduplicate by normalized key, but preserve display name
+    const seen = new Map<string, string>();
+    for (const name of allCategoryNames) {
+      const norm = categoryIdFromName(name);
+      if (!seen.has(norm)) seen.set(norm, name);
+    }
+    setCategories([
+      { id: "all", name: "All" },
+      ...Array.from(seen.entries()).map(([id, name]) => ({ id, name })),
+    ]);
+
+    const itemNames = mapped.map((item) => item.name).filter(Boolean);
+    if (itemNames.length > 0) {
+      preloadPantryImages(itemNames);
+    }
+  }, [contextPantryItems, userCategories]);
+
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!familiesReady) return;
-    refreshList();
-  }, [refreshList, familiesReady]);
+    if (familyStatusChecked && !hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      refreshList();
+    }
+  }, [familyStatusChecked, refreshList]);
 
   useEffect(() => {
     Animated.timing(dropdownAnim, {
@@ -549,26 +500,21 @@ const PantryDashboard = () => {
       );
     } catch (err) {
       console.log("adjust quantity error", err);
+      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+        return;
+      }
       showToast("error", "Could not update quantity.");
     } finally {
       setQuantityUpdatingId((prev) => (prev === item.id ? null : prev));
     }
   };
 
-  const handleScopeChange = (scope: "personal" | "family") => {
-    if (scope === activeScope) return;
-    if (scope === "family") {
-      if (!families.length || !contextFamilyId) {
-        showToast("info", "Join or select a family to share pantry items.");
-        return;
-      }
-    }
-    setScopeManuallySet(true);
-    setActiveScope(scope);
-    setGroceryItems([]);
-  };
 
   const openCreateSheet = () => {
+    if (isFamilyScope && !effectiveFamilyId) {
+      showToast("info", "Join a family to add shared pantry items.");
+      return;
+    }
     setEditingItemId(null);
     setNewProductName("");
     setNewProductQuantity("");
@@ -667,7 +613,7 @@ const PantryDashboard = () => {
         );
       }
 
-      await refreshList();
+      await refreshList(true); // Force reload after adding/updating item
       setShowAddProduct(false);
       setEditingItemId(null);
       setNewProductName("");
@@ -676,6 +622,9 @@ const PantryDashboard = () => {
       setNewProductExpiresAt("");
     } catch (err) {
       console.log("saveProduct error", err);
+      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+        return;
+      }
       showToast("error", editingItemId ? "Failed to update item." : "Failed to add item.");
     }
   };
@@ -700,10 +649,13 @@ const PantryDashboard = () => {
     try {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       await deletePantryItem(id);
-      await refreshList();
+      await refreshList(true); // Force reload after deleting item
       showToast("success", "Item deleted successfully.");
     } catch (err: any) {
       console.log("deletePantryItem error", err);
+      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+        return;
+      }
 
       let errorMessage = "Unable to delete item. ";
       if (err.message?.toLowerCase().includes("network")) {
@@ -730,8 +682,7 @@ const PantryDashboard = () => {
     const inSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
     return inCategory && inSearch;
   });
-  const needsFamilySelection =
-    isFamilyScope && !familiesLoading && !effectiveFamilyId;
+  const needsFamilySelection = isFamilyScope && !effectiveFamilyId;
 
   const openScanner = async () => {
     if (isFamilyScope && !effectiveFamilyId) {
@@ -1423,35 +1374,43 @@ const PantryDashboard = () => {
             visible={confirmVisible}
             product={pendingProduct}
             onApprove={async (payload) => {
-              setConfirmVisible(false);
-              setShowQRScanner(false);
+              try {
+                setConfirmVisible(false);
+                setShowQRScanner(false);
 
-              setNewProductName(payload.ingredient_name || "");
-              setNewProductQuantity(payload.quantity ? String(payload.quantity) : "");
-              setNewProductCategory(payload.category || "");
+                setNewProductName(payload.ingredient_name || "");
+                setNewProductQuantity(payload.quantity ? String(payload.quantity) : "");
+                setNewProductCategory(payload.category || "");
 
-              setCurrentScannedProduct(payload);
-              const targetFamilyId = isFamilyScope ? effectiveFamilyId : null;
-              if (isFamilyScope && !targetFamilyId) {
-                showToast("info", "Select a family to add scanned items.");
-                return;
+                setCurrentScannedProduct(payload);
+                const targetFamilyId = isFamilyScope ? effectiveFamilyId : null;
+                if (isFamilyScope && !targetFamilyId) {
+                  showToast("info", "Select a family to add scanned items.");
+                  return;
+                }
+                const mergeResult = await upsertPantryItemByName(
+                  {
+                    ingredient_name: payload.ingredient_name,
+                    quantity: payload.quantity ?? undefined,
+                    expires_at: payload.expires_at ?? null,
+                    category: payload.category,
+                    unit: (payload as any).unit || null,
+                  },
+                  { familyId: targetFamilyId ?? null }
+                );
+                await refreshList(true); // Force reload after scan add
+                console.log("Approved product payload:", payload);
+                showToast(
+                  "success",
+                  mergeResult.merged ? "Item quantity updated from scan." : "Item added from scan."
+                );
+              } catch (err) {
+                console.log("scan approve error", err);
+                if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+                  return;
+                }
+                showToast("error", "Could not add scanned item. Please try again.");
               }
-              const mergeResult = await upsertPantryItemByName(
-                {
-                  ingredient_name: payload.ingredient_name,
-                  quantity: payload.quantity ?? undefined,
-                  expires_at: payload.expires_at ?? null,
-                  category: payload.category,
-                  unit: (payload as any).unit || null,
-                },
-                { familyId: targetFamilyId ?? null }
-              );
-              await refreshList();
-              console.log("Approved product payload:", payload);
-              showToast(
-                "success",
-                mergeResult.merged ? "Item quantity updated from scan." : "Item added from scan."
-              );
             }}
             onCancel={() => {
               setConfirmVisible(false);

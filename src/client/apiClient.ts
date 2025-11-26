@@ -102,14 +102,6 @@ class ApiClient {
           config.headers.Authorization = `Bearer ${token}`;
         }
 
-        // Log requests in development
-        if (__DEV__) {
-          console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`);
-          if (config.data) {
-            console.log('[API Request Body]', config.data);
-          }
-        }
-
         return config;
       },
       (error) => {
@@ -121,10 +113,6 @@ class ApiClient {
     // ========== RESPONSE INTERCEPTOR ==========
     this.client.interceptors.response.use(
       (response) => {
-        // Log successful responses in development
-        if (__DEV__) {
-          console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status);
-        }
         return response;
       },
       async (error: AxiosError) => {

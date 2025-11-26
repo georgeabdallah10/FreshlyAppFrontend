@@ -47,6 +47,11 @@ type BasicBodyInformation = {
   gender: "male" | "female" | null;
 };
 
+type BodyUnits = {
+  heightUnit: "cm" | "ft";
+  weightUnit: "kg" | "lbs";
+};
+
 type OnboardingPreferenceState = {
   culturalLifestyle: string[];
   allergies: string[];
@@ -122,6 +127,10 @@ const OnboardingPreferences = () => {
       gender: null,
     }
   );
+  const [bodyUnits, setBodyUnits] = useState<BodyUnits>({
+    heightUnit: "cm",
+    weightUnit: "kg",
+  });
   const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
   const [bodyErrors, setBodyErrors] = useState<{
     age: string | null;
@@ -258,15 +267,6 @@ const OnboardingPreferences = () => {
     [getOptionScale]
   );
 
-  const bodyHasValues = useMemo(
-    () =>
-      bodyInformation.age !== null ||
-      bodyInformation.height !== null ||
-      bodyInformation.weight !== null ||
-      bodyInformation.gender !== null,
-    [bodyInformation]
-  );
-
   const bodyHasInvalidEntries = useMemo(
     () =>
       (bodyErrors.age && bodyInformation.age !== null) ||
@@ -285,7 +285,13 @@ const OnboardingPreferences = () => {
       return allergiesCount > 0;
     }
     if (isBodyStage) {
-      return bodyHasValues;
+      // For body stage, require ALL fields to be filled
+      return (
+        bodyInformation.age !== null &&
+        bodyInformation.height !== null &&
+        bodyInformation.weight !== null &&
+        bodyInformation.gender !== null
+      );
     }
     if (isCalorieStage) {
       return calorieTarget !== null;
@@ -294,7 +300,7 @@ const OnboardingPreferences = () => {
   }, [
     currentPreferenceScreen,
     allergiesCount,
-    bodyHasValues,
+    bodyInformation,
     isAllergiesStage,
     isBodyStage,
     isCalorieStage,
@@ -381,6 +387,13 @@ const OnboardingPreferences = () => {
     [animateOptionSelection, currentPreferenceScreen]
   );
 
+  const handleBodyUnitChange = useCallback((field: "height" | "weight", unit: string) => {
+    setBodyUnits((prev) => ({
+      ...prev,
+      [field === "height" ? "heightUnit" : "weightUnit"]: unit,
+    }));
+  }, []);
+
   const handleBodyInputChange = useCallback(
     (
       field: "age" | "height" | "weight" | "gender",
@@ -412,18 +425,47 @@ const OnboardingPreferences = () => {
       }
 
       let error: string | null = null;
-      if (field === "age" && (numeric < 10 || numeric > 120)) {
-        error = "Age must be between 10 and 120";
-      } else if (field === "height" && (numeric < 100 || numeric > 250)) {
-        error = "Height must be between 100 cm and 250 cm";
-      } else if (field === "weight" && (numeric < 30 || numeric > 300)) {
-        error = "Weight must be between 30 kg and 300 kg";
+      let valueInStandardUnit = numeric;
+
+      // Validate and convert based on field and unit
+      if (field === "age") {
+        if (numeric < 10 || numeric > 120) {
+          error = "Age must be between 10 and 120";
+        }
+      } else if (field === "height") {
+        if (bodyUnits.heightUnit === "cm") {
+          if (numeric < 100 || numeric > 250) {
+            error = "Height must be between 100 and 250 cm";
+          }
+          valueInStandardUnit = numeric; // Already in cm
+        } else {
+          // feet input - expect total inches (e.g., 70 for 5'10")
+          if (numeric < 39 || numeric > 98) {
+            error = "Height must be between 3'3\" and 8'2\" (39-98 inches)";
+          }
+          // Convert inches to cm (1 inch = 2.54 cm)
+          valueInStandardUnit = Math.round(numeric * 2.54);
+        }
+      } else if (field === "weight") {
+        if (bodyUnits.weightUnit === "kg") {
+          if (numeric < 30 || numeric > 300) {
+            error = "Weight must be between 30 and 300 kg";
+          }
+          valueInStandardUnit = numeric; // Already in kg
+        } else {
+          // pounds
+          if (numeric < 66 || numeric > 660) {
+            error = "Weight must be between 66 and 660 lbs";
+          }
+          // Convert lbs to kg (1 lb = 0.453592 kg)
+          valueInStandardUnit = Math.round(numeric * 0.453592);
+        }
       }
 
-      setBodyInformation((prev) => ({ ...prev, [field]: numeric }));
+      setBodyInformation((prev) => ({ ...prev, [field]: valueInStandardUnit }));
       setBodyErrors((prev) => ({ ...prev, [field]: error }));
     },
-    []
+    [bodyUnits]
   );
 
   const runStageTransition = useCallback(
@@ -476,9 +518,19 @@ const OnboardingPreferences = () => {
   const handleNext = useCallback(async () => {
     const stage = currentStageKey;
 
-    if (stage === "body" && bodyHasInvalidEntries) {
-      alert("Please fix the highlighted body information before continuing.");
-      return;
+    if (stage === "body") {
+      // Check if all required fields are filled
+      if (!bodyInformation.age || !bodyInformation.height ||
+          !bodyInformation.weight || !bodyInformation.gender) {
+        alert("Please fill in all body information fields to continue.");
+        return;
+      }
+
+      // Check for validation errors
+      if (bodyHasInvalidEntries) {
+        alert("Please fix the highlighted body information before continuing.");
+        return;
+      }
     }
 
     if (stage === "calories") {
@@ -878,6 +930,7 @@ const OnboardingPreferences = () => {
             heightError={bodyErrors.height}
             weightError={bodyErrors.weight}
             onChange={handleBodyInputChange}
+            onUnitChange={handleBodyUnitChange}
           />
           {renderNextButton()}
         </ScrollView>

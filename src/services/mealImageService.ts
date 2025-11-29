@@ -33,6 +33,7 @@ let bucketInitialized = false;
 /**
  * Ensure the Supabase bucket exists and is accessible
  * This only runs once per app session
+ * Note: Bucket must allow public INSERT or have no RLS for anon uploads
  */
 async function ensureBucketExists(): Promise<boolean> {
   if (bucketInitialized) {
@@ -48,42 +49,12 @@ async function ensureBucketExists(): Promise<boolean> {
     if (listError) {
       console.error(`[MealImageService] ❌ Bucket "${BUCKET_NAME}" error:`, listError.message);
       console.error(`[MealImageService] 📋 Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
-      console.error(`[MealImageService] 📖 Please follow the setup guide: SUPABASE_STORAGE_SETUP.md`);
-      console.error(`[MealImageService] 🔧 Quick fix:`);
-      console.error(`[MealImageService]    1. Go to Supabase Dashboard → Storage`);
-      console.error(`[MealImageService]    2. Create bucket named "${BUCKET_NAME}"`);
-      console.error(`[MealImageService]    3. Set bucket to Public`);
-      console.error(`[MealImageService]    4. Add RLS policies (INSERT/UPDATE for authenticated, SELECT for public)`);
+      console.error(`[MealImageService] 🔧 Fix: Ensure bucket RLS policies allow anon/public INSERT (like pantryItems bucket)`);
       return false;
     }
-
-    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" exists (read access confirmed)`);
-
-    // Test write permissions with a tiny test file
-    const testFilename = `.test-${Date.now()}.txt`;
-    const testData = new Uint8Array([116, 101, 115, 116]); // "test" in bytes
-
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(testFilename, testData, {
-        contentType: "text/plain",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error(`[MealImageService] ❌ Bucket write test failed:`, uploadError.message);
-      console.error(`[MealImageService] 📋 The bucket exists but uploads are blocked by RLS policies`);
-      console.error(`[MealImageService] 🔧 Fix: Add INSERT policy for authenticated users in Supabase Dashboard`);
-      console.error(`[MealImageService] 📖 See SUPABASE_STORAGE_SETUP.md for SQL policy examples`);
-      // Don't mark as initialized so we check again later
-      return false;
-    }
-
-    // Clean up test file
-    await supabase.storage.from(BUCKET_NAME).remove([testFilename]);
 
     bucketInitialized = true;
-    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" is fully accessible (read + write)`);
+    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" is accessible`);
     return true;
   } catch (error) {
     console.error(`[MealImageService] ❌ Error checking bucket:`, error);
@@ -199,28 +170,13 @@ async function generateMealImage(
 
 /**
  * Download image from URL and upload to Supabase bucket with retry logic
+ * Matches pantryImageService approach (direct upload from frontend)
  */
 async function uploadImageToBucket(
   imageUrl: string,
   filename: string,
   retries: number = 3
 ): Promise<string | null> {
-  // Check bucket exists before attempting upload
-  const bucketExists = await ensureBucketExists();
-  if (!bucketExists) {
-    console.error(`[MealImageService] ❌ Cannot upload: bucket "${BUCKET_NAME}" is not accessible`);
-    return null;
-  }
-
-  // Check authentication status
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
-    console.error(`[MealImageService] ❌ No active session - user must be authenticated to upload`);
-    console.error(`[MealImageService] 💡 This might be why uploads are failing. Check authentication.`);
-  } else {
-    console.log(`[MealImageService] ✅ User authenticated for upload`);
-  }
-
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
@@ -234,23 +190,45 @@ async function uploadImageToBucket(
 
       console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${filename} (attempt ${attempt}/${retries})`);
 
-      // Download the image (React Native compatible)
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      // Download the image (React Native compatible, same as pantryImageService)
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
       }
 
-      const arrayBuffer = await response.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
+      // Convert to Uint8Array (same approach as pantryImageService)
+      let imageBlob: Uint8Array;
+      try {
+        if (typeof imageResponse.arrayBuffer === "function") {
+          const arrayBuffer = await imageResponse.arrayBuffer();
+          imageBlob = new Uint8Array(arrayBuffer);
+        } else {
+          console.warn("⚠️ arrayBuffer() not supported, using base64 fallback");
+          const base64Data = await imageResponse.text();
+          const binary = atob(base64Data);
+          imageBlob = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+            imageBlob[i] = binary.charCodeAt(i);
+          }
+        }
+      } catch (e) {
+        console.error("⚠️ Failed to read image response data; using safe fallback.", e);
+        const base64Data = await imageResponse.text();
+        const binary = atob(base64Data);
+        imageBlob = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          imageBlob[i] = binary.charCodeAt(i);
+        }
+      }
 
-      if (uint8Array.length === 0) {
+      if (imageBlob.length === 0) {
         throw new Error("Downloaded image is empty");
       }
 
-      // Upload to Supabase bucket root
+      // Upload to Supabase bucket root (same as pantryImageService)
       const { error } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filename, uint8Array, {
+        .upload(filename, imageBlob, {
           contentType: "image/png",
           upsert: true, // Overwrite if exists
         });
@@ -260,23 +238,24 @@ async function uploadImageToBucket(
           name: error.name,
           message: error.message,
           statusCode: (error as any).statusCode,
-          fullError: error
         });
         lastError = error;
         continue; // Retry
       }
 
-      // Verify the upload by getting public URL
+      // Get public URL (same as pantryImageService)
       const { data: urlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(filename);
 
-      if (!urlData?.publicUrl) {
+      const publicUrl = urlData?.publicUrl;
+
+      if (!publicUrl) {
         throw new Error("Failed to get public URL after upload");
       }
 
       console.log(`[MealImageService] ✅ Image uploaded successfully on attempt ${attempt}/${retries}`);
-      return urlData.publicUrl;
+      return publicUrl;
     } catch (error) {
       console.error(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);
       lastError = error;

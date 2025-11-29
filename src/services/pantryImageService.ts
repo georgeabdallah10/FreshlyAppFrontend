@@ -23,7 +23,7 @@ const imageCache = new Map<
   { url: string | null; failedAt?: number; lastWarnedAt?: number }
 >();
 
-// Track pending requests to avoid duplicate API calls
+// Track pending requests to avoid duplicate  calls
 const pendingRequests = new Map<string, Promise<string | null>>();
 
 // Track which items have already logged 'waiting for pending request' for the current pending promise

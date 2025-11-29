@@ -1070,11 +1070,18 @@ const PantryDashboard = () => {
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
+            keyboardVerticalOffset={0}
           >
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={{ flex: 1, justifyContent: 'flex-end' }}
+              onPress={(e) => e.stopPropagation()}
+            >
               <ScrollView
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+                bounces={false}
               >
                 <Animated.View
                   style={[

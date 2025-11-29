@@ -1,7 +1,7 @@
 import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
 import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
 import { listMyPantryItems } from "@/src/user/pantry";
-import { getMyprefrences } from "@/src/user/setPrefrences";
+import { getMyprefrences, type UserPreferenceOut } from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 
@@ -19,6 +19,11 @@ type User = {
   phone_number?: string;
   avatar_path?: string;
   status?: string;
+  age?: number | null;
+  height?: number | null;
+  weight?: number | null;
+  gender?: "male" | "female" | null;
+  calories?: number | null;
 };
 
 type UserContextType = {
@@ -38,9 +43,10 @@ type UserContextType = {
       height: number | null;
       weight: number | null;
       gender: "male" | "female" | null;
+      calories: number | null;
     }>
   ) => Promise<User>;
-  prefrences: string[];
+  prefrences: UserPreferenceOut | null;
   pantryItems:PantryItem[] ;
   loadPantryItems: (force?: boolean) => Promise<void>;
   activeFamilyId: number | null;
@@ -57,7 +63,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [prefrences, setPrefrences] = useState([]);
+  const [prefrences, setPrefrences] = useState<UserPreferenceOut | null>(null);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [activeFamilyId, setActiveFamilyId] = useState<number | null>(null);
   const [families, setFamilies] = useState<FamilyResponse[]>([]);
@@ -80,6 +86,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       height: number | null;
       weight: number | null;
       gender: "male" | "female" | null;
+      calories: number | null;
     }>
   ) => {
     try {

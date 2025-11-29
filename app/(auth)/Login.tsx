@@ -123,7 +123,7 @@ export default function LoginScreen(): React.JSX.Element {
         showToast("success", "Login successful! Redirecting...");
         setTimeout(() => {
           setIsLoggingIn(false);
-          router.replace("/(home)/main");
+          router.replace("/(main)/(home)/main");
         }, 500);
       } else {
         setIsLoggingIn(false);
@@ -375,7 +375,7 @@ export default function LoginScreen(): React.JSX.Element {
         "[Login] Backend authentication successful, user session stored"
       );
       showToast("success", "Login successful! Redirecting...");
-      router.replace("/(home)/main");
+      router.replace("/(main)/(home)/main");
     } catch (error: any) {
       console.error("[Login] OAuth login error:", error);
       showToast(
@@ -414,7 +414,7 @@ export default function LoginScreen(): React.JSX.Element {
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-              <Text style={styles.brandName}>Savr</Text>
+              <Text style={styles.brandName}>SAVR</Text>
               <Text style={styles.welcomeText}>
                 <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text>
                 {"\n"}

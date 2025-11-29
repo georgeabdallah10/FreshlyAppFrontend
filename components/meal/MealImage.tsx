@@ -17,14 +17,13 @@ interface MealImageProps {
   size?: number;
   style?: StyleProp<ViewStyle>;
   showLoading?: boolean;
-  conversationId?: number;
   onError?: (message: string) => void; // Optional callback for error handling
   silent?: boolean; // If true, suppress error notifications
 }
 
 /**
  * MealImage Component
- * 
+ *
  * Displays meal image with automatic fallback to initials
  * Features:
  * - Automatic image fetching from service
@@ -33,6 +32,8 @@ interface MealImageProps {
  * - Toast notifications on failure
  * - Caching through service layer
  * - Customizable size and style
+ *
+ * Note: Image generation is a standalone utility, not tied to conversations
  */
 export const MealImage: React.FC<MealImageProps> = ({
   mealName,
@@ -40,7 +41,6 @@ export const MealImage: React.FC<MealImageProps> = ({
   size = 60,
   style,
   showLoading = true,
-  conversationId = 0,
   onError,
   silent = false,
 }) => {
@@ -77,9 +77,9 @@ export const MealImage: React.FC<MealImageProps> = ({
         setIsLoading(true);
         setHasError(false);
         setErrorNotified(false);
-        
-        const url = await getMealImage(mealName, conversationId);
-        
+
+        const url = await getMealImage(mealName);
+
         if (mounted) {
           if (url) {
             setImageUrl(url);
@@ -125,7 +125,7 @@ export const MealImage: React.FC<MealImageProps> = ({
     return () => {
       mounted = false;
     };
-  }, [mealName, providedImageUrl, conversationId, onError, silent]);
+  }, [mealName, providedImageUrl, onError, silent]);
 
   const containerSize = {
     width: resolvedWidth,

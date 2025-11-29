@@ -2,12 +2,16 @@ import { useUser } from "@/context/usercontext";
 import { upsertPantryItemByName } from "@/src/user/pantry";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
   Dimensions,
+  Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -278,7 +282,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         <View style={styles.optionTextContainer}>
           <Text style={styles.optionTitle}>Add many products to pantry</Text>
           <Text style={styles.optionDescription}>
-            Just take a picture of all your grocery and Savr AI will add all of
+            Just take a picture of all your grocery and SAVR AI will add all of
             them to your pantry
           </Text>
         </View>
@@ -332,165 +336,197 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
       <Text style={styles.modalTitle}>Add Product</Text>
 
-      <TouchableOpacity
-        style={styles.inputContainer}
-        onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-        activeOpacity={0.7}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <Ionicons name="basket" size={24} color="#10B981" />
-        <Text
-          style={[styles.inputText, !selectedCategory && styles.placeholder]}
-        >
-          {selectedCategory || "Select category"}
-        </Text>
-        <Ionicons
-          name={showCategoryDropdown ? "chevron-up" : "chevron-down"}
-          size={20}
-          color="#B0B0B0"
-        />
-      </TouchableOpacity>
-
-      {showCategoryDropdown && (
-        <Animated.View style={styles.dropdown}>
-          <ScrollView style={styles.dropdownScroll}>
-            {categories.map((category, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.dropdownItem}
-                onPress={() => {
-                  setSelectedCategory(category);
-                  setShowCategoryDropdown(false);
-                }}
-              >
-                <Text style={styles.dropdownItemText}>{category}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </Animated.View>
-      )}
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="cart" size={24} color="#10B981" />
-        <TextInput
-          style={styles.input}
-          placeholder="Enter product name"
-          placeholderTextColor="#B0B0B0"
-          value={productName}
-          onChangeText={setProductName}
-        />
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons name="list" size={24} color="#10B981" />
-        <TextInput
-          style={styles.input}
-          placeholder="Enter product quantity"
-          placeholderTextColor="#B0B0B0"
-          value={productQuantity.toString()}
-          onChangeText={(text) => {
-            setProductQuantity(Number(text));
-          }}
-          keyboardType="numeric"
-        />
-      </View>
-
-      {/* Unit picker with search (mirrors pantry.tsx) */}
-      <View style={{ marginBottom: 16 }}>
         <TouchableOpacity
-          style={styles.unitPicker}
-          activeOpacity={0.9}
-          onPress={() => {
-            setShowUnitDropdown((p) => !p);
-            setUnitSearch("");
-          }}
+          style={styles.modalInput}
+          onPress={() => setShowCategoryDropdown((prev) => !prev)}
         >
-          <Text style={[styles.unitPickerText, !productUnit && styles.placeholder]}>
-            {productUnit || "Unit"}
-          </Text>
-          <Ionicons
-            name={showUnitDropdown ? "chevron-up" : "chevron-down"}
-            size={18}
-            color="#B0B0B0"
+          <Image
+            source={require("../assets/icons/category.png")}
+            style={styles.menuCardIcon}
+            resizeMode="contain"
           />
+          <Text
+            style={[
+              styles.modalTextInput,
+              !selectedCategory && styles.placeholderText,
+            ]}
+          >
+            {selectedCategory || "Select category"}
+          </Text>
+          <Text style={styles.dropdownIcon}>▼</Text>
         </TouchableOpacity>
 
-        {showUnitDropdown && (
-          <View style={styles.unitDropdown}>
-            <View style={styles.unitSearchBar}>
-              <TextInput
-                style={styles.unitSearchInput}
-                placeholder="Search unit…"
-                placeholderTextColor="#B0B0B0"
-                value={unitSearch}
-                onChangeText={setUnitSearch}
-                autoFocus
-              />
-            </View>
-
-            <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-              {UNIT_OPTIONS.filter((u) =>
-                u.toLowerCase().includes(unitSearch.toLowerCase())
-              ).map((u) => (
+        {showCategoryDropdown && (
+          <Animated.View style={styles.dropdown}>
+            <ScrollView style={styles.dropdownScroll}>
+              {categories.map((category, index) => (
                 <TouchableOpacity
-                  key={u}
-                  style={[styles.unitOption, productUnit === u && styles.unitOptionSelected]}
+                  key={index}
+                  style={styles.dropdownItem}
                   onPress={() => {
-                    setProductUnit(u);
-                    setShowUnitDropdown(false);
+                    setSelectedCategory(category);
+                    setShowCategoryDropdown(false);
                   }}
                 >
-                  <Text
-                    style={[
-                      styles.unitOptionText,
-                      productUnit === u && styles.unitOptionTextSelected,
-                    ]}
-                  >
-                    {u}
-                  </Text>
-                  {productUnit === u && <Text style={styles.dropdownCheck}>✓</Text>}
+                  <Text style={styles.dropdownItemText}>{category}</Text>
                 </TouchableOpacity>
               ))}
-
-              {UNIT_OPTIONS.filter((u) =>
-                u.toLowerCase().includes(unitSearch.toLowerCase())
-              ).length === 0 && (
-                <View style={styles.unitEmpty}>
-                  <Text style={styles.unitEmptyText}>No matches</Text>
-                </View>
-              )}
             </ScrollView>
-          </View>
+          </Animated.View>
         )}
-      </View>
 
+        <View style={styles.modalInput}>
+          <Image
+            source={require("../assets/icons/bag.png")}
+            style={styles.menuCardIcon}
+            resizeMode="contain"
+          />
+          <TextInput
+            style={styles.modalTextInput}
+            placeholder="Enter product name"
+            placeholderTextColor="#B0B0B0"
+            value={productName}
+            onChangeText={setProductName}
+          />
+        </View>
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={handleAddSingleProduct}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.addButtonText}>Add</Text>
-      </TouchableOpacity>
+        <View style={styles.qRow}>
+          <View style={[styles.modalInput, styles.qInput]}>
+            <Image
+              source={require("../assets/icons/box.png")}
+              style={styles.menuCardIcon}
+              resizeMode="contain"
+            />
+            <TextInput
+              style={styles.modalTextInput}
+              placeholder="Quantity"
+              placeholderTextColor="#B0B0B0"
+              keyboardType="numeric"
+              value={productQuantity.toString()}
+              onChangeText={(text) => setProductQuantity(Number(text))}
+              returnKeyType="done"
+            />
+          </View>
+
+          <View style={styles.unitPickerContainer}>
+            <TouchableOpacity
+              style={styles.unitPicker}
+              activeOpacity={0.9}
+              onPress={() => {
+                setShowUnitDropdown((p) => !p);
+                setUnitSearch("");
+              }}
+            >
+              <Text
+                style={[
+                  styles.unitPickerText,
+                  !productUnit && styles.placeholderText,
+                ]}
+              >
+                {productUnit || "Unit"}
+              </Text>
+              <Text style={styles.dropdownIcon}>▼</Text>
+            </TouchableOpacity>
+
+            {showUnitDropdown && (
+              <View style={styles.unitDropdown}>
+                <View style={styles.unitSearchBar}>
+                  <TextInput
+                    style={styles.unitSearchInput}
+                    placeholder="Search unit…"
+                    placeholderTextColor="#B0B0B0"
+                    value={unitSearch}
+                    onChangeText={setUnitSearch}
+                    autoFocus
+                  />
+                </View>
+
+                <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+                  {UNIT_OPTIONS.filter((u) =>
+                    u.toLowerCase().includes(unitSearch.toLowerCase())
+                  ).map((u) => (
+                    <TouchableOpacity
+                      key={u}
+                      style={[styles.unitOption, productUnit === u && styles.unitOptionSelected]}
+                      onPress={() => {
+                        setProductUnit(u);
+                        setShowUnitDropdown(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.unitOptionText,
+                          productUnit === u && styles.unitOptionTextSelected,
+                        ]}
+                      >
+                        {u}
+                      </Text>
+                      {productUnit === u && <Text style={styles.dropdownCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  ))}
+
+                  {UNIT_OPTIONS.filter((u) =>
+                    u.toLowerCase().includes(unitSearch.toLowerCase())
+                  ).length === 0 && (
+                    <View style={styles.unitEmpty}>
+                      <Text style={styles.unitEmptyText}>No matches</Text>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <TouchableOpacity style={styles.modalButton} onPress={handleAddSingleProduct}>
+          <LinearGradient
+            colors={["#00A86B", "#008F5C"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.modalButtonText}>Add</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
     </Animated.View>
   );
 
   return (
     <Modal visible={visible} transparent animationType="none">
-      <TouchableOpacity
-        style={styles.modalOverlay}
-        activeOpacity={1}
-        onPress={onClose}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={{ flex: 1 }}
       >
         <TouchableOpacity
+          style={styles.modalOverlay}
           activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+          onPress={onClose}
         >
-          {modalType === "choice" && renderChoiceModal()}
-          {modalType === "single" && renderSingleProductModal()}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            {modalType === "choice" && renderChoiceModal()}
+            {modalType === "single" && renderSingleProductModal()}
+          </TouchableOpacity>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </KeyboardAvoidingView>
     </Modal>
   );
+};
+
+const COLORS = {
+  primary: "#00A86B",
+  white: "#FFFFFF",
+  text: "#0A0A0A",
+  textMuted: "#666666",
+  border: "#E0E0E0",
+  background: "#FAFAFA",
 };
 
 const styles = StyleSheet.create({
@@ -500,28 +536,81 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 20,
+    padding: 24,
     paddingBottom: 40,
-    paddingTop: 12,
     minHeight: 250,
   },
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: "#E0E0E0",
+    backgroundColor: COLORS.border,
     borderRadius: 2,
     alignSelf: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 24,
+    color: COLORS.text,
     textAlign: "center",
+    marginBottom: 24,
+  },
+  modalInput: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  modalTextInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.text
+  },
+  placeholderText: {
+    color: "#B0B0B0"
+  },
+  dropdownIcon: {
+    fontSize: 12,
+    color: COLORS.textMuted
+  },
+  menuCardIcon: {
+    width: 23,
+    height: 23,
+    marginRight: 6,
+  },
+  qRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 16,
+  },
+  qInput: {
+    flex: 1,
+  },
+  unitPickerContainer: {
+    flex: 1,
+  },
+  modalButton: {
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  buttonGradient: {
+    padding: 18,
+    alignItems: "center",
+  },
+  modalButtonText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.white
   },
   optionCard: {
     flexDirection: "row",
@@ -590,37 +679,44 @@ const styles = StyleSheet.create({
   placeholder: {
     color: "#B0B0B0",
   },
-  dropdownCheck: {
-  fontSize: 16,
-  color: '#10B981',   // matches the selected green
-  fontWeight: '700',
-  marginLeft: 8,
-},
   dropdown: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     borderRadius: 12,
-    marginBottom: 16,
-    maxHeight: 200,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
+    marginTop: -8,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 3,
+    elevation: 4,
   },
   dropdownScroll: {
     maxHeight: 200,
   },
   dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingVertical: 14,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#E8F8F1"
   },
   dropdownItemText: {
-    fontSize: 15,
-    color: "#1F2937",
+    fontSize: 16,
+    color: COLORS.text
+  },
+  dropdownItemTextSelected: {
+    color: COLORS.primary,
+    fontWeight: "600"
+  },
+  dropdownCheck: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: "700"
   },
   uploadContainer: {
     backgroundColor: "#F9FAFB",
@@ -656,27 +752,25 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
-  /* ===== Unit picker styles (mirrors pantry.tsx look) ===== */
+  /* ===== Unit picker styles (matches pantry.tsx) ===== */
   unitPicker: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: COLORS.background,
     borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
   },
   unitPickerText: {
-    fontSize: 15,
-    color: "#1F2937",
+    fontSize: 16,
+    color: COLORS.text,
   },
   unitDropdown: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: COLORS.border,
     marginTop: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -684,21 +778,26 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
     overflow: "hidden",
+    position: "absolute",
+    top: 60,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
   },
   unitSearchBar: {
     paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    borderBottomColor: COLORS.border,
   },
   unitSearchInput: {
-    backgroundColor: "#F7F8FA",
+    backgroundColor: COLORS.background,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 12,
     fontSize: 15,
-    color: "#1F2937",
+    color: COLORS.text,
   },
   unitOption: {
     flexDirection: "row",
@@ -712,10 +811,10 @@ const styles = StyleSheet.create({
   },
   unitOptionText: {
     fontSize: 15,
-    color: "#1F2937",
+    color: COLORS.text,
   },
   unitOptionTextSelected: {
-    color: "#10B981",
+    color: COLORS.primary,
     fontWeight: "600",
   },
   unitEmpty: {
@@ -724,6 +823,6 @@ const styles = StyleSheet.create({
   },
   unitEmptyText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: COLORS.textMuted,
   },
 });

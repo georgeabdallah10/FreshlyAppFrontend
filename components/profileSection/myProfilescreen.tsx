@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import Icon from "./components/icon";
 import PasswordModal from "./components/passwordModal";
+import DeleteAccountModal from "./components/deleteAccountModal";
 import { useUser } from "@/context/usercontext";
 import { useRouter } from "expo-router";
 
@@ -31,6 +32,7 @@ type Profile = {
 const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const { user, refreshUser, logout, updateUserInfo } = useUser();
   const router = useRouter();
 
@@ -109,7 +111,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const handleEditProfile = () => {
     console.log("handleEditProfile")
     router.push({
-      pathname: "/(user)/setPfp",
+      pathname: "/(main)/(user)/setPfp",
       params: {
         fromProfile: "true",
       },
@@ -243,7 +245,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             style={styles.passwordButton}
             onPress={() =>
               router.push({
-                pathname: "/(user)/prefrences",
+                pathname:"/(main)/(user)/prefrences",
                 params: { fromProfile: "true" },
               })
             }
@@ -270,7 +272,18 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
+                    <TouchableOpacity
+            style={styles.deleteAccoutnButton}
+            onPress={() => setShowDeleteModal(true)}
+          >
+            <View style={styles.passwordLeft}>
+              <Icon name="trash" size={20} color="#ffffff" />
+              <Text style={[styles.passwordText, {color: "#ffffff"}]}>Delete Account</Text>
+            </View>
+            <Text style={[styles.chevron,  {color: "#ffffff"}]}>›</Text>
+          </TouchableOpacity>
         </View>
+        
 
         {isEditing && (
           <View style={styles.actionButtons}>
@@ -290,6 +303,10 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       <PasswordModal
         visible={showPasswordModal}
         onClose={() => setShowPasswordModal(false)}
+      />
+      <DeleteAccountModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
       />
     </View>
   );
@@ -383,6 +400,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+
   },
   sectionTitle: {
     fontSize: 16,
@@ -419,6 +437,16 @@ const styles = StyleSheet.create({
     padding: 14,
     backgroundColor: "#F5F7FA",
     borderRadius: 12,
+    marginBottom: 15,
+  },
+  deleteAccoutnButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    backgroundColor: "#FF3B30",
+    borderRadius: 12,
+    marginBottom: 15,
   },
   passwordLeft: {
     flexDirection: "row",

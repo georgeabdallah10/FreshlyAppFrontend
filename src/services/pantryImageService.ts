@@ -78,6 +78,7 @@ async function checkSupabaseImage(itemName: string): Promise<string | null> {
 
 /**
  * Generate AI image via backend and upload to Supabase
+ * Note: Image generation is a standalone utility, not tied to conversations
  */
 async function generateAndUploadImage(
   itemName: string
@@ -101,17 +102,22 @@ async function generateAndUploadImage(
       headers,
       body: JSON.stringify({
         prompt: `A professional photograph of ${itemName}, grocery store quality, clean white background, well-lit, high quality product photography`,
+        size: "1024x1024",
+        quality: "standard",
+        style: "vivid",
       }),
     });
 
     if (!response.ok) {
-      console.log(` ERROR, Image generation failed: ${response.status}`);
+      console.error(`❌ Image generation failed: ${response.status}`);
+      return null;
     }
 
     const result = await response.json();
-    const imageUrl = result.image_url || result.imageUrl;
+    // Backend now returns only { image_url, prompt }
+    const imageUrl = result.image_url;
     if (!imageUrl) {
-      console.error(`❌ No valid image URL returned from backend:`, result);
+      console.error(`❌ No image_url in response:`, result);
       return null;
     }
 

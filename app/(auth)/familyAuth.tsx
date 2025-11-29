@@ -14,7 +14,9 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -224,7 +226,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
               if (onComplete) {
                 onComplete();
               } else {
-                router.replace('/(user)/prefrences');
+                router.replace('/(main)/(user)/prefrences');
               }
             }
           },
@@ -432,7 +434,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       <TouchableOpacity
         style={styles.skipButton}
         activeOpacity={0.7}
-        onPress={() => router.replace("/(user)/prefrences")}
+        onPress={() => router.replace('/(main)/(user)/prefrences')}
       >
         <Text style={styles.skipButtonText}>Skip for now</Text>
       </TouchableOpacity>
@@ -545,7 +547,7 @@ onPress={() => {
         style={styles.nextButton}
         onPress={() => {
           Alert.alert("Success", "Family setup complete!");
-          router.replace("/(home)/main");
+          router.replace('/(main)/(home)/main');
         }}
         activeOpacity={0.8}
       >
@@ -573,82 +575,87 @@ onPress={() => {
             },
           ]}
         />
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
         >
-          <Animated.View
-            style={[
-              styles.modalContent,
-              {
-                transform: [
-                  {
-                    translateY: slideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [400, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.modalHandle} />
-
-            <Text style={styles.modalTitle}>Add Member</Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="person-outline" size={20} color="#9CA3AF" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Full name"
-                  placeholderTextColor="#9CA3AF"
-                  value={newMember.name}
-                  onChangeText={(text) =>
-                    setNewMember({ ...newMember, name: text })
-                  }
-                />
-              </View>
-
-              <View style={styles.inputWrapper}>
-                <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Email address"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  value={newMember.email}
-                  onChangeText={(text) =>
-                    setNewMember({ ...newMember, email: text })
-                  }
-                />
-              </View>
-
-              <View style={styles.inputWrapper}>
-                <Ionicons name="call-outline" size={20} color="#9CA3AF" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Phone number"
-                  placeholderTextColor="#9CA3AF"
-                  keyboardType="phone-pad"
-                  value={newMember.phone}
-                  onChangeText={(text) =>
-                    setNewMember({ ...newMember, phone: text })
-                  }
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalAddButton}
-              onPress={handleAddMember}
-              activeOpacity={0.8}
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [
+                    {
+                      translateY: slideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [400, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
-              <Text style={styles.modalAddButtonText}>Add Member</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+              <View style={styles.modalHandle} />
+
+              <Text style={styles.modalTitle}>Add Member</Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="person-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Full name"
+                    placeholderTextColor="#9CA3AF"
+                    value={newMember.name}
+                    onChangeText={(text) =>
+                      setNewMember({ ...newMember, name: text })
+                    }
+                  />
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="mail-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Email address"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    value={newMember.email}
+                    onChangeText={(text) =>
+                      setNewMember({ ...newMember, email: text })
+                    }
+                  />
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="call-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Phone number"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="phone-pad"
+                    value={newMember.phone}
+                    onChangeText={(text) =>
+                      setNewMember({ ...newMember, phone: text })
+                    }
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalAddButton}
+                onPress={handleAddMember}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalAddButtonText}>Add Member</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </TouchableOpacity>
     </Modal>
   );
@@ -673,61 +680,66 @@ onPress={() => {
             },
           ]}
         />
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
         >
-          <Animated.View
-            style={[
-              styles.modalContent,
-              {
-                transform: [
-                  {
-                    translateY: joinSlideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [400, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.modalHandle} />
-
-            <View style={styles.joinModalIconContainer}>
-              <View style={styles.joinModalIcon}>
-                <Ionicons name="key-outline" size={32} color="#10B981" />
-              </View>
-            </View>
-
-            <Text style={styles.modalTitle}>Join Family</Text>
-            <Text style={styles.joinModalSubtitle}>
-              Enter the family code to join an existing family
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="keypad-outline" size={20} color="#9CA3AF" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter family code"
-                  placeholderTextColor="#9CA3AF"
-                  value={joinCode}
-                  onChangeText={setJoinCode}
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalAddButton}
-              onPress={handleJoinSubmit}
-              activeOpacity={0.8}
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [
+                    {
+                      translateY: joinSlideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [400, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
-              <Text style={styles.modalAddButtonText}>Join Family</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+              <View style={styles.modalHandle} />
+
+              <View style={styles.joinModalIconContainer}>
+                <View style={styles.joinModalIcon}>
+                  <Ionicons name="key-outline" size={32} color="#10B981" />
+                </View>
+              </View>
+
+              <Text style={styles.modalTitle}>Join Family</Text>
+              <Text style={styles.joinModalSubtitle}>
+                Enter the family code to join an existing family
+              </Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="keypad-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter family code"
+                    placeholderTextColor="#9CA3AF"
+                    value={joinCode}
+                    onChangeText={setJoinCode}
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalAddButton}
+                onPress={handleJoinSubmit}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalAddButtonText}>Join Family</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </TouchableOpacity>
     </Modal>
   );
@@ -752,72 +764,77 @@ onPress={() => {
             },
           ]}
         />
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={(e) => e.stopPropagation()}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
         >
-          <Animated.View
-            style={[
-              styles.modalContent,
-              {
-                transform: [
-                  {
-                    translateY: createSlideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [400, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
           >
-            <View style={styles.modalHandle} />
-
-            <View style={styles.joinModalIconContainer}>
-              <View style={styles.joinModalIcon}>
-                <Ionicons name="home-outline" size={32} color="#10B981" />
-              </View>
-            </View>
-
-            <Text style={styles.modalTitle}>Create Family</Text>
-            <Text style={styles.joinModalSubtitle}>
-              Choose a name for your family group
-            </Text>
-
-            <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
-                <Ionicons name="people-outline" size={20} color="#9CA3AF" />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter family name"
-                  placeholderTextColor="#9CA3AF"
-                  value={familyName}
-                  onChangeText={setFamilyName}
-                />
-              </View>
-            </View>
-
-            <View style={styles.infoBox}>
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color="#6B7280"
-              />
-              <Text style={styles.infoText}>
-                An invite code will be generated for you to share with family
-                members
-              </Text>
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalAddButton}
-              onPress={handleCreateSubmit}
-              activeOpacity={0.8}
+            <Animated.View
+              style={[
+                styles.modalContent,
+                {
+                  transform: [
+                    {
+                      translateY: createSlideAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [400, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
-              <Text style={styles.modalAddButtonText}>Create Family</Text>
-            </TouchableOpacity>
-          </Animated.View>
-        </TouchableOpacity>
+              <View style={styles.modalHandle} />
+
+              <View style={styles.joinModalIconContainer}>
+                <View style={styles.joinModalIcon}>
+                  <Ionicons name="home-outline" size={32} color="#10B981" />
+                </View>
+              </View>
+
+              <Text style={styles.modalTitle}>Create Family</Text>
+              <Text style={styles.joinModalSubtitle}>
+                Choose a name for your family group
+              </Text>
+
+              <View style={styles.inputContainer}>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="people-outline" size={20} color="#9CA3AF" />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter family name"
+                    placeholderTextColor="#9CA3AF"
+                    value={familyName}
+                    onChangeText={setFamilyName}
+                  />
+                </View>
+              </View>
+
+              <View style={styles.infoBox}>
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color="#6B7280"
+                />
+                <Text style={styles.infoText}>
+                  An invite code will be generated for you to share with family
+                  members
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalAddButton}
+                onPress={handleCreateSubmit}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalAddButtonText}>Create Family</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </TouchableOpacity>
     </Modal>
   );

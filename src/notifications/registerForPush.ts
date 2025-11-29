@@ -52,3 +52,19 @@ export async function isPushNotificationEnabled(): Promise<boolean> {
   const { status } = await Notifications.getPermissionsAsync();
   return status === "granted";
 }
+
+export async function setBadgeCount(count: number): Promise<void> {
+  try {
+    await Notifications.setBadgeCountAsync(Math.max(0, count));
+  } catch (error) {
+    console.warn("[Notifications] Failed to set badge count:", error);
+  }
+}
+
+export async function clearBadgeCount(): Promise<void> {
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch (error) {
+    console.warn("[Notifications] Failed to clear badge count:", error);
+  }
+}

@@ -26,6 +26,11 @@ export type UserOut = {
   is_verified: boolean;
   pfp: string;
   status: string;
+  age?: number | null;
+  height?: number | null;
+  weight?: number | null;
+  gender?: "male" | "female" | null;
+  calories?: number | null;
   preference: {
     id: number;
     user_id: number;
@@ -329,6 +334,7 @@ export const updateUserInfo = async (
     height: number | null;
     weight: number | null;
     gender: "male" | "female" | null;
+    calories: number | null;
   }>
 ): Promise<User> => {
   try {

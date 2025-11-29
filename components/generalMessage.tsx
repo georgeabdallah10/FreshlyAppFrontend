@@ -147,12 +147,10 @@ const ToastBanner: React.FC<Props> = ({
     };
   }, [visible, autoDuration, onHide, opacity, translateY]);
 
-  // Keep it mounted but non-interactive when hidden
-  const containerPointerEvents = visible ? "auto" : "none";
-
   return (
     <Animated.View
-      pointerEvents={containerPointerEvents}
+      // Allow touches to pass through outside the banner area
+      pointerEvents="box-none"
       accessibilityLiveRegion="polite"
       style={[
         styles.wrap,
@@ -173,6 +171,7 @@ const ToastBanner: React.FC<Props> = ({
           hasButtons && styles.cardWithButtons,
           style,
         ]}
+        pointerEvents="auto"
       >
         {/* Title (optional, for confirm dialogs) */}
         {title ? (

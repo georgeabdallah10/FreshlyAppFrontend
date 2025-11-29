@@ -444,7 +444,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const handleShareCode = async () => {
     try {
       await Share.share({
-        message: `Join our family on Savr!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
+        message: `Join our family on SAVR!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
       });
     } catch (error) {
       console.error("Error sharing:", error);

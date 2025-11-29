@@ -107,10 +107,10 @@ const VerificationScreen = () => {
     const handleVerificationSuccess = () => {
       console.log(fromSignUp)
       if (fromSignUp === "true") {
-        router.replace("/(user)/setPfp");
+        router.replace('/setPfp');
         console.log("from sign up")
       } else {
-        router.replace("/(home)/main");
+        router.replace('/(main)/(home)/main');
         console.log("why not")
       }
     };

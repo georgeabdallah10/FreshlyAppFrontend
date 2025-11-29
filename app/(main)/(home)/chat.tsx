@@ -1551,7 +1551,7 @@ Rules:
         >
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Savr AI</Text>
+        <Text style={styles.headerTitle}>SAVR AI</Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.headerButton}

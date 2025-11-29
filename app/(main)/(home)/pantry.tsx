@@ -20,6 +20,7 @@ import {
     Easing,
     FlatList,
     Image,
+    KeyboardAvoidingView,
     LayoutAnimation,
     Modal,
     Platform,
@@ -1003,54 +1004,59 @@ const PantryDashboard = () => {
           activeOpacity={1}
           onPress={() => setShowAddCategory(false)}
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={(e) => e.stopPropagation()}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
           >
-            <Animated.View
-              style={[
-                styles.modalContent,
-                {
-                  opacity: categorySheetAnim,
-                  transform: [
-                    {
-                      translateY: categorySheetAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [40, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation()}
             >
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Add Category</Text>
-              <View style={styles.modalInput}>
-                <Image
-                  source={require("../../../assets/icons/category.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
-                <TextInput
-                  style={styles.modalTextInput}
-                  placeholder="Enter category name"
-                  placeholderTextColor="#B0B0B0"
-                  value={newCategoryName}
-                  onChangeText={setNewCategoryName}
-                />
-              </View>
-              <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
-                <LinearGradient
-                  colors={[COLORS.primary, "#008F5C"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.modalButtonText}>Add</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </TouchableOpacity>
+              <Animated.View
+                style={[
+                  styles.modalContent,
+                  {
+                    opacity: categorySheetAnim,
+                    transform: [
+                      {
+                        translateY: categorySheetAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [40, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                <View style={styles.modalHandle} />
+                <Text style={styles.modalTitle}>Add Category</Text>
+                <View style={styles.modalInput}>
+                  <Image
+                    source={require("../../../assets/icons/category.png")}
+                    style={styles.menuCardIcon}
+                    resizeMode="contain"
+                  />
+                  <TextInput
+                    style={styles.modalTextInput}
+                    placeholder="Enter category name"
+                    placeholderTextColor="#B0B0B0"
+                    value={newCategoryName}
+                    onChangeText={setNewCategoryName}
+                  />
+                </View>
+                <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
+                  <LinearGradient
+                    colors={[COLORS.primary, "#008F5C"]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.buttonGradient}
+                  >
+                    <Text style={styles.modalButtonText}>Add</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </Animated.View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
 
@@ -1061,173 +1067,71 @@ const PantryDashboard = () => {
           activeOpacity={1}
           onPress={() => setShowAddProduct(false)}
         >
-          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-            <Animated.View
-              style={[
-                styles.modalContent,
-                {
-                  opacity: productSheetAnim,
-                  transform: [
-                    {
-                      translateY: productSheetAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [40, 0],
-                      }),
-                    },
-                  ],
-                },
-              ]}
-            >
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>
-                {editingItemId ? "Edit Product" : "Add Product"}
-              </Text>
-
-              <TouchableOpacity
-                style={styles.modalInput}
-                onPress={() => setShowCategoryDropdown((prev) => !prev)}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            style={{ flex: 1 }}
+          >
+            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
               >
-                <Image
-                  source={require("../../../assets/icons/category.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
-                <Text
-                  style={[
-                    styles.modalTextInput,
-                    !newProductCategory && styles.placeholderText,
-                  ]}
-                >
-                  {newProductCategory || "Select category"}
-                </Text>
-                <Text style={styles.dropdownIcon}>▼</Text>
-              </TouchableOpacity>
-
-              {showCategoryDropdown && (
                 <Animated.View
                   style={[
-                    styles.dropdownMenu,
+                    styles.modalContent,
                     {
-                      opacity: dropdownAnim,
+                      opacity: productSheetAnim,
                       transform: [
                         {
-                          scaleY: dropdownAnim.interpolate({
+                          translateY: productSheetAnim.interpolate({
                             inputRange: [0, 1],
-                            outputRange: [0.95, 1],
-                          }),
-                        },
-                        {
-                          translateY: dropdownAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-6, 0],
+                            outputRange: [40, 0],
                           }),
                         },
                       ],
                     },
                   ]}
                 >
-                  <ScrollView style={{ maxHeight: 200 }}>
-                    {categories
-                      .filter((c) => c.id !== "all")
-                      .map((category) => (
-                        <TouchableOpacity
-                          key={category.id}
-                          style={[
-                            styles.dropdownItem,
-                            newProductCategory === category.name &&
-                              styles.dropdownItemSelected,
-                          ]}
-                          onPress={() => {
-                            setNewProductCategory(category.name);
-                            setShowCategoryDropdown(false);
-                          }}
-                        >
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              newProductCategory === category.name &&
-                                styles.dropdownItemTextSelected,
-                            ]}
-                          >
-                            {category.name}
-                          </Text>
-                          {newProductCategory === category.name && (
-                            <Text style={styles.dropdownCheck}>✓</Text>
-                          )}
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                </Animated.View>
-              )}
+                  <View style={styles.modalHandle} />
+                  <Text style={styles.modalTitle}>
+                    {editingItemId ? "Edit Product" : "Add Product"}
+                  </Text>
 
-              <View style={styles.modalInput}>
-                <Image
-                  source={require("../../../assets/icons/bag.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
-                <TextInput
-                  style={styles.modalTextInput}
-                  placeholder="Enter product name"
-                  placeholderTextColor="#B0B0B0"
-                  value={newProductName}
-                  onChangeText={setNewProductName}
-                />
-              </View>
-
-              <View style={styles.qRow}>
-                <View style={[styles.modalInput, styles.qInput]}>
-                  <Image
-                    source={require("../../../assets/icons/box.png")}
-                    style={styles.menuCardIcon}
-                    resizeMode="contain"
-                  />
-                  <TextInput
-                    style={styles.modalTextInput}
-                    placeholder="Quantity"
-                    placeholderTextColor="#B0B0B0"
-                    keyboardType="numeric"
-                    value={newProductQuantity}
-                    onChangeText={setNewProductQuantity}
-                    returnKeyType="done"
-                  />
-                </View>
-
-                <View style={styles.unitPickerContainer}>
                   <TouchableOpacity
-                    style={styles.unitPicker}
-                    activeOpacity={0.9}
-                    onPress={() => {
-                      setShowUnitDropdown((p) => !p);
-                      setUnitSearch("");
-                    }}
+                    style={styles.modalInput}
+                    onPress={() => setShowCategoryDropdown((prev) => !prev)}
                   >
+                    <Image
+                      source={require("../../../assets/icons/category.png")}
+                      style={styles.menuCardIcon}
+                      resizeMode="contain"
+                    />
                     <Text
                       style={[
-                        styles.unitPickerText,
-                        !newProductUnit && styles.placeholderText,
+                        styles.modalTextInput,
+                        !newProductCategory && styles.placeholderText,
                       ]}
                     >
-                      {newProductUnit || "Unit"}
+                      {newProductCategory || "Select category"}
                     </Text>
                     <Text style={styles.dropdownIcon}>▼</Text>
                   </TouchableOpacity>
 
-                  {showUnitDropdown && (
+                  {showCategoryDropdown && (
                     <Animated.View
                       style={[
-                        styles.unitDropdown,
+                        styles.dropdownMenu,
                         {
-                          opacity: unitDropdownAnim,
+                          opacity: dropdownAnim,
                           transform: [
                             {
-                              scaleY: unitDropdownAnim.interpolate({
+                              scaleY: dropdownAnim.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: [0.95, 1],
                               }),
                             },
                             {
-                              translateY: unitDropdownAnim.interpolate({
+                              translateY: dropdownAnim.interpolate({
                                 inputRange: [0, 1],
                                 outputRange: [-6, 0],
                               }),
@@ -1236,93 +1140,205 @@ const PantryDashboard = () => {
                         },
                       ]}
                     >
-                      <View style={styles.unitSearchBar}>
-                        <TextInput
-                          style={styles.unitSearchInput}
-                          placeholder="Search unit…"
-                          placeholderTextColor="#B0B0B0"
-                          value={unitSearch}
-                          onChangeText={setUnitSearch}
-                          autoFocus
-                        />
-                      </View>
-
-                      <FlatList
-                        data={UNIT_OPTIONS.filter((u) =>
-                          u.toLowerCase().includes(unitSearch.toLowerCase())
-                        )}
-                        keyExtractor={(u) => u}
-                        keyboardShouldPersistTaps="handled"
-                        style={{ maxHeight: 200 }}
-                        renderItem={({ item }) => (
-                          <TouchableOpacity
-                            style={[
-                              styles.unitOption,
-                              newProductUnit === item && styles.unitOptionSelected,
-                            ]}
-                            onPress={() => {
-                              setNewProductUnit(item);
-                              setShowUnitDropdown(false);
-                            }}
-                          >
-                            <Text
+                      <ScrollView style={{ maxHeight: 200 }}>
+                        {categories
+                          .filter((c) => c.id !== "all")
+                          .map((category) => (
+                            <TouchableOpacity
+                              key={category.id}
                               style={[
-                                styles.unitOptionText,
-                                newProductUnit === item &&
-                                  styles.unitOptionTextSelected,
+                                styles.dropdownItem,
+                                newProductCategory === category.name &&
+                                  styles.dropdownItemSelected,
                               ]}
+                              onPress={() => {
+                                setNewProductCategory(category.name);
+                                setShowCategoryDropdown(false);
+                              }}
                             >
-                              {item}
-                            </Text>
-                            {newProductUnit === item && (
-                              <Text style={styles.dropdownCheck}>✓</Text>
-                            )}
-                          </TouchableOpacity>
-                        )}
-                        ListEmptyComponent={
-                          <View style={styles.unitEmpty}>
-                            <Text style={styles.unitEmptyText}>No matches</Text>
-                          </View>
-                        }
-                      />
+                              <Text
+                                style={[
+                                  styles.dropdownItemText,
+                                  newProductCategory === category.name &&
+                                    styles.dropdownItemTextSelected,
+                                ]}
+                              >
+                                {category.name}
+                              </Text>
+                              {newProductCategory === category.name && (
+                                <Text style={styles.dropdownCheck}>✓</Text>
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                      </ScrollView>
                     </Animated.View>
                   )}
-                </View>
-              </View>
 
-              <View style={styles.modalInput}>
-                <Image
-                  source={require("../../../assets/icons/calendar.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
-                <TextInput
-                  style={styles.modalTextInput}
-                  placeholder="Expiration (YYYY-MM-DD) — optional"
-                  placeholderTextColor="#B0B0B0"
-                  value={newProductExpiresAt}
-                  onChangeText={setNewProductExpiresAt}
-                  keyboardType="numbers-and-punctuation"
-                />
-              </View>
-              <Text style={styles.hintText}>
-                Tip: Leave blank to auto-set based on category when creating.
-              </Text>
+                  <View style={styles.modalInput}>
+                    <Image
+                      source={require("../../../assets/icons/bag.png")}
+                      style={styles.menuCardIcon}
+                      resizeMode="contain"
+                    />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      placeholder="Enter product name"
+                      placeholderTextColor="#B0B0B0"
+                      value={newProductName}
+                      onChangeText={setNewProductName}
+                    />
+                  </View>
 
-              <TouchableOpacity style={styles.modalButton} onPress={handleSaveProduct}>
-                <LinearGradient
-                  colors={[COLORS.primary, "#008F5C"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.buttonGradient}
-                >
-                  <Text style={styles.modalButtonText}>
-                    {editingItemId ? "Save" : "Add"}
+                  <View style={styles.qRow}>
+                    <View style={[styles.modalInput, styles.qInput]}>
+                      <Image
+                        source={require("../../../assets/icons/box.png")}
+                        style={styles.menuCardIcon}
+                        resizeMode="contain"
+                      />
+                      <TextInput
+                        style={styles.modalTextInput}
+                        placeholder="Quantity"
+                        placeholderTextColor="#B0B0B0"
+                        keyboardType="numeric"
+                        value={newProductQuantity}
+                        onChangeText={setNewProductQuantity}
+                        returnKeyType="done"
+                      />
+                    </View>
+
+                    <View style={styles.unitPickerContainer}>
+                      <TouchableOpacity
+                        style={styles.unitPicker}
+                        activeOpacity={0.9}
+                        onPress={() => {
+                          setShowUnitDropdown((p) => !p);
+                          setUnitSearch("");
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.unitPickerText,
+                            !newProductUnit && styles.placeholderText,
+                          ]}
+                        >
+                          {newProductUnit || "Unit"}
+                        </Text>
+                        <Text style={styles.dropdownIcon}>▼</Text>
+                      </TouchableOpacity>
+
+                      {showUnitDropdown && (
+                        <Animated.View
+                          style={[
+                            styles.unitDropdown,
+                            {
+                              opacity: unitDropdownAnim,
+                              transform: [
+                                {
+                                  scaleY: unitDropdownAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [0.95, 1],
+                                  }),
+                                },
+                                {
+                                  translateY: unitDropdownAnim.interpolate({
+                                    inputRange: [0, 1],
+                                    outputRange: [-6, 0],
+                                  }),
+                                },
+                              ],
+                            },
+                          ]}
+                        >
+                          <View style={styles.unitSearchBar}>
+                            <TextInput
+                              style={styles.unitSearchInput}
+                              placeholder="Search unit…"
+                              placeholderTextColor="#B0B0B0"
+                              value={unitSearch}
+                              onChangeText={setUnitSearch}
+                              autoFocus
+                            />
+                          </View>
+
+                          <FlatList
+                            data={UNIT_OPTIONS.filter((u) =>
+                              u.toLowerCase().includes(unitSearch.toLowerCase())
+                            )}
+                            keyExtractor={(u) => u}
+                            keyboardShouldPersistTaps="handled"
+                            style={{ maxHeight: 200 }}
+                            renderItem={({ item }) => (
+                              <TouchableOpacity
+                                style={[
+                                  styles.unitOption,
+                                  newProductUnit === item && styles.unitOptionSelected,
+                                ]}
+                                onPress={() => {
+                                  setNewProductUnit(item);
+                                  setShowUnitDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.unitOptionText,
+                                    newProductUnit === item &&
+                                      styles.unitOptionTextSelected,
+                                  ]}
+                                >
+                                  {item}
+                                </Text>
+                                {newProductUnit === item && (
+                                  <Text style={styles.dropdownCheck}>✓</Text>
+                                )}
+                              </TouchableOpacity>
+                            )}
+                            ListEmptyComponent={
+                              <View style={styles.unitEmpty}>
+                                <Text style={styles.unitEmptyText}>No matches</Text>
+                              </View>
+                            }
+                          />
+                        </Animated.View>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.modalInput}>
+                    <Image
+                      source={require("../../../assets/icons/calendar.png")}
+                      style={styles.menuCardIcon}
+                      resizeMode="contain"
+                    />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      placeholder="Expiration (YYYY-MM-DD) — optional"
+                      placeholderTextColor="#B0B0B0"
+                      value={newProductExpiresAt}
+                      onChangeText={setNewProductExpiresAt}
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                  <Text style={styles.hintText}>
+                    Tip: Leave blank to auto-set based on category when creating.
                   </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animated.View>
-          </TouchableOpacity>
+
+                  <TouchableOpacity style={styles.modalButton} onPress={handleSaveProduct}>
+                    <LinearGradient
+                      colors={[COLORS.primary, "#008F5C"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.buttonGradient}
+                    >
+                      <Text style={styles.modalButtonText}>
+                        {editingItemId ? "Save" : "Add"}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              </ScrollView>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
 

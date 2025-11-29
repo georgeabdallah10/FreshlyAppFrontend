@@ -38,7 +38,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     if (onPress) {
       onPress();
     } else {
-      router.push('/(home)/notifications');
+      router.push('/(main)/(home)/notifications');
     }
   };
 

@@ -27,6 +27,70 @@ const pendingRequests = new Map<string, Promise<string | null>>();
 // Track which cacheKeys have already logged the waiting message
 const waitingLogShown = new Set<string>();
 
+// Track if we've checked bucket existence (prevents repeated checks)
+let bucketInitialized = false;
+
+/**
+ * Ensure the Supabase bucket exists and is accessible
+ * This only runs once per app session
+ */
+async function ensureBucketExists(): Promise<boolean> {
+  if (bucketInitialized) {
+    return true;
+  }
+
+  try {
+    // Try to list the bucket to check if it exists and is accessible
+    const { error: listError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .list('', { limit: 1 });
+
+    if (listError) {
+      console.error(`[MealImageService] ❌ Bucket "${BUCKET_NAME}" error:`, listError.message);
+      console.error(`[MealImageService] 📋 Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
+      console.error(`[MealImageService] 📖 Please follow the setup guide: SUPABASE_STORAGE_SETUP.md`);
+      console.error(`[MealImageService] 🔧 Quick fix:`);
+      console.error(`[MealImageService]    1. Go to Supabase Dashboard → Storage`);
+      console.error(`[MealImageService]    2. Create bucket named "${BUCKET_NAME}"`);
+      console.error(`[MealImageService]    3. Set bucket to Public`);
+      console.error(`[MealImageService]    4. Add RLS policies (INSERT/UPDATE for authenticated, SELECT for public)`);
+      return false;
+    }
+
+    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" exists (read access confirmed)`);
+
+    // Test write permissions with a tiny test file
+    const testFilename = `.test-${Date.now()}.txt`;
+    const testData = new Uint8Array([116, 101, 115, 116]); // "test" in bytes
+
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .upload(testFilename, testData, {
+        contentType: "text/plain",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error(`[MealImageService] ❌ Bucket write test failed:`, uploadError.message);
+      console.error(`[MealImageService] 📋 The bucket exists but uploads are blocked by RLS policies`);
+      console.error(`[MealImageService] 🔧 Fix: Add INSERT policy for authenticated users in Supabase Dashboard`);
+      console.error(`[MealImageService] 📖 See SUPABASE_STORAGE_SETUP.md for SQL policy examples`);
+      // Don't mark as initialized so we check again later
+      return false;
+    }
+
+    // Clean up test file
+    await supabase.storage.from(BUCKET_NAME).remove([testFilename]);
+
+    bucketInitialized = true;
+    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" is fully accessible (read + write)`);
+    return true;
+  } catch (error) {
+    console.error(`[MealImageService] ❌ Error checking bucket:`, error);
+    return false;
+  }
+}
+
 /**
  * Sanitize meal name for use as filename
  * - Removes special characters
@@ -82,14 +146,14 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
 
 /**
  * Generate AI image for meal using backend endpoint
+ * Note: Image generation is a standalone utility, not tied to conversations
  */
 async function generateMealImage(
-  mealName: string,
-  conversationId: number = 0
+  mealName: string
 ): Promise<string | null> {
   try {
     const token = await Storage.getItem("access_token");
-    
+
     // Create a descriptive prompt for better AI images
     const prompt = `A delicious, appetizing photo of ${mealName}, professional food photography, well-plated, high quality, restaurant-style presentation`;
 
@@ -106,7 +170,6 @@ async function generateMealImage(
         size: "1024x1024",
         quality: "standard",
         style: "natural", // or "vivid" for more dramatic images
-        conversationID: conversationId,
       }),
     });
 
@@ -117,12 +180,12 @@ async function generateMealImage(
     }
 
     const data = await response.json();
-    
-    // Assuming backend returns { url: string } or similar
-    const imageUrl = data.url || data.image_url || data.imageUrl;
-    
+
+    // Backend now returns only { image_url, prompt }
+    const imageUrl = data.image_url;
+
     if (!imageUrl) {
-      console.error("[MealImageService] No image URL in response:", data);
+      console.error("[MealImageService] No image_url in response:", data);
       return null;
     }
 
@@ -135,49 +198,108 @@ async function generateMealImage(
 }
 
 /**
- * Download image from URL and upload to Supabase bucket
+ * Download image from URL and upload to Supabase bucket with retry logic
  */
 async function uploadImageToBucket(
   imageUrl: string,
-  filename: string
+  filename: string,
+  retries: number = 3
 ): Promise<string | null> {
-  try {
-    console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${filename}`);
-
-    // Download the image (React Native compatible)
-    const response = await fetch(imageUrl);
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-
-    // Upload to Supabase bucket root
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filename, uint8Array, {
-        contentType: "image/png",
-        upsert: true, // Overwrite if exists
-      });
-
-    if (error) {
-      console.error("[MealImageService] Upload error:", error);
-      return null;
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(BUCKET_NAME)
-      .getPublicUrl(filename);
-
-    console.log(`[MealImageService] ✅ Image uploaded successfully`);
-    return urlData.publicUrl;
-  } catch (error) {
-    console.error("[MealImageService] Error uploading to bucket:", error);
+  // Check bucket exists before attempting upload
+  const bucketExists = await ensureBucketExists();
+  if (!bucketExists) {
+    console.error(`[MealImageService] ❌ Cannot upload: bucket "${BUCKET_NAME}" is not accessible`);
     return null;
   }
+
+  // Check authentication status
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.error(`[MealImageService] ❌ No active session - user must be authenticated to upload`);
+    console.error(`[MealImageService] 💡 This might be why uploads are failing. Check authentication.`);
+  } else {
+    console.log(`[MealImageService] ✅ User authenticated for upload`);
+  }
+
+  let lastError: any = null;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      if (attempt > 1) {
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        console.log(`[MealImageService] Retry attempt ${attempt}/${retries} after ${delay}ms delay`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${filename} (attempt ${attempt}/${retries})`);
+
+      // Download the image (React Native compatible)
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+
+      if (uint8Array.length === 0) {
+        throw new Error("Downloaded image is empty");
+      }
+
+      // Upload to Supabase bucket root
+      const { error } = await supabase.storage
+        .from(BUCKET_NAME)
+        .upload(filename, uint8Array, {
+          contentType: "image/png",
+          upsert: true, // Overwrite if exists
+        });
+
+      if (error) {
+        console.error(`[MealImageService] Upload error (attempt ${attempt}/${retries}):`, {
+          name: error.name,
+          message: error.message,
+          statusCode: (error as any).statusCode,
+          fullError: error
+        });
+        lastError = error;
+        continue; // Retry
+      }
+
+      // Verify the upload by getting public URL
+      const { data: urlData } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(filename);
+
+      if (!urlData?.publicUrl) {
+        throw new Error("Failed to get public URL after upload");
+      }
+
+      console.log(`[MealImageService] ✅ Image uploaded successfully on attempt ${attempt}/${retries}`);
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);
+      lastError = error;
+
+      // Don't retry on certain errors
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        if (errorMsg.includes('permission') || errorMsg.includes('unauthorized') || errorMsg.includes('forbidden')) {
+          console.error(`[MealImageService] ❌ Permission error - aborting retries`);
+          break;
+        }
+      }
+    }
+  }
+
+  // All retries failed
+  console.error(`[MealImageService] ❌ Failed to upload after ${retries} attempts:`, lastError);
+  return null;
 }
 
 /**
  * Get or generate meal image with full caching strategy
- * 
+ *
  * Flow:
  * 1. Check in-memory cache (instant)
  * 2. Check if already being fetched (prevent duplicates)
@@ -185,14 +307,12 @@ async function uploadImageToBucket(
  * 4. Generate new image if not found (slow, costs money)
  * 5. Upload generated image to bucket (for future use)
  * 6. Cache the result
- * 
+ *
  * @param mealName - Name of the meal
- * @param conversationId - Optional conversation ID for context
  * @returns Image URL or null if failed
  */
 export async function getMealImage(
-  mealName: string,
-  conversationId: number = 0
+  mealName: string
 ): Promise<string | null> {
   if (!mealName || mealName.trim() === "") {
     console.warn("[MealImageService] Empty meal name provided");
@@ -252,7 +372,7 @@ export async function getMealImage(
 
       // Generate new image (slow, costs money)
       console.log(`[MealImageService] 🆕 No existing image, generating new one...`);
-      const generatedUrl = await generateMealImage(mealName, conversationId);
+      const generatedUrl = await generateMealImage(mealName);
       
       if (!generatedUrl) {
         console.error(`[MealImageService] Failed to generate image for: ${mealName}`);
@@ -262,15 +382,17 @@ export async function getMealImage(
 
       // Upload to bucket for future use (important for cost savings!)
       const bucketUrl = await uploadImageToBucket(generatedUrl, filename);
-      
+
       if (bucketUrl) {
-        // Cache the bucket URL (more permanent than generated URL)
+        // Cache the bucket URL (permanent storage)
         imageCache.set(cacheKey, { url: bucketUrl });
         return bucketUrl;
       } else {
-        // If upload failed, still cache the generated URL
-        imageCache.set(cacheKey, { url: generatedUrl });
-        return generatedUrl;
+        // CRITICAL: Don't cache temporary generated URLs - they expire!
+        // Mark as failed so we retry later, but return temp URL for immediate use
+        console.warn(`[MealImageService] ⚠️ Upload failed for ${mealName}, will retry next time`);
+        imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
+        return generatedUrl; // Return temp URL for immediate use only
       }
     } catch (error) {
       console.error(`[MealImageService] Error in getMealImage:`, error);
@@ -280,8 +402,7 @@ export async function getMealImage(
       // Clean up pending request and waiting log
       pendingRequests.delete(cacheKey);
       waitingLogShown.delete(cacheKey);
-      lastLogTimes.delete(cacheKey);
-      cacheHitLastLog.delete(cacheKey);
+      // Don't delete lastLogTimes and cacheHitLastLog - they're for rate-limiting logs
     }
   })();
 

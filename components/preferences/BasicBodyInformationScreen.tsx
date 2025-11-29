@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   StyleSheet,
@@ -46,6 +46,10 @@ const BasicBodyInformationScreen: React.FC<
   const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
   const [showHeightUnitPicker, setShowHeightUnitPicker] = useState(false);
   const [showWeightUnitPicker, setShowWeightUnitPicker] = useState(false);
+  const [heightFeet, setHeightFeet] = useState("");
+  const [heightInches, setHeightInches] = useState("");
+  const [weightLbsInput, setWeightLbsInput] = useState("");
+  const [weightKgInput, setWeightKgInput] = useState("");
 
   const handleHeightUnitChange = (unit: HeightUnit) => {
     setHeightUnit(unit);
@@ -53,6 +57,10 @@ const BasicBodyInformationScreen: React.FC<
     onUnitChange?.("height", unit);
     // Clear height value when switching units to avoid confusion
     onChange("height", "");
+    if (unit === "cm") {
+      setHeightFeet("");
+      setHeightInches("");
+    }
   };
 
   const handleWeightUnitChange = (unit: WeightUnit) => {
@@ -61,14 +69,89 @@ const BasicBodyInformationScreen: React.FC<
     onUnitChange?.("weight", unit);
     // Clear weight value when switching units to avoid confusion
     onChange("weight", "");
+    setWeightLbsInput("");
+    setWeightKgInput("");
   };
 
   const getHeightPlaceholder = () => {
-    return heightUnit === "cm" ? "100-250 cm" : "3'3\" - 8'2\"";
+    return "100-250 cm";
   };
 
   const getWeightPlaceholder = () => {
     return weightUnit === "kg" ? "30-300 kg" : "66-660 lbs";
+  };
+
+  const getWeightValue = () => {
+    if (weightUnit === "kg") {
+      if (weightKgInput !== "") return weightKgInput;
+      return weight !== null && !Number.isNaN(weight) ? String(weight) : "";
+    }
+    return weightLbsInput;
+  };
+
+  useEffect(() => {
+    if (heightUnit === "ft" && height !== null && !Number.isNaN(height)) {
+      const totalInches = Math.round(height / 2.54);
+      const ft = Math.floor(totalInches / 12);
+      const inch = totalInches % 12;
+      setHeightFeet(ft ? String(ft) : "");
+      setHeightInches(String(inch));
+    }
+  }, [height, heightUnit]);
+
+  const parsedFeet = heightFeet ? Number(heightFeet) : NaN;
+  const parsedInches = heightInches ? Number(heightInches) : NaN;
+  const feetOutOfRange =
+    heightFeet !== "" && (Number.isNaN(parsedFeet) || parsedFeet < 3 || parsedFeet > 8);
+  const inchesOutOfRange =
+    heightInches !== "" &&
+    (Number.isNaN(parsedInches) || parsedInches < 0 || parsedInches > 11);
+  const heightRestrictionInvalid = feetOutOfRange || inchesOutOfRange;
+  const weightInput = weightUnit === "kg" ? weightKgInput : weightLbsInput;
+  const parsedWeight = weightInput ? Number(weightInput) : NaN;
+  const weightRange =
+    weightUnit === "kg" ? { min: 30, max: 300 } : { min: 66, max: 660 };
+  const weightOutOfRange =
+    weightInput !== "" &&
+    (Number.isNaN(parsedWeight) ||
+      parsedWeight < weightRange.min ||
+      parsedWeight > weightRange.max);
+
+  const updateHeightFromParts = (feetValue: string, inchesValue: string) => {
+    const ft = feetValue ? Number(feetValue) : NaN;
+    const inch = inchesValue ? Number(inchesValue) : NaN;
+
+    const feetValid = !Number.isNaN(ft) && ft >= 3 && ft <= 8;
+    const inchesValid = !Number.isNaN(inch) && inch >= 0 && inch <= 11;
+
+    if (feetValid && inchesValid) {
+      const totalInches = ft * 12 + inch;
+      onChange("height", String(totalInches));
+    } else {
+      onChange("height", "");
+    }
+  };
+
+  const handleFeetChange = (text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, "");
+    if (!digitsOnly) {
+      setHeightFeet("");
+      updateHeightFromParts("", heightInches);
+      return;
+    }
+    setHeightFeet(digitsOnly);
+    updateHeightFromParts(digitsOnly, heightInches);
+  };
+
+  const handleInchesChange = (text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, "");
+    if (digitsOnly === "") {
+      setHeightInches("");
+      updateHeightFromParts(heightFeet, "");
+      return;
+    }
+    setHeightInches(digitsOnly);
+    updateHeightFromParts(heightFeet, digitsOnly);
   };
 
   return (
@@ -153,16 +236,55 @@ const BasicBodyInformationScreen: React.FC<
             <Text style={styles.unitButtonArrow}>▼</Text>
           </TouchableOpacity>
         </View>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={height !== null ? String(height) : ""}
-          placeholder={getHeightPlaceholder()}
-          placeholderTextColor="#B0B0B0"
-          onFocus={() => setFocusedField("height")}
-          onBlur={() => setFocusedField(null)}
-          onChangeText={(text) => onChange("height", text)}
-        />
+        {heightUnit === "cm" ? (
+          <TextInput
+            style={styles.input}
+            keyboardType="numeric"
+            value={height !== null ? String(height) : ""}
+            placeholder={getHeightPlaceholder()}
+            placeholderTextColor="#B0B0B0"
+            onFocus={() => setFocusedField("height")}
+            onBlur={() => setFocusedField(null)}
+            onChangeText={(text) => onChange("height", text)}
+          />
+        ) : (
+          <View style={styles.heightSplitRow}>
+            <TextInput
+              style={[styles.input, styles.heightSplitInput]}
+              keyboardType="numeric"
+              value={heightFeet}
+              placeholder="ft"
+              placeholderTextColor="#B0B0B0"
+              maxLength={1}
+              onFocus={() => setFocusedField("height")}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={handleFeetChange}
+            />
+            <Text style={styles.heightDelimiter}>'</Text>
+            <TextInput
+              style={[styles.input, styles.heightSplitInput]}
+              keyboardType="numeric"
+              value={heightInches}
+              placeholder="in"
+              placeholderTextColor="#B0B0B0"
+              maxLength={2}
+              onFocus={() => setFocusedField("height")}
+              onBlur={() => setFocusedField(null)}
+              onChangeText={handleInchesChange}
+            />
+            <Text style={styles.heightDelimiter}>"</Text>
+          </View>
+        )}
+        {heightUnit === "ft" && (
+          <Text
+            style={[
+              styles.heightRestrictionText,
+              heightRestrictionInvalid && styles.heightRestrictionTextInvalid,
+            ]}
+          >
+            Feet: 3-8 | Inches: 0-11
+          </Text>
+        )}
         {heightError ? (
           <Text style={styles.errorText}>{heightError}</Text>
         ) : null}
@@ -190,13 +312,31 @@ const BasicBodyInformationScreen: React.FC<
         <TextInput
           style={styles.input}
           keyboardType="numeric"
-          value={weight !== null ? String(weight) : ""}
+          value={getWeightValue()}
           placeholder={getWeightPlaceholder()}
           placeholderTextColor="#B0B0B0"
           onFocus={() => setFocusedField("weight")}
           onBlur={() => setFocusedField(null)}
-          onChangeText={(text) => onChange("weight", text)}
+          onChangeText={(text) => {
+            const sanitized = text.replace(/[^0-9.]/g, "");
+            if (weightUnit === "kg") {
+              setWeightKgInput(sanitized);
+            } else {
+              setWeightLbsInput(sanitized);
+            }
+            onChange("weight", sanitized);
+          }}
         />
+        <Text
+          style={[
+            styles.weightRestrictionText,
+            weightOutOfRange && styles.weightRestrictionTextInvalid,
+          ]}
+        >
+          {weightUnit === "kg"
+            ? "Weight range: 30 - 300 kg"
+            : "Weight range: 66 - 660 lbs"}
+        </Text>
         {weightError ? (
           <Text style={styles.errorText}>{weightError}</Text>
         ) : null}
@@ -411,9 +551,43 @@ const styles = StyleSheet.create({
   genderLabelSelected: {
     color: "#00C853",
   },
+  heightSplitRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  heightSplitInput: {
+    width: 72,
+    backgroundColor: "#E0E4EB",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    textAlign: "center",
+  },
+  heightDelimiter: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#666666",
+  },
+  heightRestrictionText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#666666",
+  },
+  heightRestrictionTextInvalid: {
+    color: "#FF3B30",
+  },
   errorText: {
     marginTop: 6,
     fontSize: 12,
+    color: "#FF3B30",
+  },
+  weightRestrictionText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: "#666666",
+  },
+  weightRestrictionTextInvalid: {
     color: "#FF3B30",
   },
   modalOverlay: {

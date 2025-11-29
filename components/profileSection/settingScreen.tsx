@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  Linking,
 } from 'react-native';
 import Icon from './components/icon';
 
@@ -137,6 +138,28 @@ const SettingsScreen: React.FC<Props> = ({ onBack }) => {
               />
             </TouchableOpacity>
           </View>
+          
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>FeedBack</Text>
+
+          <TouchableOpacity
+            style={styles.feedBackItem}
+            activeOpacity={0.8}
+            onPress={() =>
+              Linking.openURL(
+                'https://docs.google.com/forms/d/e/1FAIpQLSdXLWW6aYIaFI_xUUsA1ybpP2vz36qxTXiFcVgGi-g1G44qjg/viewform' // TODO: replace with provided Google Form URL
+              )
+            }
+          >
+            <View style={styles.settingLeft}>
+              <View style={styles.settingIcon}>
+                <Icon name="email" size={20} color="#666" />
+              </View>
+              <Text style={styles.settingLabel}>Feedback</Text>
+            </View>
+          </TouchableOpacity>
+        
         </View>
       </ScrollView>
     </View>
@@ -195,6 +218,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F5F5F5',
+  },
+    feedBackItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+    backgroundColor: "#F7F7F7",
+    borderRadius: 40,
+    padding: 10
   },
   settingLeft: {
     flexDirection: 'row',

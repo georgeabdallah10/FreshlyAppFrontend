@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const TUTORIAL_KEY = 'hasSeenMainTutorial';
-const DEV_MODE = false;
+const DEV_MODE = true;
 const ANIMATION_DURATION = 400;
 const FADE_DURATION = 300;
 
@@ -34,8 +34,8 @@ const TUTORIAL_STEPS = [
   {
     order: 1,
     name: 'welcome',
-    title: 'Welcome to Savr! 🍊',
-    text: "Let's explore your main dashboard and discover how Savr makes meal planning effortless.",
+    title: 'Welcome to SAVR! 🍊',
+    text: "Let's explore your main dashboard and discover how SAVR makes meal planning effortless.",
   },
   {
     order: 2,
@@ -71,7 +71,7 @@ const TUTORIAL_STEPS = [
     order: 7,
     name: 'complete',
     title: "You're All Set! 🎉",
-    text: 'Smarter shopping and healthier eating starts now. Enjoy your Savr experience!',
+    text: 'Smarter shopping and healthier eating starts now. Enjoy your SAVR experience!',
   },
 ];
 

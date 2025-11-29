@@ -20,6 +20,7 @@ const ICONS = {
   email: '✉️',
   location: '📍',
   camera: '📷',
+  trash: '🗑️',
 } as const;
 
 export type IconName = keyof typeof ICONS;

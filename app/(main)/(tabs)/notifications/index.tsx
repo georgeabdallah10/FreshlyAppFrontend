@@ -313,7 +313,7 @@ function EmptyState({ isLoading, filter, onRefresh }: EmptyStateProps) {
     },
     updates: {
       icon: 'megaphone-outline',
-      text: 'No updates\nfrom the Savr team.',
+      text: 'No updates\nfrom the SAVR team.',
     },
   };
 

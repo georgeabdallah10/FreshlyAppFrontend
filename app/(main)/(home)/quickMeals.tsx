@@ -70,11 +70,12 @@ const TOTAL_PHASES = 6;
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const OptionRow: React.FC<{
   label: string;
+  description?: string;
   selected: boolean;
   onPress: () => void;
   mode?: "radio" | "check";
   icon?: keyof typeof Ionicons.glyphMap;
-}> = React.memo(({ label, selected, onPress, mode = "radio", icon }) => {
+}> = React.memo(({ label, description, selected, onPress, mode = "radio", icon }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const checkmarkScale = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
@@ -144,6 +145,11 @@ const OptionRow: React.FC<{
       <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
         {label}
       </Text>
+      {description ? (
+        <Text style={[styles.optionDescription, selected && styles.optionDescriptionSelected]}>
+          {description}
+        </Text>
+      ) : null}
     </AnimatedTouchable>
   );
 });
@@ -290,17 +296,24 @@ const QuickMealsCreateScreen: React.FC = () => {
     onSave: async () => {},
   });
   const [showMealComponent, setshowMealComponent] = useState(false);
-  
+
   // Rate limiting state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  
+
   // Loading state
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const spinnerRotation = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Track if meal was successfully generated (for button disabling)
+  const [mealGenerated, setMealGenerated] = useState(false);
+  const isGenerateDisabled = useMemo(
+    () => isGenerating || isButtonDisabled,
+    [isGenerating, isButtonDisabled]
+  );
 
   // Cooldown timer effect
   useEffect(() => {
@@ -520,6 +533,8 @@ Rules:
     if (showMealComponent) {
       setshowMealComponent(false);
     }
+    // Reset meal generated state when navigating to next phase
+    setMealGenerated(false);
   }, [showMealComponent]);
 
   const back = useCallback(() => {
@@ -531,6 +546,8 @@ Rules:
       if (showMealComponent) {
         setshowMealComponent(false);
       }
+      // Reset meal generated state when navigating back
+      setMealGenerated(false);
     }
   }, [phase, router, showMealComponent]);
 
@@ -543,9 +560,12 @@ Rules:
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setIsButtonDisabled(true);
     setIsGenerating(true);
     setshowMealComponent(false);
-    
+    setMealGenerated(false);
+
+    let triggeredCooldown = false;
     try {
       const payload = {
         ingredientSource: form.ingredientSource,
@@ -571,6 +591,15 @@ choices_json:
 ${JSON.stringify(payload)}
 `;
 
+      // Check cooking method choices for LLM guidance
+      const useAllMethods = form.cookingMethods.includes("all");
+      const useBasicMethods = form.cookingMethods.includes("basic");
+      const cookingMethodsInstruction = useAllMethods
+        ? "\n\nUser selected all available cooking methods. You may use any reasonable household technique that fits the recipe."
+        : useBasicMethods
+          ? "\n\nUser chose basic cooking methods. Provide easy beginner-friendly cooking steps using simple techniques like boiling, sautéing, baking, pan-frying, steaming, or air-frying. The steps must be short and straightforward."
+          : "";
+
       const system_prompt = `
 You are Savr AI professional chef. Make sure to create real meals that are eatable and delicious. Return ONLY a valid, minified JSON object for one meal recipe that respects allergens, diet_codes, and the user's goal. Never invent pantry items. Respect allowed cookingMethods and any additional instructions provided by the user. No prose, no markdown, no comments.
 
@@ -581,7 +610,7 @@ NUTRITIONAL ACCURACY IS CRITICAL:
 - Do not estimate or invent nutritional data
 - Ensure macros align with the calorie total (1g protein/carbs = 4cal, 1g fat = 9cal)
 
-CRITICAL: If the user provides additionalInstructions in choices_json, follow them EXACTLY. Incorporate them into the recipe generation.
+CRITICAL: If the user provides additionalInstructions in choices_json, follow them EXACTLY. Incorporate them into the recipe generation.${cookingMethodsInstruction}
 `;
 
       const user_prompt = `${inputsBlock}
@@ -682,6 +711,11 @@ ${JSON_DIRECTIVE}`;
       setGenerationProgress(100);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setshowMealComponent(true);
+      // Mark meal as generated to disable the button
+      setMealGenerated(true);
+      // Brief cooldown after success to avoid spamming
+      startCooldown(10);
+      triggeredCooldown = true;
     } catch (error: any) {
       console.error('[QuickMeals] Generation error:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -692,21 +726,27 @@ ${JSON_DIRECTIVE}`;
       if (errorStr.includes('timeout')) {
         errorMessage = 'Request timed out. The AI is taking too long. Please try again with simpler preferences.';
         startCooldown(60);
+        triggeredCooldown = true;
       } else if (errorStr.includes('network') || errorStr.includes('fetch')) {
         errorMessage = 'No internet connection. Please check your network and try again.';
         startCooldown(30);
+        triggeredCooldown = true;
       } else if (errorStr.includes('401')) {
         errorMessage = 'Session expired. Please log in again.';
         startCooldown(30);
+        triggeredCooldown = true;
       } else if (errorStr.includes('429')) {
         errorMessage = 'Too many requests. Please wait a few minutes before trying again.';
         startCooldown(120);
+        triggeredCooldown = true;
       } else if (errorStr.includes('500') || errorStr.includes('503')) {
         errorMessage = 'Server error. Please try again in a moment.';
         startCooldown(45);
+        triggeredCooldown = true;
       } else {
         errorMessage = 'Something went wrong generating your meal. Please try again.';
         startCooldown(30);
+        triggeredCooldown = true;
       }
       
       alert(errorMessage);
@@ -714,6 +754,9 @@ ${JSON_DIRECTIVE}`;
     } finally {
       setIsGenerating(false);
       setGenerationProgress(0);
+      if (!triggeredCooldown) {
+        setIsButtonDisabled(false);
+      }
     }
   }, [form, prefrences, pantryItems, JSON_DIRECTIVE, isGenerating, isButtonDisabled, cooldownRemaining]);
 
@@ -961,6 +1004,7 @@ ${JSON_DIRECTIVE}`;
           title="Which cooking methods do you have?"
         >
           {[
+            { key: "all", label: "All available methods", icon: "apps-outline" as const, },
             { key: "stovetop", label: "Stovetop", icon: "flame" as const },
             { key: "oven", label: "Oven", icon: "business" as const },
             { key: "microwave", label: "Microwave", icon: "radio-outline" as const },
@@ -1210,7 +1254,7 @@ ${JSON_DIRECTIVE}`;
           <Ionicons
             name="chevron-back"
             size={20}
-            color={phase === 0 || isGenerating ? COLORS.disabled : COLORS.primary}
+            colxor={phase === 0 || isGenerating ? COLORS.disabled : COLORS.primary}
           />
           <Text
             style={[
@@ -1226,13 +1270,17 @@ ${JSON_DIRECTIVE}`;
           onPress={() => (phase === TOTAL_PHASES - 1 ? finish() : next())}
           style={[
             styles.btnSolid,
-            (isGenerating || isButtonDisabled) && styles.btnSolidDisabled
+            isGenerateDisabled && styles.btnSolidDisabled
           ]}
-          disabled={isGenerating || isButtonDisabled}
+          disabled={isGenerateDisabled}
         >
           <Text style={styles.btnSolidText}>
-            {phase === TOTAL_PHASES - 1 
-              ? (isGenerating ? "Generating..." : cooldownRemaining > 0 ? `Wait ${cooldownRemaining}s` : "Generate Meal")
+            {phase === TOTAL_PHASES - 1
+              ? (isGenerating
+                  ? "Generating..."
+                  : mealGenerated
+                    ? "Generate Meal"
+                    : "Generate Meal")
               : "Next"}
           </Text>
           <Ionicons name="chevron-forward" size={20} color="#fff" />
@@ -1510,7 +1558,7 @@ const styles = StyleSheet.create({
   },
   option: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     backgroundColor: COLORS.card,
     borderRadius: 16,
@@ -1550,6 +1598,15 @@ const styles = StyleSheet.create({
   optionTextSelected: {
     color: COLORS.primary,
     fontWeight: "700",
+  },
+  optionDescription: {
+    flexBasis: "100%",
+    marginTop: 4,
+    fontSize: 13,
+    color: COLORS.sub,
+  },
+  optionDescriptionSelected: {
+    color: COLORS.primary,
   },
   input: {
     borderWidth: 1.5,

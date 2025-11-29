@@ -92,7 +92,7 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
       <View style={styles.headerBar}>
         <TouchableOpacity
           style={styles.headerBackBtn}
-          onPress={() => router.back()}
+          onPress={() => router.replace("/(main)/(home)/main")}
           activeOpacity={0.7}
         >
           <Text style={styles.headerIcon}>←</Text>
@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FF3B30",
+  color: "#FF3B30",
   },
   headerIcon: {
     fontSize: 20,

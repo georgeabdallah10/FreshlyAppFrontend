@@ -184,13 +184,13 @@ const Hero = () => {
         style={styles.titleContainer}
       >
         <Text style={styles.h1}>
-          Savr <Text style={styles.h1Accent}>Features</Text>
+          SAVR <Text style={styles.h1Accent}>Features</Text>
         </Text>
       </Animated.View>
 
       <Animated.View entering={FadeInUp.delay(200).duration(600)}>
         <Text style={styles.subtitle}>
-          Your AI-powered meal planning and grocery assistant. Savr learns your
+          Your AI-powered meal planning and grocery assistant. SAVR learns your
           tastes, plans your week, builds a smart shopping list, and helps you
           cook with what you already have—saving time, money, and food waste.
         </Text>
@@ -372,9 +372,9 @@ export default function SavrFeaturesScreen() {
 
         {/* How to Use */}
         <View style={styles.section}>
-          <Text style={styles.h2}>How to Use Savr</Text>
+          <Text style={styles.h2}>How to Use SAVR</Text>
           <Text style={styles.sectionBlurb}>
-            Get set up in minutes—Savr handles the planning so you can focus on
+            Get set up in SAVR handles the planning so you can focus on
             living.
           </Text>
           <View style={styles.stepsWrap}>
@@ -396,7 +396,7 @@ export default function SavrFeaturesScreen() {
 
         {/* Closing + CTA */}
         <View style={[styles.section, styles.closing]}>
-          <Text style={styles.h2}>Why People Love Savr</Text>
+          <Text style={styles.h2}>Why People Love SAVR</Text>
           <Text style={styles.sectionBlurb}>
             A simpler way to plan, shop, and eat—personal to you, powered by AI.
             Less stress, less waste, more time back every week.

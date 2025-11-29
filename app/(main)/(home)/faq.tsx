@@ -34,7 +34,7 @@ type FAQCategory = {
 
 const FAQ_DATA: FAQCategory[] = [
   {
-    title: "Basics of Savr",
+    title: "Basics of SAVR",
     icon: "information-circle",
     color: "#00A86B",
     items: [
@@ -243,7 +243,7 @@ const FAQScreen = () => {
         <View style={styles.heroSection}>
           <Text style={styles.title}>Frequently Asked Questions</Text>
           <Text style={styles.subtitle}>
-            Find answers to common questions about Savr
+            Find answers to common questions about SAVR
           </Text>
         </View>
 

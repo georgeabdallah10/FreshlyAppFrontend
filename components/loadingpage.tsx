@@ -78,7 +78,7 @@ export default function SplashScreen(): React.JSX.Element {
             style={styles.logoImage}
             resizeMode="contain"
           />
-          <Text style={styles.brandName}>Savr</Text>
+          <Text style={styles.brandName}>SAVR</Text>
         </View>
         
         <View style={styles.loadingContainer}>

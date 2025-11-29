@@ -242,7 +242,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         await Storage.setItem("access_token", login.data.access_token);
         showToast(
           "success",
-          "Account created successfully! Welcome to Savr!"
+          "Account created successfully! Welcome to SAVR!"
         );
 
         // Send verification code (non-blocking)
@@ -254,7 +254,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         setTimeout(() => {
           setIsCreatingAccount(false);
           console.log("Navigating to setPfp screen...");
-          router.replace("/(user)/setPfp");
+          router.replace("/(main)/(user)/setPfp");
         }, 800);
 
         return;
@@ -555,8 +555,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
 
       await Storage.setItem("access_token", backend.data.access_token);
       console.log("[Signup] User authenticated successfully in backend");
-      showToast("success", "Welcome to Savr!");
-      router.replace("/(user)/setPfp");
+      showToast("success", "Welcome to SAVR!");
+      router.replace("/(main)/(user)/setPfp");
     } catch (error: any) {
       console.error("[Signup] OAuth signup error:", error);
       showToast(
@@ -595,7 +595,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 style={styles.logoImage}
                 resizeMode="contain"
               />
-              <Text style={styles.brandName}>Savr</Text>
+              <Text style={styles.brandName}>SAVR</Text>
               <Text style={{ color: "#00A86B", fontSize: 20 }}>
                 Smarter Shopping.
               </Text>

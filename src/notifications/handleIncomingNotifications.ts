@@ -8,8 +8,9 @@
 
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import type { NotificationResponse, NotificationCategory } from './types';
+import type { NotificationCategory } from './types';
 import { clearBadgeCount } from './registerForPush';
+
 
 // ============================================
 // NOTIFICATION TAP HANDLER
@@ -26,6 +27,7 @@ export function setupNotificationResponseListener(): () => void {
 
   // Return cleanup function
   return () => {
+  
     subscription.remove();
   };
 }
@@ -89,7 +91,7 @@ async function handleNotificationResponse(
 ): Promise<void> {
   try {
     const { notification } = response;
-    const { data, title, body } = notification.request.content;
+    const { data } = notification.request.content;
 
     // Clear badge when user interacts with notification
     await clearBadgeCount();
@@ -98,15 +100,15 @@ async function handleNotificationResponse(
     if (data?.category) {
       await routeNotification(data.category as NotificationCategory, data);
     } else if (data?.type) {
-      await routeByType(data.type, data);
+      await routeByType(String(data.type), data);
     } else {
       // Default: Navigate to notifications screen
-      router.push('/(tabs)/notifications');
+      router.push('/(main)/(tabs)/notifications');
     }
   } catch (error) {
     console.error('[NotificationHandler] Error handling notification response:', error);
     // Fallback: Navigate to notifications screen
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   }
 }
 
@@ -144,7 +146,7 @@ async function routeNotification(
 
     default:
       // Navigate to notifications screen
-      router.push('/(tabs)/notifications');
+      router.push('/(main)/(tabs)/notifications');
   }
 }
 
@@ -152,13 +154,15 @@ async function routeNotification(
  * Route based on notification type (for backward compatibility)
  */
 async function routeByType(type: string, data: Record<string, any>): Promise<void> {
+  if (!type) return;
+
   if (type === 'daily_check') {
     // Silent background task, don't navigate
     return;
   }
 
   // Default routing
-  router.push('/(tabs)/notifications');
+  router.push('/(main)/(tabs)/notifications');
 }
 
 // ============================================
@@ -176,16 +180,16 @@ async function handleMealRequestNotification(data: Record<string, any>): Promise
     if (mealId) {
       // Navigate to meal details
       router.push({
-        pathname: '/(home)/meal/[id]',
+        pathname:'/(main)/(home)/meals',
         params: { id: mealId.toString() },
       });
     } else {
       // Navigate to notifications screen
-      router.push('/(tabs)/notifications');
+      router.push('/(main)/(tabs)/notifications');
     }
   } catch (error) {
     console.error('[NotificationHandler] Error handling meal request:', error);
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   }
 }
 
@@ -200,16 +204,16 @@ async function handlePantryExpirationNotification(data: Record<string, any>): Pr
     if (itemId) {
       // Navigate to pantry with item highlighted
       router.push({
-        pathname: '/(tabs)/pantry',
+        pathname: '/(main)/(home)/pantry',
         params: { highlightItem: itemId.toString() },
       });
     } else {
       // Navigate to pantry screen
-      router.push('/(tabs)/pantry');
+      router.push('/(main)/(home)/pantry');
     }
   } catch (error) {
     console.error('[NotificationHandler] Error handling pantry expiration:', error);
-    router.push('/(tabs)/pantry');
+    router.push('/(main)/(home)/pantry');
   }
 }
 
@@ -224,22 +228,22 @@ async function handleUserMessageNotification(data: Record<string, any>): Promise
     if (conversationId) {
       // Navigate to specific conversation
       router.push({
-        pathname: '/(home)/chat',
+        pathname: '/(main)/(home)/chat',
         params: { conversationId: conversationId.toString() },
       });
     } else if (senderId) {
       // Navigate to chat with specific user
       router.push({
-        pathname: '/(home)/chat',
+        pathname: '/(main)/(home)/chat',
         params: { userId: senderId.toString() },
       });
     } else {
       // Navigate to messages/chat list
-      router.push('/(home)/chat');
+      router.push('/(main)/(home)/chat');
     }
   } catch (error) {
     console.error('[NotificationHandler] Error handling user message:', error);
-    router.push('/(home)/chat');
+    router.push('/(main)/(home)/chat');
   }
 }
 
@@ -253,10 +257,10 @@ async function handleFreshlyUpdateNotification(data: Record<string, any>): Promi
 
     // If there's an action URL, you could open it in a webview or external browser
     // For now, navigate to notifications screen to show the update
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   } catch (error) {
     console.error('[NotificationHandler] Error handling Freshly update:', error);
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   }
 }
 
@@ -267,10 +271,10 @@ async function handleFreshlyUpdateNotification(data: Record<string, any>): Promi
 async function handleSystemNotification(data: Record<string, any>): Promise<void> {
   try {
     // Navigate to notifications screen
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   } catch (error) {
     console.error('[NotificationHandler] Error handling system notification:', error);
-    router.push('/(tabs)/notifications');
+    router.push('/(main)/(tabs)/notifications');
   }
 }
 

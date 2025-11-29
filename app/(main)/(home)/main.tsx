@@ -14,10 +14,11 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from '@expo/vector-icons';
 import IconButton from "@/components/iconComponent";
-import Icon from "@/components/profileSection/components/icon";
+import HomeTutorial, { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
 
+// 🔧 DEV MODE: Set to true to always show tutorial (for testing)
+const TUTORIAL_DEV_MODE = false;
 
 type MenuItem = {
   id: string;
@@ -33,10 +34,20 @@ const BottomNavigation = ({
   activeTab,
   onTabPress,
   safeBottom,
+  quickAddRef,
+  chatButtonRef,
+  familyButtonRef,
+  settingsButtonRef,
+  disabled,
 }: {
   activeTab: string;
   onTabPress: (tab: string) => void;
   safeBottom?: number;
+  quickAddRef?: React.RefObject<View | null>;
+  chatButtonRef?: React.RefObject<View | null>;
+  familyButtonRef?: React.RefObject<View | null>;
+  settingsButtonRef?: React.RefObject<View | null>;
+  disabled?: boolean;
 }) => {
   const inset = Math.max(0, safeBottom || 0);
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -101,9 +112,11 @@ const BottomNavigation = ({
           />
           */}
           <TouchableOpacity
+            ref={quickAddRef}
             style={styles.navItem}
             onPress={() => handleNavOnPress("+")}
             activeOpacity={0.8}
+            disabled={disabled}
           >
             <View style={styles.navIconContainer}>
               <Text
@@ -119,9 +132,11 @@ const BottomNavigation = ({
           </TouchableOpacity>
 
           <TouchableOpacity
+            ref={chatButtonRef}
             style={styles.navItem}
             onPress={() => handleNavOnPress("chat")}
             activeOpacity={0.8}
+            disabled={disabled}
           >
             <View style={styles.navIconContainer}>
               <Text
@@ -137,9 +152,11 @@ const BottomNavigation = ({
           </TouchableOpacity>
 
           <TouchableOpacity
+            ref={familyButtonRef}
             style={styles.navItem}
             onPress={() => handleNavOnPress("family")}
             activeOpacity={0.8}
+            disabled={disabled}
           >
             <View style={styles.navIconContainer}>
               <Text
@@ -155,9 +172,11 @@ const BottomNavigation = ({
           </TouchableOpacity>
 
           <TouchableOpacity
+            ref={settingsButtonRef}
             style={styles.navItem}
             onPress={() => router.push("/(main)/(home)/profile")}
             activeOpacity={0.8}
+            disabled={disabled}
           >
             <View style={styles.navIconContainer}>
               <IconButton  iconName="settings-outline" iconSize={35} />
@@ -174,6 +193,74 @@ const HomeDashboard = () => {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { data: pendingShareCount = 0 } = usePendingRequestCount();
+
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [targetMeasurements, setTargetMeasurements] = useState<Record<string, TargetMeasurements>>({});
+
+  // Refs for measuring positions
+  const pantryRef = useRef<View>(null);
+  const mealPlansRef = useRef<View>(null);
+  const groceryRef = useRef<View>(null);
+  const quickMealsRef = useRef<View>(null);
+  const allFeaturesRef = useRef<View>(null);
+
+  // Bottom navigation refs
+  const quickAddRef = useRef<View>(null);
+  const chatButtonRef = useRef<View>(null);
+  const familyButtonRef = useRef<View>(null);
+  const settingsButtonRef = useRef<View>(null);
+
+  // Check if tutorial should be shown
+  useEffect(() => {
+    const checkAndShowTutorial = async () => {
+      // If dev mode is on, always show tutorial
+      if (TUTORIAL_DEV_MODE) {
+        setTimeout(() => {
+          measureAllTargets();
+          setShowTutorial(true);
+        }, 500);
+        return;
+      }
+
+      // Otherwise, check if user has completed it
+      const hasCompleted = await checkTutorialCompleted();
+      if (!hasCompleted) {
+        // Give time for layout to settle
+        setTimeout(() => {
+          measureAllTargets();
+          setShowTutorial(true);
+        }, 500);
+      }
+    };
+
+    checkAndShowTutorial();
+  }, []);
+
+  // Measure all target positions
+  const measureAllTargets = () => {
+    const measureElement = (ref: React.RefObject<View | null>, key: string) => {
+      if (ref.current) {
+        ref.current.measureInWindow((x, y, width, height) => {
+          setTargetMeasurements(prev => ({ ...prev, [key]: { x, y, width, height } }));
+        });
+      }
+    };
+
+    measureElement(pantryRef, 'pantry');
+    measureElement(mealPlansRef, 'mealPlans');
+    measureElement(groceryRef, 'grocery');
+    measureElement(quickMealsRef, 'quickMeals');
+    measureElement(allFeaturesRef, 'allFeatures');
+    measureElement(quickAddRef, 'quickAdd');
+    measureElement(chatButtonRef, 'chatButton');
+    measureElement(familyButtonRef, 'familyButton');
+    measureElement(settingsButtonRef, 'settingsButton');
+  };
+
+  const handleTutorialComplete = () => {
+    setShowTutorial(false);
+  };
 
   const menuItems: MenuItem[] = [
     {
@@ -232,12 +319,14 @@ const HomeDashboard = () => {
             <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        scrollEnabled={!showTutorial}
       >
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.menuButton}
           activeOpacity={0.6}
           onPress={() => router.push("/(main)/(home)/faq")}
+          disabled={showTutorial}
         >
           <View style={styles.menuIcon}>
             <Image
@@ -258,7 +347,7 @@ const HomeDashboard = () => {
           iconSize={24}
           iconColor="#1F2937"
           badgeColor="#FF3B30"
-          onPress={() => router.push("/(main)/(home)/notifications")}
+          onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
           extraCount={pendingShareCount}
           containerStyle={styles.notificationButton}
         />
@@ -273,33 +362,44 @@ const HomeDashboard = () => {
         </View>
         {/* Menu Grid */}
         <View style={styles.menuGrid}>
-          {menuItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.menuCard, { backgroundColor: item.bgColor }]}
-              onPress={() => handleMenuPress(item)}
-              activeOpacity={0.8}
-            >
-              <View style={styles.menuCardHeader}>
-                <View style={styles.menuIconContainer}>
-                  <Image
-                    source={item.iconSource}
-                    style={styles.menuCardIcon}
-                    resizeMode="contain"
-                  />
+          {menuItems.map((item) => {
+            // Assign refs based on menu item title
+            let itemRef;
+            if (item.title === 'Pantry') itemRef = pantryRef;
+            else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
+            else if (item.title === 'Grocery') itemRef = groceryRef;
+            else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
+
+            return (
+              <TouchableOpacity
+                key={item.id}
+                ref={itemRef}
+                style={[styles.menuCard, { backgroundColor: item.bgColor }]}
+                onPress={() => handleMenuPress(item)}
+                activeOpacity={0.8}
+                disabled={showTutorial}
+              >
+                <View style={styles.menuCardHeader}>
+                  <View style={styles.menuIconContainer}>
+                    <Image
+                      source={item.iconSource}
+                      style={styles.menuCardIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.menuCardTitle}>{item.title}</Text>
                 </View>
-                <Text style={styles.menuCardTitle}>{item.title}</Text>
-              </View>
-              <View style={styles.menuCardFooter}>
-                <Text style={styles.menuCardSubtitle}>{item.subtitle}</Text>
-                <Text style={styles.arrowIcon}>→</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+                <View style={styles.menuCardFooter}>
+                  <Text style={styles.menuCardSubtitle}>{item.subtitle}</Text>
+                  <Text style={styles.arrowIcon}>→</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* Start New Chat Section */}
-        <View style={styles.chatSection}>
+        <View ref={allFeaturesRef} style={styles.chatSection}>
           <View style={styles.chatIconContainer}>
             <Image
               source={chatIconSource}
@@ -313,6 +413,7 @@ const HomeDashboard = () => {
             style={styles.startChatButton}
             onPress={handleStartChat}
             activeOpacity={0.9}
+            disabled={showTutorial}
           >
             <Text style={styles.startChatButtonText}>Explore more</Text>
             <Text style={styles.startChatArrow}>→</Text>
@@ -325,6 +426,18 @@ const HomeDashboard = () => {
         activeTab={activeTab}
         onTabPress={handleTabPress}
         safeBottom={insets.bottom}
+        quickAddRef={quickAddRef}
+        chatButtonRef={chatButtonRef}
+        familyButtonRef={familyButtonRef}
+        settingsButtonRef={settingsButtonRef}
+        disabled={showTutorial}
+      />
+
+      {/* Tutorial Overlay */}
+      <HomeTutorial
+        visible={showTutorial}
+        onComplete={handleTutorialComplete}
+        targetMeasurements={targetMeasurements}
       />
     </View>
   );

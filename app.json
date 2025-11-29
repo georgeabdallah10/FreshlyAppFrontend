@@ -28,7 +28,7 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app needs your location to find nearby grocery stores.",
-        "NSCameraUsageDescription": "Allow Savr to use the camera for barcode scanning.",
+        "NSCameraUsageDescription": "Allow SAVR to use the camera for barcode scanning.",
         "UIBackgroundModes": [
           "remote-notification",
           "remote-notification"
@@ -39,7 +39,7 @@
         [
           "expo-camera",
           {
-            "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+            "cameraPermission": "Allow SAVR to use the camera for barcode scanning."
           }
         ],
         [
@@ -52,7 +52,7 @@
         [
           "expo-camera",
           {
-            "cameraPermission": "Allow Savr to use the camera for barcode scanning."
+            "cameraPermission": "Allow SAVR to use the camera for barcode scanning."
           }
         ],
         [

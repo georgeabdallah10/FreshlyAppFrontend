@@ -1,13 +1,12 @@
-import { queryClient } from "@/src/config/queryClient";
 import { UserProvider } from "@/context/usercontext";
 import { FamilyProvider } from "@/context/familycontext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import QueryPersistProvider from "@/providers/QueryPersistProvider";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { QueryClientProvider } from "@tanstack/react-query";
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import "../global.css";
@@ -22,7 +21,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar hidden={true} />
-      <QueryClientProvider client={queryClient}>
+      <QueryPersistProvider>
         <UserProvider>
           <FamilyProvider>
             <ThemeProvider
@@ -32,7 +31,7 @@ export default function RootLayout() {
             </ThemeProvider>
           </FamilyProvider>
         </UserProvider>
-      </QueryClientProvider>
+      </QueryPersistProvider>
     </>
   );
 }

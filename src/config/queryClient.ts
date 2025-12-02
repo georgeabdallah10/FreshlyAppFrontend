@@ -2,13 +2,13 @@
  * ============================================
  * REACT QUERY CONFIGURATION
  * ============================================
- * 
+ *
  * Production-grade React Query setup with:
  * - Optimized default query settings
  * - Retry logic
  * - Cache time configuration
  * - Background refetching
- * - Persistence (optional)
+ * - MMKV persistence for offline support
  * - DevTools for debugging
  */
 
@@ -23,25 +23,25 @@ const queryConfig: DefaultOptions = {
     // ========== CACHE CONFIGURATION ==========
     staleTime: 1000 * 60 * 5, // 5 minutes - Data is fresh for 5 min
     gcTime: 1000 * 60 * 30, // 30 minutes - Cache garbage collection (formerly cacheTime)
-    
+
     // ========== REFETCH CONFIGURATION ==========
-    refetchOnWindowFocus: false, // Don't refetch on window focus (mobile friendly)
+    refetchOnWindowFocus: true, // Refetch when app comes to foreground
     refetchOnMount: true, // Refetch when component mounts if data is stale
     refetchOnReconnect: true, // Refetch when network reconnects
-    
+
     // ========== RETRY CONFIGURATION ==========
     retry: 2, // Retry failed requests 2 times
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
-    
+
     // ========== NETWORK MODE ==========
     networkMode: 'online', // Only fetch when online
   },
-  
+
   mutations: {
     // ========== RETRY CONFIGURATION FOR MUTATIONS ==========
     retry: 1, // Retry mutations once on failure
     retryDelay: 1000, // 1 second delay between retries
-    
+
     // ========== NETWORK MODE ==========
     networkMode: 'online', // Only mutate when online
   },
@@ -134,6 +134,28 @@ export const queryKeys = {
     all: ['barcode'] as const,
     product: (barcode: string) => [...queryKeys.barcode.all, barcode] as const,
   },
+
+  // ========== NOTIFICATIONS QUERIES ==========
+  notifications: {
+    all: ['notifications'] as const,
+    lists: () => [...queryKeys.notifications.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.notifications.lists(), { filters }] as const,
+    details: () => [...queryKeys.notifications.all, 'detail'] as const,
+    detail: (id: number) => [...queryKeys.notifications.details(), id] as const,
+    unreadCount: () => [...queryKeys.notifications.all, 'unreadCount'] as const,
+    stats: () => [...queryKeys.notifications.all, 'stats'] as const,
+  },
+
+  // ========== MEAL PLANS QUERIES ==========
+  mealPlans: {
+    all: ['mealPlans'] as const,
+    lists: () => [...queryKeys.mealPlans.all, 'list'] as const,
+    list: (filters?: any) => [...queryKeys.mealPlans.lists(), { filters }] as const,
+    details: () => [...queryKeys.mealPlans.all, 'detail'] as const,
+    detail: (id: number) => [...queryKeys.mealPlans.details(), id] as const,
+    active: () => [...queryKeys.mealPlans.all, 'active'] as const,
+    week: (date: string) => [...queryKeys.mealPlans.all, 'week', date] as const,
+  },
 };
 
 // ============================================
@@ -183,6 +205,21 @@ export const invalidateQueries = {
    * Invalidate all grocery-related queries
    */
   grocery: () => queryClient.invalidateQueries({ queryKey: queryKeys.grocery.all }),
+
+  /**
+   * Invalidate all notification-related queries
+   */
+  notifications: () => queryClient.invalidateQueries({ queryKey: queryKeys.notifications.all }),
+
+  /**
+   * Invalidate all meal plan-related queries
+   */
+  mealPlans: () => queryClient.invalidateQueries({ queryKey: queryKeys.mealPlans.all }),
+
+  /**
+   * Invalidate specific meal plan
+   */
+  mealPlanDetail: (id: number) => queryClient.invalidateQueries({ queryKey: queryKeys.mealPlans.detail(id) }),
 };
 
 // ============================================

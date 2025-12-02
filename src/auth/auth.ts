@@ -50,6 +50,7 @@ export type ApiResult<T> =
 
 export type OAuthSignupResponse = {
   access_token: string;
+  refresh_token: string;
   token_type: string;
   user: UserOut;
 };
@@ -206,6 +207,7 @@ export type LoginInput = {
 
 export type LoginResponse = {
   access_token: string;
+  refresh_token: string;
   token_type: string; // usually "bearer"
   user?: {
     id: number;

@@ -2,6 +2,7 @@ import RecipeItem from "@/components/meal/mealPreview";
 import { useUser } from "@/context/usercontext";
 import { askAI } from "@/src/home/chat";
 import { createMealForSignleUser } from "@/src/user/meals";
+import { getMealImage } from "@/src/services/mealImageService";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -830,6 +831,18 @@ ${JSON_DIRECTIVE}`;
 
     setIsSubmitting(true);
     try {
+      // Generate and upload image to Supabase, then save URL to meal
+      console.log('[QuickMeals] Generating image for meal:', meal.name);
+      const imageUrl = await getMealImage(meal.name);
+
+      if (imageUrl) {
+        meal.image = imageUrl;
+        console.log('[QuickMeals] Image URL saved to meal:', imageUrl);
+      } else {
+        console.warn('[QuickMeals] Image generation failed, using emoji fallback');
+        // Keep the emoji fallback already set in meal.image
+      }
+
       const res = await createMealForSignleUser(meal as any);
       console.log('[QuickMeals] Meal saved successfully:', res);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1314,7 +1327,7 @@ ${JSON_DIRECTIVE}`;
             </Animated.View>
             <Text style={styles.loadingTitle}>Creating Your Perfect Meal</Text>
             <Text style={styles.loadingSubtitle}>
-              Our AI chef is analyzing your preferences and crafting a delicious recipe...
+              SAVR AI chef is analyzing your preferences and crafting a delicious recipe...
             </Text>
             <View style={styles.progressBarContainer}>
               <View style={styles.progressBarTrack}>
@@ -1329,12 +1342,7 @@ ${JSON_DIRECTIVE}`;
                 {Math.round(Math.min(generationProgress, 100))}%
               </Text>
             </View>
-            <View style={styles.loadingFooter}>
-              <Ionicons name="information-circle" size={16} color={COLORS.sub} />
-              <Text style={styles.loadingHint}>
-                This may take up to 45 seconds
-              </Text>
-            </View>
+
           </View>
         </View>
       )}

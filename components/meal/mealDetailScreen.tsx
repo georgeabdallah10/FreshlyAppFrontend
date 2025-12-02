@@ -2,11 +2,13 @@
 import {
   deleteMealForSignleUser,
   updateMealForSignleUser,
+  toggleMealFavorite,
 } from "@/src/user/meals";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Image,
   ScrollView,
   StyleSheet,
@@ -17,6 +19,7 @@ import {
 } from "react-native";
 import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
+import ToastBanner from "@/components/generalMessage";
 
 type Props = {
   meal: Meal;
@@ -48,6 +51,15 @@ const buildUpdateInputFromMeal = (m: Meal) => ({
   isFavorite: m.isFavorite,
 });
 
+type ToastType = "success" | "error";
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+  duration?: number;
+  topOffset?: number;
+}
+
 const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedMeal, setEditedMeal] = useState<Meal>({ ...meal });
@@ -55,6 +67,25 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [deleting, setDeleting] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [familyId, setFamilyId] = useState<number | null>(null);
+  const [isFavoriting, setIsFavoriting] = useState(false);
+  const favoriteAnimValue = useRef(new Animated.Value(1)).current;
+
+  const [toast, setToast] = useState<ToastState>({
+    visible: false,
+    type: "success",
+    message: "",
+    duration: 3000,
+    topOffset: 40,
+  });
+
+  const showToast = (
+    type: ToastType,
+    message: string,
+    duration: number = 3000,
+    topOffset: number = 40
+  ) => {
+    setToast({ visible: true, type, message, duration, topOffset });
+  };
 
   React.useEffect(() => {
     let isMounted = true;
@@ -133,9 +164,56 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
     );
   };
 
-  const toggleFavorite = () => {
-    setEditedMeal((m) => ({ ...m, isFavorite: !m.isFavorite }));
+  const toggleFavorite = async () => {
+    if (isFavoriting) return; // Prevent double clicks
+
+    const newFavoriteStatus = !editedMeal.isFavorite;
+
+    try {
+      setIsFavoriting(true);
+
+      // Smooth pulse animation
+      Animated.sequence([
+        Animated.timing(favoriteAnimValue, {
+          toValue: 1.3,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(favoriteAnimValue, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
+      // Optimistically update UI
+      setEditedMeal((m) => ({ ...m, isFavorite: newFavoriteStatus }));
+
+      // Call backend with full meal payload
+      const mealPayload = buildUpdateInputFromMeal(editedMeal);
+      await toggleMealFavorite(meal.id, mealPayload as any, newFavoriteStatus);
+
+      // Show success toast
+      showToast(
+        "success",
+        newFavoriteStatus
+          ? "Meal added to favorites! ❤️"
+          : "Meal removed from favorites",
+        2500,
+        40
+      );
+    } catch (error: any) {
+      // Rollback on error
+      setEditedMeal((m) => ({ ...m, isFavorite: !newFavoriteStatus }));
+      showToast("error", error?.message || "Failed to update favorite status");
+    } finally {
+      setIsFavoriting(false);
+    }
   };
+
+  const hasImage =
+    typeof editedMeal.image === "string" &&
+    (editedMeal.image.startsWith("http") || editedMeal.image.startsWith("data:"));
 
   return (
     <View style={styles.container}>
@@ -151,12 +229,20 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         <View style={styles.headerActions}>
           <TouchableOpacity
             onPress={toggleFavorite}
-            style={styles.iconButton}
+            style={[styles.iconButton, isFavoriting && styles.iconButtonDisabled]}
             activeOpacity={0.8}
+            disabled={isFavoriting}
           >
-            <Text style={styles.favoriteIcon}>
-              {editedMeal.isFavorite ? "❤️" : "🤍"}
-            </Text>
+            <Animated.View
+              style={{
+                transform: [{ scale: favoriteAnimValue }],
+                opacity: isFavoriting ? 0.6 : 1,
+              }}
+            >
+              <Text style={styles.favoriteIcon}>
+                {editedMeal.isFavorite ? "❤️" : "🤍"}
+              </Text>
+            </Animated.View>
           </TouchableOpacity>
           
           {familyId !== null && (
@@ -217,7 +303,15 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={styles.heroImage}>
-            <Text style={styles.heroEmoji}>{editedMeal.image}</Text>
+            {hasImage ? (
+              <Image
+                source={{ uri: editedMeal.image }}
+                style={styles.heroImageAsset}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={styles.heroEmoji}>{editedMeal.image || "🍽"}</Text>
+            )}
           </View>
 
           {isEditing ? (
@@ -570,6 +664,16 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           }}
         />
       )}
+
+      {/* Toast Banner */}
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        duration={toast.duration ?? 3000}
+        topOffset={toast.topOffset ?? 40}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
     </View>
   );
 };
@@ -602,6 +706,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  iconButtonDisabled: {
+    opacity: 0.7,
+  },
   favoriteIcon: { fontSize: 20 },
   editButton: {
     paddingHorizontal: 16,
@@ -633,6 +740,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
+  },
+  heroImageAsset: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 60,
   },
   heroEmoji: { fontSize: 60 },
   heroTitle: {

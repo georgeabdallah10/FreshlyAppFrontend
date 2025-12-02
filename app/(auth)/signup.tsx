@@ -240,6 +240,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
         }
 
         await Storage.setItem("access_token", login.data.access_token);
+        await Storage.setItem("refresh_token", login.data.refresh_token);
         showToast(
           "success",
           "Account created successfully! Welcome to SAVR!"
@@ -554,6 +555,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
       }
 
       await Storage.setItem("access_token", backend.data.access_token);
+      await Storage.setItem("refresh_token", backend.data.refresh_token);
       console.log("[Signup] User authenticated successfully in backend");
       showToast("success", "Welcome to SAVR!");
       router.replace("/(main)/(user)/setPfp");

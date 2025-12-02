@@ -1,6 +1,8 @@
 import { BASE_URL } from "@/src/env/baseUrl";
 import { Storage } from "@/src/utils/storage";
 import { supabase } from "../supabase/client";
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
 
 /**
  * Meal Image Service
@@ -79,15 +81,97 @@ function sanitizeMealName(mealName: string): string {
 }
 
 /**
+ * Compress and resize image to reduce file size for reliable uploads
+ * - Resizes to max 512px width (maintains aspect ratio)
+ * - Converts to JPEG with 0.75 quality
+ * - Target: <300KB file size
+ */
+async function compressImage(imageUrl: string): Promise<Uint8Array> {
+  try {
+    console.log(`[MealImageService] 🔧 Starting compression for image...`);
+
+    // Step 1: Download to temp file (ImageManipulator needs file URI)
+    const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+    if (!cacheDir) {
+      throw new Error('No cache directory available');
+    }
+    const tempPath = `${cacheDir}temp-meal-${Date.now()}.png`;
+    console.log(`[MealImageService] 📥 Downloading to temp: ${tempPath}`);
+
+    const downloadResult = await FileSystem.downloadAsync(imageUrl, tempPath);
+
+    if (downloadResult.status !== 200) {
+      throw new Error(`Download failed with status ${downloadResult.status}`);
+    }
+
+    const originalInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+    if (!originalInfo.exists || !originalInfo.size) {
+      throw new Error('Downloaded file is invalid');
+    }
+
+    const originalSizeMB = (originalInfo.size / (1024 * 1024)).toFixed(2);
+    console.log(`[MealImageService] 📊 Original size: ${originalSizeMB}MB`);
+
+    // Step 2: Compress with ImageManipulator
+    const manipResult = await ImageManipulator.manipulateAsync(
+      downloadResult.uri,
+      [
+        { resize: { width: 512 } }, // Resize to 512px width, maintain aspect ratio
+      ],
+      {
+        compress: 0.75, // 75% quality
+        format: ImageManipulator.SaveFormat.JPEG,
+      }
+    );
+
+    console.log(`[MealImageService] ✅ Compressed to: ${manipResult.uri}`);
+
+    // Step 3: Read compressed file as base64
+    const compressedBase64 = await FileSystem.readAsStringAsync(manipResult.uri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    // Step 4: Convert base64 to Uint8Array
+    const binaryString = atob(compressedBase64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const compressedSizeMB = (bytes.length / (1024 * 1024)).toFixed(2);
+    const compressedSizeKB = (bytes.length / 1024).toFixed(0);
+    console.log(`[MealImageService] ✅ Compressed size: ${compressedSizeMB}MB (${compressedSizeKB}KB)`);
+    console.log(`[MealImageService] 📉 Size reduction: ${((1 - bytes.length / originalInfo.size) * 100).toFixed(1)}%`);
+
+    // Step 5: Cleanup temp files
+    try {
+      await FileSystem.deleteAsync(tempPath, { idempotent: true });
+      await FileSystem.deleteAsync(manipResult.uri, { idempotent: true });
+      console.log(`[MealImageService] 🗑️ Cleaned up temp files`);
+    } catch (cleanupError) {
+      console.warn(`[MealImageService] ⚠️ Cleanup failed:`, cleanupError);
+    }
+
+    return bytes;
+  } catch (error) {
+    console.error(`[MealImageService] ❌ Compression failed:`, error);
+    throw error;
+  }
+}
+
+/**
  * Check if image exists in Supabase bucket
+ * Checks for both .jpg (compressed) and .png (legacy) formats
  */
 async function checkImageInBucket(filename: string): Promise<string | null> {
   try {
-    // List files in the bucket root
+    // Check for compressed JPEG first (new format)
+    const jpgFilename = filename.replace(/\.png$/, '.jpg');
+
     const { data, error } = await supabase.storage
       .from(BUCKET_NAME)
       .list('', {
-        search: filename,
+        search: jpgFilename,
       });
 
     if (error) {
@@ -95,16 +179,29 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
       return null;
     }
 
-    // Check if file exists
-    const fileExists = data?.some(file => file.name === filename);
-    
-    if (fileExists) {
-      // Get public URL
+    // Check if JPEG exists
+    if (data?.some(file => file.name === jpgFilename)) {
+      const { data: urlData } = supabase.storage
+        .from(BUCKET_NAME)
+        .getPublicUrl(jpgFilename);
+
+      console.log(`[MealImageService] ✅ Found existing image: ${jpgFilename}`);
+      return urlData.publicUrl;
+    }
+
+    // Fallback: Check for legacy PNG format
+    const { data: pngData } = await supabase.storage
+      .from(BUCKET_NAME)
+      .list('', {
+        search: filename,
+      });
+
+    if (pngData?.some(file => file.name === filename)) {
       const { data: urlData } = supabase.storage
         .from(BUCKET_NAME)
         .getPublicUrl(filename);
-      
-      console.log(`[MealImageService] ✅ Found existing image: ${filename}`);
+
+      console.log(`[MealImageService] ✅ Found existing legacy PNG image: ${filename}`);
       return urlData.publicUrl;
     }
 
@@ -169,8 +266,10 @@ async function generateMealImage(
 }
 
 /**
- * Download image from URL and upload to Supabase bucket with retry logic
- * Matches pantryImageService approach (direct upload from frontend)
+ * Download, compress, and upload image to Supabase bucket with retry logic
+ * - Downloads DALL-E image
+ * - Compresses to JPEG (~512px, quality 0.75)
+ * - Uploads compressed version to Supabase
  */
 async function uploadImageToBucket(
   imageUrl: string,
@@ -178,6 +277,9 @@ async function uploadImageToBucket(
   retries: number = 3
 ): Promise<string | null> {
   let lastError: any = null;
+
+  // Change extension from .png to .jpg for compressed images
+  const compressedFilename = filename.replace(/\.png$/, '.jpg');
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
@@ -188,65 +290,58 @@ async function uploadImageToBucket(
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${filename} (attempt ${attempt}/${retries})`);
+      console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${compressedFilename} (attempt ${attempt}/${retries})`);
 
-      // Download the image (React Native compatible, same as pantryImageService)
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to download image: ${imageResponse.status} ${imageResponse.statusText}`);
+      // Compress the image (downloads, resizes, compresses to JPEG)
+      const compressedBytes = await compressImage(imageUrl);
+
+      if (compressedBytes.length === 0) {
+        throw new Error("Compressed image is empty");
       }
 
-      // Convert to Uint8Array (same approach as pantryImageService)
-      let imageBlob: Uint8Array;
-      try {
-        if (typeof imageResponse.arrayBuffer === "function") {
-          const arrayBuffer = await imageResponse.arrayBuffer();
-          imageBlob = new Uint8Array(arrayBuffer);
-        } else {
-          console.warn("⚠️ arrayBuffer() not supported, using base64 fallback");
-          const base64Data = await imageResponse.text();
-          const binary = atob(base64Data);
-          imageBlob = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) {
-            imageBlob[i] = binary.charCodeAt(i);
-          }
-        }
-      } catch (e) {
-        console.error("⚠️ Failed to read image response data; using safe fallback.", e);
-        const base64Data = await imageResponse.text();
-        const binary = atob(base64Data);
-        imageBlob = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          imageBlob[i] = binary.charCodeAt(i);
-        }
-      }
+      const sizeMB = (compressedBytes.length / (1024 * 1024)).toFixed(2);
+      const sizeKB = (compressedBytes.length / 1024).toFixed(0);
 
-      if (imageBlob.length === 0) {
-        throw new Error("Downloaded image is empty");
-      }
+      // Upload compressed JPEG to Supabase
+      console.log(`[MealImageService] 📤 Uploading ${sizeMB}MB (${sizeKB}KB) to Supabase...`);
 
-      // Upload to Supabase bucket root (same as pantryImageService)
-      const { error } = await supabase.storage
+      const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filename, imageBlob, {
-          contentType: "image/png",
-          upsert: true, // Overwrite if exists
+        .upload(compressedFilename, compressedBytes, {
+          contentType: "image/jpeg",
+          upsert: true,
         });
 
       if (error) {
-        console.error(`[MealImageService] Upload error (attempt ${attempt}/${retries}):`, {
+        console.error(`[MealImageService] ❌ Supabase upload error (attempt ${attempt}/${retries}):`, {
           name: error.name,
           message: error.message,
           statusCode: (error as any).statusCode,
+          fullError: error,
         });
-        lastError = error;
-        continue; // Retry
+
+        // Check if file actually exists despite error (sometimes upload succeeds but returns error)
+        console.log(`[MealImageService] 🔍 Checking if file actually exists despite error...`);
+        const { data: fileData, error: listError } = await supabase.storage
+          .from(BUCKET_NAME)
+          .list('', { search: compressedFilename });
+
+        if (!listError && fileData?.some(f => f.name === compressedFilename)) {
+          console.log(`[MealImageService] ✅ File exists in bucket despite error! Using it.`);
+          // File is there, proceed to get URL
+        } else {
+          console.log(`[MealImageService] ❌ File does not exist, error is real`);
+          lastError = error;
+          continue; // Retry
+        }
+      } else {
+        console.log(`[MealImageService] ✅ Supabase upload successful:`, data);
       }
 
-      // Get public URL (same as pantryImageService)
+      // Get public URL
       const { data: urlData } = supabase.storage
         .from(BUCKET_NAME)
-        .getPublicUrl(filename);
+        .getPublicUrl(compressedFilename);
 
       const publicUrl = urlData?.publicUrl;
 
@@ -255,6 +350,7 @@ async function uploadImageToBucket(
       }
 
       console.log(`[MealImageService] ✅ Image uploaded successfully on attempt ${attempt}/${retries}`);
+      console.log(`[MealImageService] 🔗 Public URL: ${publicUrl}`);
       return publicUrl;
     } catch (error) {
       console.error(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);

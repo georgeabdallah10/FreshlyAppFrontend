@@ -200,13 +200,37 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = async () => {
-    await Storage.deleteItem("access_token");
-    setUser(null);
-    setActiveFamilyId(null);
-    setIsInFamily(false);
-    setFamilies([]);
-    setPantryItems([]);
-    setPantryLoaded(false);
+    try {
+      const accessToken = await Storage.getItem("access_token");
+
+      // Call backend to revoke tokens
+      if (accessToken) {
+        const { BASE_URL } = require("@/src/env/baseUrl");
+        await fetch(`${BASE_URL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }).catch(() => {
+          // Continue with local cleanup even if API fails
+        });
+      }
+    } catch (error) {
+      console.log('[UserContext] Logout API call failed:', error);
+      // Continue with local cleanup even if API fails
+    } finally {
+      // Clear stored tokens
+      await Storage.deleteItem("access_token");
+      await Storage.deleteItem("refresh_token");
+      await Storage.deleteItem("tutorialCompleted"); // Reset tutorial on logout
+      setUser(null);
+      setActiveFamilyId(null);
+      setIsInFamily(false);
+      setFamilies([]);
+      setPantryItems([]);
+      setPantryLoaded(false);
+    }
   };
 
   return (

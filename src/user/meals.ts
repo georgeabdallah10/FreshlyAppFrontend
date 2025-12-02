@@ -171,3 +171,32 @@ export async function deleteMealForSignleUser(mealId: number) {
   // 204 No Content expected
   return true;
 }
+
+export async function toggleMealFavorite(
+  mealId: number,
+  meal: CreateMealInput,
+  isFavorite: boolean
+) {
+  const token = await Storage.getItem("access_token");
+
+  // Build full payload with updated favorite status
+  const updatedMeal = { ...meal, isFavorite };
+  const body = toApiMeal(updatedMeal);
+
+  const res = await fetch(`${BASE_URL}/meals/me/${mealId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    console.log("Toggle favorite failed:", res.status, errText);
+    throw new Error(`Toggle favorite failed: ${res.status}`);
+  }
+
+  return res.json(); // MealOut
+}

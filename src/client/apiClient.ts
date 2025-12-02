@@ -17,7 +17,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { BASE_URL } from '../env/baseUrl';
-import { supabase } from '../supabase/client';
 
 // ============================================
 // TYPES
@@ -49,6 +48,15 @@ async function getAuthToken(): Promise<string | null> {
   }
 }
 
+async function getRefreshToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem('refresh_token');
+  } catch (error) {
+    console.log('ERROR [API Client] Error retrieving refresh token:', error);
+    return null;
+  }
+}
+
 async function setAuthToken(token: string): Promise<void> {
   try {
     await AsyncStorage.setItem('access_token', token);
@@ -57,9 +65,18 @@ async function setAuthToken(token: string): Promise<void> {
   }
 }
 
+async function setRefreshToken(token: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem('refresh_token', token);
+  } catch (error) {
+    console.log('ERROR [API Client] Error setting refresh token:', error);
+  }
+}
+
 async function clearAuthToken(): Promise<void> {
   try {
     await AsyncStorage.removeItem('access_token');
+    await AsyncStorage.removeItem('refresh_token');
   } catch (error) {
     console.log('ERROR [API Client] Error clearing auth token:', error);
   }
@@ -138,37 +155,43 @@ class ApiClient {
           this.isRefreshing = true;
 
           try {
-            // Attempt to refresh the Supabase session
-            const { data, error: refreshError } = await supabase.auth.refreshSession();
+            // Get refresh token from storage
+            const refreshToken = await getRefreshToken();
 
-            if (refreshError || !data.session) {
-              // Session refresh failed - this is expected when no Supabase session exists
-              // Just fall through to cleanup and return 401
-              throw refreshError || new Error('No session');
+            if (!refreshToken) {
+              throw new Error('No refresh token available');
             }
 
-            const newToken = data.session.access_token;
-            await setAuthToken(newToken);
+            // Call backend refresh endpoint
+            const response = await axios.post(`${BASE_URL}/auth/refresh`, {
+              refresh_token: refreshToken
+            });
+
+            const { access_token, refresh_token: new_refresh_token } = response.data;
+
+            // Update stored tokens
+            await setAuthToken(access_token);
+            await setRefreshToken(new_refresh_token);
+
+            // Update default header
+            this.client.defaults.headers.common['Authorization'] = `Bearer ${access_token}`;
+            originalRequest.headers.Authorization = `Bearer ${access_token}`;
 
             // Process queued requests
-            this.failedQueue.forEach((prom) => prom.resolve(newToken));
+            this.failedQueue.forEach((prom) => prom.resolve(access_token));
             this.failedQueue = [];
 
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            // Retry original request
             return this.client(originalRequest);
           } catch (refreshError) {
-            // Token refresh failed - silently clear auth and fail gracefully
-            // This is EXPECTED behavior when user is not authenticated or has no Supabase session
+            // Token refresh failed - clear auth and fail gracefully
             this.failedQueue.forEach((prom) => prom.reject(refreshError));
             this.failedQueue = [];
-            
-            // Clear tokens silently
+
+            // Clear tokens
             await clearAuthToken();
-            await supabase.auth.signOut().catch(() => {
-              // Ignore signOut errors - session might not exist
-            });
-            
-            // Return normalized 401 error (silent - no console errors)
+
+            // Return normalized 401 error
             return Promise.reject(this.normalizeError(error));
           } finally {
             this.isRefreshing = false;

@@ -228,9 +228,32 @@ export async function deleteMeal(id: number): Promise<void> {
 
 /**
  * Toggle favorite status of a meal
+ * Sends full meal payload with updated favorite status
  */
-export async function toggleMealFavorite(id: number, isFavorite: boolean): Promise<Meal> {
-  const response = await apiClient.patch<any>(`/meals/${id}/favorite`, { is_favorite: isFavorite });
+export async function toggleMealFavorite(id: number, meal: Meal, isFavorite: boolean): Promise<Meal> {
+  // Build full payload with updated favorite status
+  const mealInput: CreateMealInput = {
+    name: meal.name,
+    image: meal.image,
+    calories: meal.calories,
+    prepTime: meal.prepTime,
+    cookTime: meal.cookTime,
+    mealType: meal.mealType,
+    cuisine: meal.cuisine,
+    tags: meal.tags,
+    macros: meal.macros,
+    difficulty: meal.difficulty,
+    servings: meal.servings,
+    dietCompatibility: meal.dietCompatibility,
+    goalFit: meal.goalFit,
+    ingredients: meal.ingredients,
+    instructions: meal.instructions,
+    cookingTools: meal.cookingTools,
+    notes: meal.notes,
+  };
+
+  const apiData = { ...toApiMeal(mealInput), is_favorite: isFavorite };
+  const response = await apiClient.patch<any>(`/meals/me/${id}`, apiData);
   return fromApiMeal(response);
 }
 

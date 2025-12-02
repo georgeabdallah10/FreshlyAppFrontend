@@ -212,11 +212,11 @@ export function useDeleteMeal(options?: UseMutationOptions<void, ApiError, numbe
 /**
  * Toggle meal favorite status
  */
-export function useToggleMealFavorite(options?: UseMutationOptions<Meal, ApiError, { id: number; isFavorite: boolean }>) {
+export function useToggleMealFavorite(options?: UseMutationOptions<Meal, ApiError, { id: number; meal: Meal; isFavorite: boolean }>) {
   const queryClient = useQueryClient();
 
-  return useMutation<Meal, ApiError, { id: number; isFavorite: boolean }>({
-    mutationFn: ({ id, isFavorite }) => mealsApi.toggleMealFavorite(id, isFavorite),
+  return useMutation<Meal, ApiError, { id: number; meal: Meal; isFavorite: boolean }>({
+    mutationFn: ({ id, meal, isFavorite }) => mealsApi.toggleMealFavorite(id, meal, isFavorite),
     onMutate: async ({ id, isFavorite }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: queryKeys.meals.detail(id) });

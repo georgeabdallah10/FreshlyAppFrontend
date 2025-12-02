@@ -120,6 +120,7 @@ export default function LoginScreen(): React.JSX.Element {
 
       if (result.ok) {
         await Storage.setItem("access_token", result.data.access_token);
+        await Storage.setItem("refresh_token", result.data.refresh_token);
         showToast("success", "Login successful! Redirecting...");
         setTimeout(() => {
           setIsLoggingIn(false);
@@ -371,6 +372,7 @@ export default function LoginScreen(): React.JSX.Element {
       }
 
       await Storage.setItem("access_token", backend.data.access_token);
+      await Storage.setItem("refresh_token", backend.data.refresh_token);
       console.log(
         "[Login] Backend authentication successful, user session stored"
       );

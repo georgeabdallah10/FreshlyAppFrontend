@@ -1,6 +1,7 @@
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { createMealForSignleUser, type CreateMealInput } from "@/src/user/meals";
+import { getMealImage } from "@/src/services/mealImageService";
 import {
   createConversation,
   deleteConversation,
@@ -1484,6 +1485,19 @@ Rules:
     try {
       const payload = buildMealInputFromRecipe(recipe);
       setSavingMealId(messageId);
+
+      // Generate and upload image to Supabase, then save URL to meal
+      console.log('[ChatAI] Generating image for meal:', payload.name);
+      const imageUrl = await getMealImage(payload.name);
+
+      if (imageUrl) {
+        payload.image = imageUrl;
+        console.log('[ChatAI] Image URL saved to meal:', imageUrl);
+      } else {
+        console.warn('[ChatAI] Image generation failed, using emoji fallback');
+        // Keep the emoji fallback from buildMealInputFromRecipe
+      }
+
       await createMealForSignleUser(payload);
       showToast('success', 'Meal saved to your collection! Redirecting...');
       router.push("/(main)/(home)/meals");

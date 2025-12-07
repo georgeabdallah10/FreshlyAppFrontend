@@ -183,26 +183,24 @@ export function useHandleNotificationClick() {
 // PUSH NOTIFICATION HOOKS
 // ============================================
 
-import { useEffect, useState, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  registerForPushNotifications,
-  getStoredPushToken,
-  isPushNotificationEnabled,
-  setupNotificationHandler,
-  setBadgeCount,
-} from '../src/notifications/registerForPush';
-import {
-  setupNotificationResponseListener,
-  setupNotificationReceivedListener,
+    setupNotificationReceivedListener,
+    setupNotificationResponseListener,
 } from '../src/notifications/handleIncomingNotifications';
 import {
-  schedulePantryExpirationNotifications,
+    isPushNotificationEnabled,
+    registerForPushNotifications,
+    setBadgeCount,
+} from '../src/notifications/registerForPush';
+import {
+    schedulePantryExpirationNotifications,
 } from '../src/notifications/schedulePantryNotifications';
 
 /**
  * Complete notification system hook with push notifications and pantry alerts
  */
-export function useNotificationSystem() {
+export function useNotificationSystem(userId?: number) {
   const queryClient = useQueryClient();
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [permissionsGranted, setPermissionsGranted] = useState<boolean>(false);
@@ -214,7 +212,7 @@ export function useNotificationSystem() {
 
   // Register for push notifications mutation
   const registerPushMutation = useMutation({
-    mutationFn: registerForPushNotifications,
+    mutationFn: (id: number) => registerForPushNotifications(id),
     onSuccess: (token) => {
       if (token) {
         setExpoPushToken(token);
@@ -235,15 +233,6 @@ export function useNotificationSystem() {
 
     async function initialize() {
       try {
-        // Setup notification handler
-        setupNotificationHandler();
-
-        // Check stored push token
-        const storedToken = await getStoredPushToken();
-        if (storedToken) {
-          setExpoPushToken(storedToken);
-        }
-
         // Check permission status
         const hasPermission = await isPushNotificationEnabled();
         setPermissionsGranted(hasPermission);
@@ -282,8 +271,10 @@ export function useNotificationSystem() {
 
   // Register for push
   const registerForPush = useCallback(() => {
-    registerPushMutation.mutate();
-  }, [registerPushMutation]);
+    if (userId) {
+      registerPushMutation.mutate(userId);
+    }
+  }, [registerPushMutation, userId]);
 
   // Refresh all notification data
   const refresh = useCallback(async () => {
@@ -322,7 +313,7 @@ export function useNotificationSystem() {
 /**
  * Hook for notification permissions only
  */
-export function useNotificationPermissions() {
+export function useNotificationPermissions(userId?: number) {
   const [permissionsGranted, setPermissionsGranted] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(true);
 
@@ -342,8 +333,12 @@ export function useNotificationPermissions() {
   }, []);
 
   const requestPermissions = useCallback(async () => {
+    if (!userId) {
+      console.warn('[useNotificationPermissions] No userId provided');
+      return false;
+    }
     try {
-      const token = await registerForPushNotifications();
+      const token = await registerForPushNotifications(userId);
       setPermissionsGranted(!!token);
       return !!token;
     } catch (error) {
@@ -351,7 +346,7 @@ export function useNotificationPermissions() {
       setPermissionsGranted(false);
       return false;
     }
-  }, []);
+  }, [userId]);
 
   return {
     permissionsGranted,

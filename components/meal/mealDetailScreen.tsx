@@ -1,25 +1,27 @@
 // ==================== screens/MealDetailScreen.tsx ====================
+import ToastBanner from "@/components/generalMessage";
+import { useGroceryList } from '@/context/groceryListContext';
+import { useUser } from '@/context/usercontext';
 import {
-  deleteMealForSignleUser,
-  updateMealForSignleUser,
-  toggleMealFavorite,
+    deleteMealForSignleUser,
+    toggleMealFavorite,
+    updateMealForSignleUser,
 } from "@/src/user/meals";
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Image,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    Animated,
+    Image,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
-import ToastBanner from "@/components/generalMessage";
 
 type Props = {
   meal: Meal;
@@ -68,7 +70,11 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [showShareModal, setShowShareModal] = useState(false);
   const [familyId, setFamilyId] = useState<number | null>(null);
   const [isFavoriting, setIsFavoriting] = useState(false);
+  const [addingToGrocery, setAddingToGrocery] = useState(false);
   const favoriteAnimValue = useRef(new Animated.Value(1)).current;
+
+  const { addRecipeToList } = useGroceryList();
+  const { isInFamily, activeFamilyId } = useUser();
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -208,6 +214,58 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       showToast("error", error?.message || "Failed to update favorite status");
     } finally {
       setIsFavoriting(false);
+    }
+  };
+
+  const handleAddToGroceryList = async (scope: 'personal' | 'family') => {
+    try {
+      setAddingToGrocery(true);
+
+      const payload: any = {
+        meal_id: meal.id, // Using meal_id for semantic clarity (backend accepts both meal_id and recipe_id)
+        scope: scope,
+      };
+
+      if (scope === 'family' && activeFamilyId) {
+        payload.family_id = activeFamilyId;
+      }
+
+      const response = await addRecipeToList(payload);
+
+      const scopeLabel = scope === 'personal' ? 'Personal' : 'Family';
+
+      if (response.items_added === 0) {
+        showToast('success', 'All ingredients already in pantry!', 3000, 40);
+      } else {
+        const message = `Added ${response.items_added} ingredient${response.items_added !== 1 ? 's' : ''} to ${scopeLabel} grocery list`;
+        showToast('success', message, 3000, 40);
+      }
+    } catch (error: any) {
+      // Handle specific error cases from the backend
+      const status = error?.status ?? error?.response?.status;
+      const message = error?.message?.toLowerCase() ?? '';
+      
+      let errorMessage = 'Failed to add to grocery list';
+      
+      if (status === 400) {
+        if (message.includes('not found')) {
+          errorMessage = 'This meal could not be found. Please try again.';
+        } else if (message.includes('scope required')) {
+          errorMessage = 'Please select a list type (Personal or Family).';
+        } else {
+          errorMessage = 'Invalid request. Please try again.';
+        }
+      } else if (status === 403) {
+        errorMessage = 'You do not have access to this family list.';
+      } else if (status === 404) {
+        errorMessage = 'Meal not found. It may have been deleted.';
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      showToast('error', errorMessage, 3000, 40);
+    } finally {
+      setAddingToGrocery(false);
     }
   };
 
@@ -556,6 +614,49 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               )}
             </View>
           ))}
+        </View>
+
+        {/* Grocery List Actions */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Add to Grocery List</Text>
+          <Text style={styles.sectionSubtitle}>
+            Missing ingredients will be added automatically
+          </Text>
+          <View style={styles.groceryButtonsContainer}>
+            <TouchableOpacity
+              style={[styles.groceryButton, styles.groceryButtonPersonal]}
+              onPress={() => handleAddToGroceryList('personal')}
+              disabled={addingToGrocery}
+              activeOpacity={0.8}
+            >
+              {addingToGrocery ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.groceryButtonIcon}>🛒</Text>
+                  <Text style={styles.groceryButtonText}>Personal List</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {isInFamily && (
+              <TouchableOpacity
+                style={[styles.groceryButton, styles.groceryButtonFamily]}
+                onPress={() => handleAddToGroceryList('family')}
+                disabled={addingToGrocery}
+                activeOpacity={0.8}
+              >
+                {addingToGrocery ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Text style={styles.groceryButtonIcon}>👨‍👩‍👧‍👦</Text>
+                    <Text style={styles.groceryButtonText}>Family List</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Cooking Tools */}
@@ -994,6 +1095,42 @@ const styles = StyleSheet.create({
   menuCardIcon: {
     width: 26,
     height: 26,
+  },
+
+  // Grocery List Styles
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  groceryButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  groceryButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  groceryButtonPersonal: {
+    backgroundColor: '#00A86B',
+  },
+  groceryButtonFamily: {
+    backgroundColor: '#FD8100',
+  },
+  groceryButtonIcon: {
+    fontSize: 20,
+  },
+  groceryButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
   },
 });
 

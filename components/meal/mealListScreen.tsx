@@ -3,7 +3,7 @@ import { preloadMealImages } from "@/src/services/mealImageService";
 import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   LayoutAnimation,
@@ -26,6 +26,7 @@ interface MealListScreenProps {
   isLoading?: boolean;
   hasError?: boolean;
   onImageError?: (message: string) => void;
+  scrollToEnd?: boolean;
 }
 
 const COLORS = {
@@ -58,7 +59,8 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   onMealSelect,
   isLoading: parentLoading = false,
   hasError: parentError = false,
-  onImageError 
+  onImageError,
+  scrollToEnd = false,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [meals, setMeals] = useState<any[]>([]);
@@ -66,6 +68,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const mapMealType = (mt?: string): Category | "All" => {
     const s = String(mt || "").toLowerCase();
@@ -135,6 +138,16 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       preloadMealImages(mealNames);
     }
   }, [meals]);
+
+  // Scroll to end when scrollToEnd prop is true and meals are loaded
+  useEffect(() => {
+    if (scrollToEnd && meals.length > 0 && scrollViewRef.current) {
+      // Small delay to ensure the ScrollView has rendered
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 300);
+    }
+  }, [scrollToEnd, meals]);
 
   if (
     Platform.OS === "android" &&
@@ -215,6 +228,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meal Plans</Text>
+        <TouchableOpacity
+          style={styles.groceryButton}
+          activeOpacity={0.8}
+          onPress={() => router.push("/(main)/(home)/groceryLists")}
+        >
+          <Text style={styles.groceryButtonIcon}>🛒</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -329,6 +349,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       ) : (
         /* Meal cards */
         <ScrollView
+          ref={scrollViewRef}
           style={styles.mealsContainer}
           contentContainerStyle={styles.mealsContent}
           showsVerticalScrollIndicator={false}
@@ -488,7 +509,24 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     flex: 1,
     textAlign: "center",
-    marginRight: 44,
+    marginRight: 0,
+  },
+  groceryButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  groceryButtonIcon: {
+    fontSize: 20,
   },
 
   /* Search */

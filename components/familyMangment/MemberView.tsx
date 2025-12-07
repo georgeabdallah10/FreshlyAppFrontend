@@ -6,23 +6,24 @@ import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-    leaveFamily,
-    listFamilyMembers,
-    removeFamilyMember,
-    updateFamilyMemberRole,
+  leaveFamily,
+  listFamilyMembers,
+  removeFamilyMember,
+  updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    Animated,
-    Modal,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 
@@ -67,11 +68,17 @@ const MemberView: React.FC<MemberViewProps> = ({
       const u = m.user ?? {};
       const userId = String(m.user_id || u.id || m.id || "");
       const isOwner = m.role === "owner" || m.is_owner === true;
+      const isAdmin = m.role === "admin";
       
       // Get user details from nested user object (backend now guarantees this)
       const name = u.name || u.full_name || u.display_name || "Unknown Member";
       const email = u.email || "";
       const phone = u.phone_number || u.phone || "";
+      
+      // Determine role: owner > admin > member
+      let role: "owner" | "admin" | "member" = "member";
+      if (isOwner) role = "owner";
+      else if (isAdmin) role = "admin";
       
       return {
         id: userId,
@@ -79,21 +86,23 @@ const MemberView: React.FC<MemberViewProps> = ({
         email: email || "No email",
         phone: phone || "No phone",
         status: (m.status ?? "active") as FamilyMember["status"],
-        role: isOwner ? "owner" : "member",
+        role,
         joinedAt: m.joined_at ?? m.created_at ?? "",
         avatar_path: u.avatar_path ?? m.avatar_path ?? null,
       } as FamilyMember;
     });
   }, [user]);
   
-  const sortMembers = useCallback((list: FamilyMember[]) => {
+  const sortMembers = useCallback((list: FamilyMember[], userId?: string) => {
     return [...list].sort((a, b) => {
-      const priority = (role: FamilyMember["role"]) => {
-        if (role === "owner") return 0;
-        if (role === "admin") return 1;
-        return 2;
+      const priority = (member: FamilyMember) => {
+        if (member.role === "owner") return 0;
+        if (member.role === "admin") return 1;
+        // Current user comes after owners and admins
+        if (userId && String(member.id) === String(userId)) return 2;
+        return 3;
       };
-      const diff = priority(a.role) - priority(b.role);
+      const diff = priority(a) - priority(b);
       if (diff !== 0) return diff;
       return a.name.localeCompare(b.name);
     });
@@ -180,7 +189,7 @@ const MemberView: React.FC<MemberViewProps> = ({
       const data = await listFamilyMembers(Number(resolvedFamilyData.id));
       console.log(data)
       const normalized = normalizeMembers(data || []);
-      setLocalMembers(sortMembers(normalized));
+      setLocalMembers(sortMembers(normalized, currentUserId));
     } catch (e) {
       console.warn("Failed to load members:", e);
     } finally {
@@ -206,7 +215,7 @@ const MemberView: React.FC<MemberViewProps> = ({
         const normalized = mapMembership(updated);
         if (normalized) {
           setLocalMembers((prev) =>
-            sortMembers(prev.map((m) => (m.id === member.id ? normalized : m)))
+            sortMembers(prev.map((m) => (m.id === member.id ? normalized : m)), currentUserId)
           );
           showToast("success", `${member.name} is now ${nextRole}.`);
         }
@@ -270,9 +279,9 @@ const MemberView: React.FC<MemberViewProps> = ({
   // Initialize members from props on mount
   useEffect(() => {
     if (members && members.length > 0) {
-      setLocalMembers(sortMembers(normalizeMembers(members)));
+      setLocalMembers(sortMembers(normalizeMembers(members), currentUserId));
     }
-  }, [members, normalizeMembers, sortMembers]);
+  }, [members, normalizeMembers, sortMembers, currentUserId]);
 
   useEffect(() => {
     fetchMembers();
@@ -352,29 +361,33 @@ const MemberView: React.FC<MemberViewProps> = ({
           <Text style={styles.familyMemberCount}>
             {resolvedFamilyData.memberCount} Members
           </Text>
+          
+          {inviteCode ? (
+            <View style={styles.inviteCodeContainer}>
+              <View style={styles.inviteCodeRow}>
+                <Ionicons name="key-outline" size={14} color="#10B981" />
+                <Text style={styles.inviteCodeLabel}>Invite Code</Text>
+              </View>
+              <View style={styles.inviteCodeValueRow}>
+                <Text style={styles.inviteCodeValue}>{inviteCode}</Text>
+                <TouchableOpacity
+                  style={styles.copyButton}
+                  onPress={async () => {
+                    try {
+                      await Clipboard.setStringAsync(inviteCode);
+                      showToast("success", "Invite code copied to clipboard");
+                    } catch {
+                      showToast("success", "Invite code copied");
+                    }
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="copy-outline" size={18} color="#10B981" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : null}
         </View>
-
-        {inviteCode ? (
-          <View style={styles.codeContainer}>
-            <Text style={styles.sectionTitle}>Invite Code</Text>
-            <Text style={styles.codeText}>{inviteCode}</Text>
-            <TouchableOpacity
-              style={styles.modalButtonSecondary}
-              onPress={async () => {
-                try {
-                  await Clipboard.setStringAsync(inviteCode);
-                  showToast("success", "Invite code copied to clipboard");
-                } catch {
-                  showToast("success", "Invite code copied");
-                }
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="copy" size={16} color="#10B981" />
-              <Text style={styles.modalButtonSecondaryText}>Copy Code</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Members</Text>
@@ -391,16 +404,25 @@ const MemberView: React.FC<MemberViewProps> = ({
                 key={member.id}
                 style={[
                   styles.memberCard,
-                  isCurrentUser && styles.currentUserCard,
-                  !isCurrentUser && isOwner && styles.ownerCardHighlight,
-                  !isCurrentUser && isAdmin && styles.adminCardHighlight,
+                  // Role-based styling takes priority over current user styling
+                  isOwner && styles.ownerCardHighlight,
+                  isAdmin && styles.adminCardHighlight,
+                  // Current user styling only if not owner or admin
+                  isCurrentUser && !isOwner && !isAdmin && styles.currentUserCard,
                 ]}
               >
                 <View style={styles.memberLeft}>
                   <View style={styles.memberAvatar}>
-                    <Text style={styles.memberInitial}>
-                      {member.name.charAt(0).toUpperCase()}
-                    </Text>
+                    {member.avatar_path ? (
+                      <Image
+                        source={{ uri: member.avatar_path }}
+                        style={styles.memberImage}
+                      />
+                    ) : (
+                      <Text style={styles.memberInitial}>
+                        {member.name.charAt(0).toUpperCase()}
+                      </Text>
+                    )}
                   </View>
                   <View style={styles.memberInfo}>
                     <View style={styles.memberNameRow}>
@@ -428,14 +450,17 @@ const MemberView: React.FC<MemberViewProps> = ({
                     </View>
                   </View>
                 </View>
+
+                {/* Show action button for admins to manage other members */}
+                
                 {canManageMember(member) && (
                   <IconButton
                     iconName="settings-outline"
                     iconColor="#6B7280"
-                    iconSize={18}
-                    containerSize={34}
+                    iconSize={20}
+                    containerSize={36}
                     backgroundColor="#F3F4F6"
-                    borderRadius={17}
+                    borderRadius={18}
                     onPress={() => openActionModal(member)}
                     style={styles.actionTrigger}
                   />
@@ -639,7 +664,43 @@ const styles = StyleSheet.create({
   familyMemberCount: {
     fontSize: 14,
     color: "#9CA3AF",
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  inviteCodeContainer: {
+    backgroundColor: "#ECFDF5",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: "#D1FAE5",
+  },
+  inviteCodeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  inviteCodeLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#059669",
+  },
+  inviteCodeValueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  inviteCodeValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#10B981",
+    letterSpacing: 2,
+  },
+  copyButton: {
+    padding: 8,
+    backgroundColor: "#D1FAE5",
+    borderRadius: 8,
   },
   inviteButton: {
     flexDirection: "row",
@@ -707,6 +768,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+    overflow: "hidden",
+  },
+  memberImage: {
+    width: "100%",
+    height: "100%",
   },
   memberInitial: {
     fontSize: 20,

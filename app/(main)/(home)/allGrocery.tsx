@@ -1,7 +1,11 @@
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
-import { listMyPantryItems, upsertPantryItemByName, type PantryItem as ApiPantryItem } from "@/src/user/pantry";
+import {
+  listMyPantryItems,
+  upsertPantryItemByName,
+  type PantryItem as ApiPantryItem,
+} from "@/src/user/pantry";
 import { getConfidenceColor } from "@/src/utils/aiApi";
 import { scanImageViaProxy } from "@/src/utils/groceryScanProxy";
 import { Ionicons } from "@expo/vector-icons";
@@ -23,7 +27,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import IconButton from "@/components/iconComponent";
@@ -40,43 +44,81 @@ type ScannedItem = {
   barcode?: string;
 };
 
-type ScanStep = "selection" | "scanning" | "confirmation" | "processing" | "success";
+type ScanStep =
+  | "selection"
+  | "scanning"
+  | "confirmation"
+  | "processing"
+  | "success";
 
 const CATEGORIES = [
-  "Produce", "Fruits", "Vegetables", "Dairy", "Meat", "Seafood",
-  "Grains & Pasta", "Bakery", "Canned & Jarred", "Frozen", "Snacks",
-  "Beverages", "Spices & Herbs", "Baking", "Condiments & Sauces",
-  "Oils & Vinegars", "Breakfast & Cereal", "Legumes & Nuts", 
-  "Sweets & Desserts", "Other"
+  "Produce",
+  "Fruits",
+  "Vegetables",
+  "Dairy",
+  "Meat",
+  "Seafood",
+  "Grains & Pasta",
+  "Bakery",
+  "Canned & Jarred",
+  "Frozen",
+  "Snacks",
+  "Beverages",
+  "Spices & Herbs",
+  "Baking",
+  "Condiments & Sauces",
+  "Oils & Vinegars",
+  "Breakfast & Cereal",
+  "Legumes & Nuts",
+  "Sweets & Desserts",
+  "Other",
 ];
 
-const UNITS = ["g", "kg", "oz", "lb", "cup", "mL", "L", "ea", "pc", "can", "jar", "bottle", "pack", "box", "bag"];
+const UNITS = [
+  "g",
+  "kg",
+  "oz",
+  "lb",
+  "cup",
+  "mL",
+  "L",
+  "ea",
+  "pc",
+  "can",
+  "jar",
+  "bottle",
+  "pack",
+  "box",
+  "bag",
+];
 
 const AllGroceryScanner = () => {
   const router = useRouter();
   const { loadPantryItems, activeFamilyId } = useUser();
-  
+
   // Main state
   const [currentStep, setCurrentStep] = useState<ScanStep>("selection");
-  const [selectedScanType, setSelectedScanType] = useState<ScanType | null>(null);
+  const [selectedScanType, setSelectedScanType] = useState<ScanType | null>(
+    null
+  );
   const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  
+
   // Camera and scanning state
   const [perm, requestPermission] = useCameraPermissions();
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [scanned, setScanned] = useState(false);
-  
+
   // Edit item modal state
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  
+
   // Rate limiting state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
-  
+
   // Cooldown timer effect
   useEffect(() => {
     if (cooldownRemaining > 0) {
@@ -94,12 +136,12 @@ const AllGroceryScanner = () => {
     setIsButtonDisabled(true);
     setCooldownRemaining(seconds);
   };
-  
+
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
-  
+
   // Toast state
   const [toast, setToast] = useState<{
     visible: boolean;
@@ -125,7 +167,8 @@ const AllGroceryScanner = () => {
   }, [currentStep]);
 
   // Generate unique ID
-  const generateId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const generateId = () =>
+    Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   // Handle scan type selection
   const handleScanTypeSelect = (type: ScanType) => {
@@ -142,7 +185,7 @@ const AllGroceryScanner = () => {
   const openImageCapture = async (scanType: ScanType) => {
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      
+
       if (status !== "granted") {
         showToast("error", "Camera permission is required");
         setCurrentStep("selection");
@@ -150,7 +193,7 @@ const AllGroceryScanner = () => {
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ["images"],
         allowsEditing: true,
         quality: 0.8,
       });
@@ -192,32 +235,36 @@ const AllGroceryScanner = () => {
   // Process captured image with AI via backend proxy
   const processImage = async (imageData: string, scanType: ScanType) => {
     try {
-      if (scanType === 'barcode') {
-        throw new Error('Barcode scanning should not call processImage');
+      if (scanType === "barcode") {
+        throw new Error("Barcode scanning should not call processImage");
       }
-      
+
       const response = await scanImageViaProxy({
         uri: imageData,
         scanType: scanType,
       });
-      
+
       const items: ScannedItem[] = response.items.map((item) => ({
         id: generateId(),
         name: item.name,
-        quantity: item.quantity.split(' ')[0],
-        unit: item.quantity.split(' ')[1] || 'ea',
-        category: item.category.charAt(0).toUpperCase() + item.category.slice(1),
+        quantity: item.quantity.split(" ")[0],
+        unit: item.quantity.split(" ")[1] || "ea",
+        category:
+          item.category.charAt(0).toUpperCase() + item.category.slice(1),
         confidence: item.confidence,
       }));
-      
+
       setScannedItems(items);
       setCurrentStep("confirmation");
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      
-      if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+
+      if (error instanceof Error && error.message === "UNAUTHORIZED") {
         showToast("error", "Session expired. Please log in again.");
-      } else if (error instanceof Error && error.message.includes('Not authenticated')) {
+      } else if (
+        error instanceof Error &&
+        error.message.includes("Not authenticated")
+      ) {
         showToast("error", "Session expired. Please log in again.");
       } else {
         showToast("error", `Processing failed: ${errorMsg}`);
@@ -227,34 +274,37 @@ const AllGroceryScanner = () => {
   };
 
   // Handle barcode scan
-  const handleBarcodeScan = useCallback(async (result: { data: string }) => {
-    if (scanned) return;
-    setScanned(true);
-    setShowCamera(false);
-    setCurrentStep("processing");
+  const handleBarcodeScan = useCallback(
+    async (result: { data: string }) => {
+      if (scanned) return;
+      setScanned(true);
+      setShowCamera(false);
+      setCurrentStep("processing");
 
-    try {
-      const product = await GetItemByBarcode(result.data);
-      if (product) {
-        const item: ScannedItem = {
-          id: generateId(),
-          name: product.name || "Unknown Product",
-          quantity: "1",
-          unit: "ea",
-          category: "Other",
-          barcode: result.data,
-        };
-        setScannedItems([item]);
-        setCurrentStep("confirmation");
-      } else {
-        showToast("error", "Product not found for this barcode");
+      try {
+        const product = await GetItemByBarcode(result.data);
+        if (product) {
+          const item: ScannedItem = {
+            id: generateId(),
+            name: product.name || "Unknown Product",
+            quantity: "1",
+            unit: "ea",
+            category: "Other",
+            barcode: result.data,
+          };
+          setScannedItems([item]);
+          setCurrentStep("confirmation");
+        } else {
+          showToast("error", "Product not found for this barcode");
+          setCurrentStep("selection");
+        }
+      } catch (error) {
+        showToast("error", "Failed to scan barcode");
         setCurrentStep("selection");
       }
-    } catch (error) {
-      showToast("error", "Failed to scan barcode");
-      setCurrentStep("selection");
-    }
-  }, [scanned]);
+    },
+    [scanned]
+  );
 
   // Edit item
   const handleEditItem = (item: ScannedItem) => {
@@ -265,9 +315,9 @@ const AllGroceryScanner = () => {
   // Save edited item
   const handleSaveEdit = () => {
     if (!editingItem) return;
-    
-    setScannedItems(prev =>
-      prev.map(item => item.id === editingItem.id ? editingItem : item)
+
+    setScannedItems((prev) =>
+      prev.map((item) => (item.id === editingItem.id ? editingItem : item))
     );
     setShowEditModal(false);
     setEditingItem(null);
@@ -275,17 +325,17 @@ const AllGroceryScanner = () => {
 
   // Remove item
   const handleRemoveItem = (itemId: string) => {
-    setScannedItems(prev => prev.filter(item => item.id !== itemId));
+    setScannedItems((prev) => prev.filter((item) => item.id !== itemId));
   };
 
   // Add all items to pantry
   const handleAddAllToPantry = async () => {
     if (scannedItems.length === 0) return;
     if (isSubmitting || isButtonDisabled) return;
-    
+
     setCurrentStep("processing");
     setIsSubmitting(true);
-    
+
     try {
       let snapshot: ApiPantryItem[] | undefined = await listMyPantryItems(
         activeFamilyId ? { familyId: activeFamilyId } : undefined
@@ -309,27 +359,30 @@ const AllGroceryScanner = () => {
         });
         snapshot = result.snapshot;
       }
-      
+
       await loadPantryItems();
       setCurrentStep("success");
       showToast("success", `${scannedItems.length} items added to pantry!`);
     } catch (error: any) {
       startCooldown(30);
       console.error("Failed to add items to pantry:", error);
-      
+
       let errorMessage = "Unable to add items to pantry. ";
       const errorStr = error.message?.toLowerCase() || "";
-      
+
       if (errorStr.includes("network") || errorStr.includes("fetch")) {
-        errorMessage = "No internet connection. Please check your network and try again.";
+        errorMessage =
+          "No internet connection. Please check your network and try again.";
       } else if (errorStr.includes("timeout")) {
         errorMessage = "Request timed out. Please try again.";
       } else if (errorStr.includes("401")) {
         errorMessage = "Session expired. Please log in again.";
       } else if (errorStr.includes("409")) {
-        errorMessage = "Some items already exist in your pantry. Try updating quantities instead.";
+        errorMessage =
+          "Some items already exist in your pantry. Try updating quantities instead.";
       } else if (errorStr.includes("422")) {
-        errorMessage = "Invalid item data. Please check all fields and try again.";
+        errorMessage =
+          "Invalid item data. Please check all fields and try again.";
       } else if (errorStr.includes("429")) {
         startCooldown(120);
         errorMessage = "Too many requests. Please wait before trying again.";
@@ -338,7 +391,7 @@ const AllGroceryScanner = () => {
       } else {
         errorMessage = "Failed to add items. Please try again.";
       }
-      
+
       showToast("error", errorMessage);
       setCurrentStep("confirmation");
     } finally {
@@ -357,31 +410,17 @@ const AllGroceryScanner = () => {
   };
 
   // Render selection screen
-  const renderSelectionScreen = () => (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView 
+  const renderrSelectionScreen = () => (
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <Text style={styles.title}>How would you like to scan?</Text>
+      <Text style={styles.subtitle}>Choose your preferred scanning method</Text>
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#00A86B" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Scan Groceries</Text>
-          <View style={styles.backButton} />
-        </View>
-
         <View style={styles.content}>
-          <Text style={styles.title}>How would you like to scan?</Text>
-          <Text style={styles.subtitle}>
-            Choose your preferred scanning method
-          </Text>
-
           <View style={styles.optionsContainer}>
             <TouchableOpacity
               style={styles.optionCard}
@@ -392,7 +431,9 @@ const AllGroceryScanner = () => {
                 colors={["#E8F8F1", "#FFFFFF"]}
                 style={styles.optionGradient}
               >
-                <View style={[styles.optionIcon, { backgroundColor: "#E8F8F1" }]}>
+                <View
+                  style={[styles.optionIcon, { backgroundColor: "#E8F8F1" }]}
+                >
                   <Ionicons name="camera" size={40} color="#00A86B" />
                 </View>
                 <Text style={styles.optionTitle}>Scan Groceries</Text>
@@ -411,7 +452,9 @@ const AllGroceryScanner = () => {
                 colors={["#FFF3E6", "#FFFFFF"]}
                 style={styles.optionGradient}
               >
-                <View style={[styles.optionIcon, { backgroundColor: "#FFF3E6" }]}>
+                <View
+                  style={[styles.optionIcon, { backgroundColor: "#FFF3E6" }]}
+                >
                   <Ionicons name="receipt" size={40} color="#FD8100" />
                 </View>
                 <Text style={styles.optionTitle}>Scan Receipt</Text>
@@ -430,8 +473,14 @@ const AllGroceryScanner = () => {
                 colors={["#F0F0F2", "#FFFFFF"]}
                 style={styles.optionGradient}
               >
-                <View style={[styles.optionIcon, { backgroundColor: "#F0F0F2" }]}>
-                  <IconButton iconName='barcode-outline' iconSize={45} style={{marginRight:5, marginBottom: 5}} ></IconButton>
+                <View
+                  style={[styles.optionIcon, { backgroundColor: "#F0F0F2" }]}
+                >
+                  <IconButton
+                    iconName="barcode-outline"
+                    iconSize={45}
+                    style={{ marginRight: 5, marginBottom: 5 }}
+                  ></IconButton>
                 </View>
                 <Text style={styles.optionTitle}>Scan Barcode</Text>
                 <Text style={styles.optionDescription}>
@@ -447,7 +496,7 @@ const AllGroceryScanner = () => {
 
   // Render processing screen
   const renderProcessingScreen = () => (
-    <SafeAreaView style={styles.processingContainer} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.processingContainer} edges={["top", "bottom"]}>
       <Animated.View
         style={[
           styles.processingContent,
@@ -479,23 +528,20 @@ const AllGroceryScanner = () => {
 
   // Render confirmation screen
   const renderConfirmationScreen = () => (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView 
+    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
         style={styles.flexContainer}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={resetScanner}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={resetScanner}>
             <Ionicons name="arrow-back" size={24} color="#00A86B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Confirm Items</Text>
           <View style={styles.backButton} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.confirmationContent}
           contentContainerStyle={styles.confirmationScrollContent}
           showsVerticalScrollIndicator={false}
@@ -515,19 +561,24 @@ const AllGroceryScanner = () => {
             renderItem={({ item, index }) => {
               const colors = ["#00A86B", "#FD8100", "#4C4D59"];
               const color = colors[index % 3];
-              
+
               return (
-                <View style={[styles.itemCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
+                <View
+                  style={[
+                    styles.itemCard,
+                    { borderLeftColor: color, borderLeftWidth: 3 },
+                  ]}
+                >
                   <View style={styles.itemInfo}>
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemDetails}>
                       {item.quantity} {item.unit} • {item.category}
                     </Text>
                     {item.confidence && (
-                      <Text 
+                      <Text
                         style={[
                           styles.itemConfidence,
-                          { color: getConfidenceColor(item.confidence) }
+                          { color: getConfidenceColor(item.confidence) },
                         ]}
                       >
                         {Math.round(item.confidence * 100)}% confidence
@@ -556,7 +607,10 @@ const AllGroceryScanner = () => {
 
         <View style={styles.confirmationFooter}>
           <TouchableOpacity
-            style={[styles.addToPantryButton, scannedItems.length === 0 && styles.disabledButton]}
+            style={[
+              styles.addToPantryButton,
+              scannedItems.length === 0 && styles.disabledButton,
+            ]}
             onPress={handleAddAllToPantry}
             disabled={scannedItems.length === 0}
           >
@@ -579,7 +633,7 @@ const AllGroceryScanner = () => {
 
   // Render success screen
   const renderSuccessScreen = () => (
-    <SafeAreaView style={styles.successContainer} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.successContainer} edges={["top", "bottom"]}>
       <Animated.View
         style={[
           styles.successContent,
@@ -610,10 +664,7 @@ const AllGroceryScanner = () => {
             <Text style={styles.doneButtonText}>Done</Text>
           </LinearGradient>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.scanAgainButton}
-          onPress={resetScanner}
-        >
+        <TouchableOpacity style={styles.scanAgainButton} onPress={resetScanner}>
           <Text style={styles.scanAgainButtonText}>Scan Again</Text>
         </TouchableOpacity>
       </View>
@@ -626,11 +677,11 @@ const AllGroceryScanner = () => {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
-        onHide={() => setToast(prev => ({ ...prev, visible: false }))}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
         topOffset={60}
       />
 
-      {currentStep === "selection" && renderSelectionScreen()}
+      {currentStep === "selection" && renderrSelectionScreen()}
       {currentStep === "processing" && renderProcessingScreen()}
       {currentStep === "confirmation" && renderConfirmationScreen()}
       {currentStep === "success" && renderSuccessScreen()}
@@ -685,7 +736,9 @@ const AllGroceryScanner = () => {
                   style={styles.editInput}
                   value={editingItem?.name || ""}
                   onChangeText={(text) =>
-                    setEditingItem(prev => prev ? { ...prev, name: text } : null)
+                    setEditingItem((prev) =>
+                      prev ? { ...prev, name: text } : null
+                    )
                   }
                   placeholder="Item name"
                 />
@@ -698,7 +751,9 @@ const AllGroceryScanner = () => {
                     style={styles.editInput}
                     value={editingItem?.quantity || ""}
                     onChangeText={(text) =>
-                      setEditingItem(prev => prev ? { ...prev, quantity: text } : null)
+                      setEditingItem((prev) =>
+                        prev ? { ...prev, quantity: text } : null
+                      )
                     }
                     placeholder="1"
                     keyboardType="numeric"
@@ -710,7 +765,9 @@ const AllGroceryScanner = () => {
                     style={styles.editInput}
                     value={editingItem?.unit || ""}
                     onChangeText={(text) =>
-                      setEditingItem(prev => prev ? { ...prev, unit: text } : null)
+                      setEditingItem((prev) =>
+                        prev ? { ...prev, unit: text } : null
+                      )
                     }
                     placeholder="ea"
                   />
@@ -723,7 +780,9 @@ const AllGroceryScanner = () => {
                   style={styles.editInput}
                   value={editingItem?.category || ""}
                   onChangeText={(text) =>
-                    setEditingItem(prev => prev ? { ...prev, category: text } : null)
+                    setEditingItem((prev) =>
+                      prev ? { ...prev, category: text } : null
+                    )
                   }
                   placeholder="Category"
                 />
@@ -774,12 +833,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
+    justifyContent: "center",
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: "#F0F0F0",
     backgroundColor: "#FFFFFF",
+    width: "100%",
   },
   backButton: {
     width: 44,
@@ -797,7 +856,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 20,
   },
   title: {
     fontSize: 28,
@@ -1163,4 +1221,19 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AllGroceryScanner;
+// Export content component for embedding in other screens
+export const AllGroceryContent = AllGroceryScanner;
+
+// Export wrapped version for standalone navigation
+const AllGroceryScreen = () => {
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: "#FAFAFA" }}
+      edges={["top"]}
+    >
+      <AllGroceryScanner />
+    </SafeAreaView>
+  );
+};
+
+export default AllGroceryScreen;

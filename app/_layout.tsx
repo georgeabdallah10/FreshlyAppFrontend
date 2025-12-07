@@ -1,5 +1,6 @@
 import { UserProvider } from "@/context/usercontext";
 import { FamilyProvider } from "@/context/familycontext";
+import { GroceryListProvider } from "@/context/groceryListContext";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import QueryPersistProvider from "@/providers/QueryPersistProvider";
 import {
@@ -24,11 +25,13 @@ export default function RootLayout() {
       <QueryPersistProvider>
         <UserProvider>
           <FamilyProvider>
-            <ThemeProvider
-              value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-            >
-              <Slot />
-            </ThemeProvider>
+            <GroceryListProvider>
+              <ThemeProvider
+                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
+              >
+                <Slot />
+              </ThemeProvider>
+            </GroceryListProvider>
           </FamilyProvider>
         </UserProvider>
       </QueryPersistProvider>

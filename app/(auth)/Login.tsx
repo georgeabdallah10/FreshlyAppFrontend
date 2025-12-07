@@ -1,12 +1,10 @@
 import ToastBanner from "@/components/generalMessage";
-import {
-  loginUser,
-  authenticateWithOAuth,
-  type OAuthProvider,
-} from "../../src/auth/auth";
 import { supabase } from "@/src/supabase/client";
 import { Storage } from "@/src/utils/storage";
+import { Ionicons } from "@expo/vector-icons";
+import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -21,9 +19,11 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
-import * as AuthSession from "expo-auth-session";
+import {
+  authenticateWithOAuth,
+  loginUser,
+  type OAuthProvider,
+} from "../../src/auth/auth";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -38,19 +38,47 @@ interface ToastState {
 
 const toErrorText = (err: any): string => {
   if (!err) return "Something went wrong. Please try again.";
-  if (typeof err === "string") return err;
+  if (typeof err === "string") {
+    // Filter out technical error messages and return user-friendly ones
+    const lowerErr = err.toLowerCase();
+    if (lowerErr.includes("request failed with status")) {
+      return "Something went wrong. Please try again.";
+    }
+    if (lowerErr.includes("network error") || lowerErr.includes("failed to fetch")) {
+      return "Unable to connect. Please check your internet connection.";
+    }
+    return err;
+  }
   if (Array.isArray(err)) {
-    // Likely FastAPI/Pydantic errors array
-    return err.map((e) => e?.msg ?? e?.message ?? String(e)).join("\n");
+    // Likely FastAPI/Pydantic errors array - extract meaningful messages
+    const messages = err
+      .map((e) => {
+        const msg = e?.msg ?? e?.message ?? "";
+        // Make Pydantic validation errors more readable
+        if (typeof msg === "string") {
+          return msg
+            .replace(/^value is not a valid/, "Please enter a valid")
+            .replace(/^field required$/, "This field is required")
+            .replace(/^string does not match regex/, "Invalid format");
+        }
+        return String(msg);
+      })
+      .filter(Boolean);
+    return messages.length > 0 ? messages.join(". ") : "Please check your information and try again.";
   }
   if (typeof err === "object") {
-    if (err.msg) return String(err.msg);
-    if (err.message) return String(err.message);
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return "An unexpected error occurred.";
+    // Handle detail field from FastAPI
+    if (err.detail) {
+      if (typeof err.detail === "string") {
+        return toErrorText(err.detail);
+      }
+      if (Array.isArray(err.detail)) {
+        return toErrorText(err.detail);
+      }
     }
+    if (err.msg) return toErrorText(err.msg);
+    if (err.message) return toErrorText(err.message);
+    return "An unexpected error occurred. Please try again.";
   }
   return String(err);
 };
@@ -67,6 +95,7 @@ export default function LoginScreen(): React.JSX.Element {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const isAppleAvailable = Platform.OS === "ios";
   const isOAuthBusy = Boolean(oauthLoading);
@@ -119,6 +148,8 @@ export default function LoginScreen(): React.JSX.Element {
       });
 
       if (result.ok) {
+        // Reset failed attempts on successful login
+        setFailedAttempts(0);
         await Storage.setItem("access_token", result.data.access_token);
         await Storage.setItem("refresh_token", result.data.refresh_token);
         showToast("success", "Login successful! Redirecting...");
@@ -128,7 +159,15 @@ export default function LoginScreen(): React.JSX.Element {
         }, 500);
       } else {
         setIsLoggingIn(false);
-        startCooldown(30); // Shorter cooldown for login attempts
+        
+        // Track failed attempts and start cooldown after 3 failures
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+        
+        if (newFailedAttempts >= 3) {
+          startCooldown(30);
+          setFailedAttempts(0); // Reset counter after cooldown starts
+        }
 
         // Provide specific error messages based on status code
         let errorMessage = "";
@@ -150,16 +189,36 @@ export default function LoginScreen(): React.JSX.Element {
           errorMessage =
             "Unable to connect to the server. Please check your internet connection and try again.";
         } else {
-          errorMessage =
-            result.message ||
-            "Login failed. Please check your credentials and try again.";
+          // Parse the message to provide better context
+          const lowerMessage = (result.message || "").toLowerCase();
+          if (lowerMessage.includes("email") && lowerMessage.includes("password")) {
+            errorMessage = "Incorrect email or password. Please try again.";
+          } else if (lowerMessage.includes("email")) {
+            errorMessage = "There's an issue with your email. Please check and try again.";
+          } else if (lowerMessage.includes("password")) {
+            errorMessage = "There's an issue with your password. Please try again.";
+          } else if (lowerMessage.includes("invalid") || lowerMessage.includes("incorrect")) {
+            errorMessage = "Invalid login credentials. Please check your email and password.";
+          } else if (lowerMessage.includes("request failed with status")) {
+            errorMessage = "Login failed. Please check your credentials and try again.";
+          } else {
+            errorMessage = "Login failed. Please check your credentials and try again.";
+          }
         }
 
         showToast("error", errorMessage);
       }
     } catch (error: any) {
       setIsLoggingIn(false);
-      startCooldown(30);
+      
+      // Track failed attempts and start cooldown after 3 failures
+      const newFailedAttempts = failedAttempts + 1;
+      setFailedAttempts(newFailedAttempts);
+      
+      if (newFailedAttempts >= 3) {
+        startCooldown(30);
+        setFailedAttempts(0); // Reset counter after cooldown starts
+      }
 
       // Handle different types of errors
       let errorMessage = "";
@@ -169,9 +228,8 @@ export default function LoginScreen(): React.JSX.Element {
       } else if (error.name === "AbortError") {
         errorMessage =
           "Request timed out. Please check your connection and try again.";
-      } else if (error.message) {
-        errorMessage = error.message;
       } else {
+        // Don't expose raw error messages to users
         errorMessage = "An unexpected error occurred. Please try again.";
       }
 
@@ -358,15 +416,18 @@ export default function LoginScreen(): React.JSX.Element {
         if (backend.status === 400) {
           showToast(
             "error",
-            "Provider mismatch. Please use the same method you signed up with."
+            "Provider mismatch. Please use the same sign-in method you used before."
           );
         } else if (backend.status === 401) {
           showToast("error", "Authentication failed. Please try again.");
+        } else if (backend.status === 404) {
+          showToast("error", "No account found. Please sign up first.");
+        } else if (backend.status === 429) {
+          showToast("error", "Too many attempts. Please wait a moment and try again.");
+        } else if (backend.status === -1) {
+          showToast("error", "Connection issue. Please check your internet and try again.");
         } else {
-          showToast(
-            "error",
-            backend.message || "Unable to sign you in. Please try again."
-          );
+          showToast("error", "Unable to sign you in. Please try again.");
         }
         return;
       }
@@ -380,10 +441,19 @@ export default function LoginScreen(): React.JSX.Element {
       router.replace("/(main)/(home)/main");
     } catch (error: any) {
       console.error("[Login] OAuth login error:", error);
-      showToast(
-        "error",
-        error?.message || "Unable to complete login. Please try again."
-      );
+      // Provide user-friendly messages for common OAuth errors
+      let errorMessage = "Unable to complete login. Please try again.";
+      if (error?.message) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("cancel")) {
+          errorMessage = "Sign in was cancelled.";
+        } else if (msg.includes("network") || msg.includes("connection")) {
+          errorMessage = "Connection issue. Please check your internet and try again.";
+        } else if (msg.includes("session") || msg.includes("token")) {
+          errorMessage = "Authentication session expired. Please try again.";
+        }
+      }
+      showToast("error", errorMessage);
     } finally {
       setOauthLoading(null);
     }

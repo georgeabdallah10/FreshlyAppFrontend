@@ -239,7 +239,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         setUser,
         logout,
-        refreshUser,
+        refreshUser, 
         updateUserInfo,
         prefrences,
         pantryItems,

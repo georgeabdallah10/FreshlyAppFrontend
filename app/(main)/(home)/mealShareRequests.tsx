@@ -7,25 +7,25 @@
 
 import ToastBanner from '@/components/generalMessage';
 import {
-    useAcceptShareRequest,
-    useCancelShareRequest,
-    useDeclineShareRequest,
-    useReceivedShareRequests,
-    useSentShareRequests,
+  useAcceptShareRequest,
+  useCancelShareRequest,
+  useDeclineShareRequest,
+  useReceivedShareRequests,
+  useSentShareRequests,
 } from '@/hooks/useMealShare';
-import { MealShareRequest, type MealShareMealDetail, type BasicUserSummary, type ShareRequestStatus } from '@/src/services/mealShare.service';
+import { MealShareRequest, type BasicUserSummary, type MealShareMealDetail, type ShareRequestStatus } from '@/src/services/mealShare.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-    ActivityIndicator,
-    Image,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 type Tab = 'received' | 'sent';
@@ -130,6 +130,13 @@ const MealShareRequestsScreen = () => {
         type: 'success',
         message: `Request accepted! "${clonedName}" was added to your meals.`,
       });
+      // Navigate to meals screen and scroll to the bottom to show the newly added meal
+      setTimeout(() => {
+        router.push({
+          pathname: '/(main)/(home)/meals',
+          params: { scrollToEnd: 'true' },
+        });
+      }, 1500); // Wait for toast to be visible before navigating
     } catch (error: any) {
       setToast({
         visible: true,

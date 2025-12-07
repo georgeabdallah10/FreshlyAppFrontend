@@ -45,6 +45,66 @@ export interface AddGroceryItemInput {
 }
 
 // ============================================
+// NEW BACKEND-ALIGNED TYPES
+// ============================================
+
+export type GroceryListScope = "personal" | "family";
+export type GroceryListStatus = "draft" | "finalized" | "purchased";
+
+export interface GroceryListItemSummary {
+  id: number;
+  ingredient_id?: number;
+  ingredient_name: string;
+  quantity: number | null;
+  unit_code: string | null;
+  checked: boolean;
+  note?: string | null;
+}
+
+export interface GroceryListOut {
+  id: number;
+  family_id: number | null;
+  owner_user_id: number | null;
+  scope: GroceryListScope;
+  meal_plan_id?: number | null;
+  title: string | null;
+  status: GroceryListStatus;
+  created_at: string;
+  items: GroceryListItemSummary[];
+}
+
+export interface MissingIngredient {
+  ingredient_id: number;
+  ingredient_name: string;
+  quantity: number;
+  unit_code: string | null;
+  note?: string | null;
+  source: "not_in_pantry" | "personal_pantry" | "family_pantry";
+}
+
+export interface AddFromRecipeRequest {
+  meal_id: number; // The meal ID to add ingredients from (backend also accepts recipe_id)
+  list_id?: number; // Optional: add to existing list
+  scope?: GroceryListScope; // Required when creating new list
+  family_id?: number; // Required when scope is "family"
+  title?: string;
+  servings_multiplier?: number;
+}
+
+export interface AddFromRecipeResponse {
+  grocery_list: GroceryListOut;
+  items_added: number;
+  missing_ingredients: MissingIngredient[];
+  message: string;
+}
+
+export interface SyncWithPantryResponse {
+  items_removed: number;
+  items_updated: number;
+  message: string;
+}
+
+// ============================================
 // API FUNCTIONS
 // ============================================
 
@@ -134,6 +194,76 @@ export async function getGrocerySuggestions(): Promise<GroceryItem[]> {
 }
 
 // ============================================
+// NEW ENDPOINTS MATCHING BACKEND SPEC
+// ============================================
+
+/**
+ * Get family grocery lists
+ */
+export async function getFamilyGroceryLists(
+  family_id: number,
+  status?: GroceryListStatus
+): Promise<GroceryListOut[]> {
+  const params = status ? `?status=${status}` : '';
+  return await apiClient.get<GroceryListOut[]>(`/grocery-lists/family/${family_id}${params}`);
+}
+
+/**
+ * Get my personal grocery lists
+ */
+export async function getMyGroceryLists(
+  status?: GroceryListStatus
+): Promise<GroceryListOut[]> {
+  const params = status ? `?status=${status}` : '';
+  return await apiClient.get<GroceryListOut[]>(`/grocery-lists/me${params}`);
+}
+
+/**
+ * Get a specific grocery list by ID
+ */
+export async function getGroceryListById(list_id: number): Promise<GroceryListOut> {
+  return await apiClient.get<GroceryListOut>(`/grocery-lists/${list_id}`);
+}
+
+/**
+ * Add recipe ingredients to grocery list
+ * Backend handles pantry comparison based on scope
+ */
+export async function addFromRecipe(
+  payload: AddFromRecipeRequest
+): Promise<AddFromRecipeResponse> {
+  return await apiClient.post<AddFromRecipeResponse>('/grocery-lists/add-from-recipe', payload);
+}
+
+/**
+ * Toggle checked status of a grocery list item
+ */
+export async function toggleGroceryListItemChecked(item_id: number): Promise<GroceryListItemSummary> {
+  return await apiClient.post<GroceryListItemSummary>(`/grocery-lists/items/${item_id}/check`, {});
+}
+
+/**
+ * Delete a grocery list item
+ */
+export async function deleteGroceryListItem(item_id: number): Promise<{ message: string }> {
+  return await apiClient.delete<{ message: string }>(`/grocery-lists/items/${item_id}`);
+}
+
+/**
+ * Clear all checked items from a grocery list
+ */
+export async function clearCheckedItems(list_id: number): Promise<{ message: string; items_removed: number }> {
+  return await apiClient.delete<{ message: string; items_removed: number }>(`/grocery-lists/${list_id}/items/checked`);
+}
+
+/**
+ * Sync grocery list with pantry
+ */
+export async function syncGroceryListWithPantry(list_id: number): Promise<SyncWithPantryResponse> {
+  return await apiClient.post<SyncWithPantryResponse>(`/grocery-lists/${list_id}/sync-with-pantry`, {});
+}
+
+// ============================================
 // EXPORT ALL
 // ============================================
 
@@ -150,6 +280,15 @@ export const groceryService = {
   toggleGroceryItem,
   generateGroceryListFromMeals,
   getGrocerySuggestions,
+  // New endpoints
+  getFamilyGroceryLists,
+  getMyGroceryLists,
+  getGroceryListById,
+  addFromRecipe,
+  toggleGroceryListItemChecked,
+  deleteGroceryListItem,
+  clearCheckedItems,
+  syncGroceryListWithPantry,
 };
 
 // Legacy export

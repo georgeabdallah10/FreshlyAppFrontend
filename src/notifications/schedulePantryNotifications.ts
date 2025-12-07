@@ -1,4 +1,4 @@
-/**
+ /**
  * ============================================
  * PANTRY EXPIRATION NOTIFICATIONS
  * ============================================
@@ -7,10 +7,21 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import { SchedulableTriggerInputTypes } from 'expo-notifications';
 import { Platform } from 'react-native';
 import { getAllPantryItems, PantryItem } from '../services/pantry.service';
-import { getChannelIdForCategory } from './registerForPush';
-import type { PantryItemExpirationData } from './types';
+
+// ============================================
+// TYPES
+// ============================================
+
+interface PantryItemExpirationData {
+  itemId: number;
+  itemName: string;
+  expirationDate: string;
+  daysUntilExpiration: number;
+  [key: string]: unknown; // Index signature for Record<string, unknown> compatibility
+}
 
 // ============================================
 // CONSTANTS
@@ -130,14 +141,15 @@ async function scheduleExpiringSoonNotification(
       content: {
         title,
         body,
-        data,
+        data: data as Record<string, unknown>,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         ...(Platform.OS === 'android' && {
-          channelId: getChannelIdForCategory('pantry_expiration'),
+          channelId: 'default',
         }),
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.DATE,
         date: triggerDate,
       },
     });
@@ -180,14 +192,15 @@ async function scheduleExpiredItemNotification(
       content: {
         title,
         body,
-        data,
+        data: data as Record<string, unknown>,
         sound: true,
         priority: Notifications.AndroidNotificationPriority.HIGH,
         ...(Platform.OS === 'android' && {
-          channelId: getChannelIdForCategory('pantry_expiration'),
+          channelId: 'default',
         }),
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 5,
       },
     });
@@ -224,6 +237,7 @@ async function scheduleDailyPantryCheck(): Promise<void> {
         priority: Notifications.AndroidNotificationPriority.LOW,
       },
       trigger: {
+        type: SchedulableTriggerInputTypes.CALENDAR,
         hour: DAILY_CHECK_HOUR,
         minute: DAILY_CHECK_MINUTE,
         repeats: true,

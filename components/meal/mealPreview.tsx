@@ -140,7 +140,7 @@ const RecipeItem: React.FC<Props> = ({
       // Success animation
       setSaveState('success');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-      router.replace("/(home)/meals")
+      router.replace("/(main)/(home)/meals")
       
       // Stop pulse and show checkmark
       saveScale.stopAnimation(() => {

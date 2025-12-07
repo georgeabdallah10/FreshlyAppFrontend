@@ -42,5 +42,5 @@ export default function IndexPage() {
     );
   }
 
-  return <Redirect href={loggedIn ? "/(home)/main" : "/(auth)/Login"} />;
+  return <Redirect href={loggedIn ? "/(home)/main" as any : "/(auth)/Login" as any} />;
 }

@@ -6,13 +6,13 @@
  * with category-specific styling and interactions
  */
 
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
-import { router } from 'expo-router';
-import type { Notification } from '@/src/services/notification.service';
 import { useMarkAsRead } from '@/hooks/useNotifications';
+import type { Notification } from '@/src/services/notification.service';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { MotiView } from 'moti';
+import React from 'react';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 // ============================================
 // TYPES
@@ -207,14 +207,14 @@ function handleDefaultRouting(notification: Notification) {
     case 'meal_share_declined':
       if (notification.related_id) {
         router.push({
-          pathname: '/(home)/meal/[id]',
+          pathname: '/(home)/meal/[id]' as any,
           params: { id: notification.related_id.toString() },
         });
       }
       break;
 
     case 'family':
-      router.push('/(home)/chat');
+      router.push('/(home)/chat' as any);
       break;
 
     default:

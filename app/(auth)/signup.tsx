@@ -1,32 +1,32 @@
 import ToastBanner from "@/components/generalMessage";
-import {
-  loginUser,
-  registerUser,
-  sendVerificationCode,
-  authenticateWithOAuth,
-  type OAuthProvider,
-} from "../../src/auth/auth";
 import { supabase } from "@/src/supabase/client";
 import { Storage } from "@/src/utils/storage";
+import { Ionicons } from "@expo/vector-icons";
+import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
+import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import * as WebBrowser from "expo-web-browser";
-import * as AuthSession from "expo-auth-session";
+import {
+    authenticateWithOAuth,
+    loginUser,
+    registerUser,
+    sendVerificationCode,
+    type OAuthProvider,
+} from "../../src/auth/auth";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -41,19 +41,47 @@ interface ToastState {
 
 const toErrorText = (err: any): string => {
   if (!err) return "Something went wrong. Please try again.";
-  if (typeof err === "string") return err;
+  if (typeof err === "string") {
+    // Filter out technical error messages and return user-friendly ones
+    const lowerErr = err.toLowerCase();
+    if (lowerErr.includes("request failed with status")) {
+      return "Something went wrong. Please try again.";
+    }
+    if (lowerErr.includes("network error") || lowerErr.includes("failed to fetch")) {
+      return "Unable to connect. Please check your internet connection.";
+    }
+    return err;
+  }
   if (Array.isArray(err)) {
-    // Likely FastAPI/Pydantic error list
-    return err.map((e) => e?.msg ?? e?.message ?? String(e)).join("\n");
+    // Likely FastAPI/Pydantic error list - extract meaningful messages
+    const messages = err
+      .map((e) => {
+        const msg = e?.msg ?? e?.message ?? "";
+        // Make Pydantic validation errors more readable
+        if (typeof msg === "string") {
+          return msg
+            .replace(/^value is not a valid/, "Please enter a valid")
+            .replace(/^field required$/, "This field is required")
+            .replace(/^string does not match regex/, "Invalid format");
+        }
+        return String(msg);
+      })
+      .filter(Boolean);
+    return messages.length > 0 ? messages.join(". ") : "Please check your information and try again.";
   }
   if (typeof err === "object") {
-    if ((err as any).msg) return String((err as any).msg);
-    if ((err as any).message) return String((err as any).message);
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return "An unexpected error occurred.";
+    // Handle detail field from FastAPI
+    if ((err as any).detail) {
+      if (typeof (err as any).detail === "string") {
+        return toErrorText((err as any).detail);
+      }
+      if (Array.isArray((err as any).detail)) {
+        return toErrorText((err as any).detail);
+      }
     }
+    if ((err as any).msg) return toErrorText((err as any).msg);
+    if ((err as any).message) return toErrorText((err as any).message);
+    return "An unexpected error occurred. Please try again.";
   }
   return String(err);
 };
@@ -222,7 +250,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
           let errorMessage = "Unable to sign you in automatically. ";
           if (login.status === 401) {
             errorMessage +=
-              "Invalid credentials. Please try signing in manually.";
+              "Please try signing in manually with your credentials.";
           } else if (login.status === 429) {
             errorMessage +=
               "Too many login attempts. Please wait a moment and try again.";
@@ -230,9 +258,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
             errorMessage += "Server error. Please try signing in manually.";
           } else if (login.status === -1) {
             errorMessage +=
-              "Network connection issue. Please check your internet and try again.";
+              "Connection issue. Please check your internet and try signing in.";
           } else {
-            errorMessage += login.message || "Please try signing in manually.";
+            errorMessage += "Please try signing in manually.";
           }
 
           showToast("error", errorMessage);
@@ -278,19 +306,34 @@ export default function CreateAccountScreen(): React.JSX.Element {
               "Password must be at least 8 characters long and contain letters and numbers.";
           } else if (result.message.toLowerCase().includes("phone")) {
             errorMessage = "Please enter a valid phone number.";
+          } else if (result.message.toLowerCase().includes("name")) {
+            errorMessage = "Please enter a valid name.";
+          } else if (result.message.toLowerCase().includes("request failed with status")) {
+            errorMessage = "Please check your information and try again.";
+          } else if (result.message.toLowerCase().includes("already") || result.message.toLowerCase().includes("exists")) {
+            errorMessage = "This email is already registered. Please sign in instead.";
           } else {
-            errorMessage =
-              result.message || "Please check your information and try again.";
+            // Don't show raw technical messages
+            errorMessage = "Please check your information and try again.";
           }
         } else if (result.status === 409) {
           // Conflict - user already exists
           errorMessage =
             "An account with this email already exists. Please sign in instead.";
         } else if (result.status === 422) {
-          // Validation error
-          errorMessage =
-            result.message ||
-            "Please check that all fields are filled in correctly.";
+          // Validation error - parse the message to be more helpful
+          const lowerMessage = result.message.toLowerCase();
+          if (lowerMessage.includes("email")) {
+            errorMessage = "Please enter a valid email address.";
+          } else if (lowerMessage.includes("password")) {
+            errorMessage = "Password must be at least 8 characters with letters and numbers.";
+          } else if (lowerMessage.includes("phone")) {
+            errorMessage = "Please enter a valid phone number.";
+          } else if (lowerMessage.includes("name")) {
+            errorMessage = "Please enter a valid name.";
+          } else {
+            errorMessage = "Please check that all fields are filled in correctly.";
+          }
         } else if (result.status === 429) {
           // Too many requests
           errorMessage =
@@ -305,9 +348,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
           errorMessage =
             "Unable to connect to the server. Please check your internet connection and try again.";
         } else {
-          errorMessage =
-            result.message ||
-            "Unable to create your account. Please try again.";
+          // Don't show raw technical error messages to users
+          errorMessage = "Unable to create your account. Please try again.";
         }
 
         showToast("error", errorMessage);
@@ -324,9 +366,8 @@ export default function CreateAccountScreen(): React.JSX.Element {
       } else if (error.name === "AbortError") {
         errorMessage =
           "Request timed out. Please check your connection and try again.";
-      } else if (error.message) {
-        errorMessage = error.message;
       } else {
+        // Don't expose raw error messages to users
         errorMessage = "An unexpected error occurred. Please try again.";
       }
 
@@ -541,15 +582,18 @@ export default function CreateAccountScreen(): React.JSX.Element {
         if (backend.status === 400) {
           showToast(
             "error",
-            "Provider mismatch. Please use the same method you used previously."
+            "Provider mismatch. Please use the same sign-in method you used before."
           );
         } else if (backend.status === 401) {
           showToast("error", "Authentication failed. Please try again.");
+        } else if (backend.status === 409) {
+          showToast("error", "An account with this email already exists. Please sign in instead.");
+        } else if (backend.status === 429) {
+          showToast("error", "Too many attempts. Please wait a moment and try again.");
+        } else if (backend.status === -1) {
+          showToast("error", "Connection issue. Please check your internet and try again.");
         } else {
-          showToast(
-            "error",
-            backend.message || "Unable to complete signup. Please try again."
-          );
+          showToast("error", "Unable to complete signup. Please try again.");
         }
         return;
       }
@@ -561,10 +605,19 @@ export default function CreateAccountScreen(): React.JSX.Element {
       router.replace("/(main)/(user)/setPfp");
     } catch (error: any) {
       console.error("[Signup] OAuth signup error:", error);
-      showToast(
-        "error",
-        error?.message || "Unable to complete signup. Please try again."
-      );
+      // Provide user-friendly messages for common OAuth errors
+      let errorMessage = "Unable to complete signup. Please try again.";
+      if (error?.message) {
+        const msg = error.message.toLowerCase();
+        if (msg.includes("cancel")) {
+          errorMessage = "Sign up was cancelled.";
+        } else if (msg.includes("network") || msg.includes("connection")) {
+          errorMessage = "Connection issue. Please check your internet and try again.";
+        } else if (msg.includes("session") || msg.includes("token")) {
+          errorMessage = "Authentication session expired. Please try again.";
+        }
+      }
+      showToast("error", errorMessage);
     } finally {
       setOauthLoading(null);
     }

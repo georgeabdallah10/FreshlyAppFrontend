@@ -11,18 +11,27 @@ import { useSendShareRequest } from '@/hooks/useMealShare';
 import { type UserSearchResult } from '@/src/services/user.service';
 import { listFamilyMembers } from '@/src/user/family';
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Image,
+  LayoutAnimation,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 interface FamilyMember {
   id: number;
@@ -65,6 +74,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   const [familyLoading, setFamilyLoading] = useState(false);
   const [familyError, setFamilyError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [showMessageInput, setShowMessageInput] = useState(false);
   const [toast, setToast] = useState<{
     visible: boolean;
     type: 'success' | 'error';
@@ -72,8 +82,10 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   }>({ visible: false, type: 'success', message: '' });
 
   const sendRequest = useSendShareRequest();
-  const slideAnim = React.useRef(new Animated.Value(0)).current;
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const messageInputAnim = useRef(new Animated.Value(0)).current;
+  const selectedUserScale = useRef(new Animated.Value(0)).current;
 
   const mapMemberToUser = React.useCallback((member: FamilyMember): UserSearchResult | null => {
     const id = member.user?.id ?? member.user_id ?? member.id;
@@ -136,6 +148,9 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
       setFamilyMembers([]);
       setFamilyError(null);
       setMessage('');
+      setShowMessageInput(false);
+      messageInputAnim.setValue(0);
+      selectedUserScale.setValue(0);
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -244,28 +259,69 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
     return (name.charAt(0) || 'U').toUpperCase();
   }, [getUserName]);
 
-  const renderUserOption = (candidate: UserSearchResult) => (
-    <TouchableOpacity
-      key={candidate.id}
-      style={[
-        styles.memberCard,
-        selectedUser?.id === candidate.id && styles.memberCardSelected,
-      ]}
-      onPress={() => setSelectedUser(candidate)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.memberAvatar}>
-        <Text style={styles.memberInitial}>{getUserInitial(candidate)}</Text>
-      </View>
-      <View style={styles.memberInfo}>
-        <Text style={styles.memberName}>{getUserName(candidate)}</Text>
-        {candidate.email && <Text style={styles.memberEmail}>{candidate.email}</Text>}
-      </View>
-      {selectedUser?.id === candidate.id && (
-        <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-      )}
-    </TouchableOpacity>
-  );
+  // Handle user selection with animation
+  const handleSelectUser = React.useCallback((candidate: UserSearchResult) => {
+    setSelectedUser(candidate);
+    selectedUserScale.setValue(0);
+    Animated.spring(selectedUserScale, {
+      toValue: 1,
+      tension: 100,
+      friction: 8,
+      useNativeDriver: true,
+    }).start();
+  }, [selectedUserScale]);
+
+  // Toggle message input with animation
+  const toggleMessageInput = React.useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowMessageInput(!showMessageInput);
+    Animated.timing(messageInputAnim, {
+      toValue: showMessageInput ? 0 : 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [showMessageInput, messageInputAnim]);
+
+  // Get avatar URI for a user
+  const getAvatarUri = React.useCallback((candidate: UserSearchResult | null | undefined): string | null => {
+    if (!candidate) return null;
+    return candidate.avatar_path || null;
+  }, []);
+
+  const renderUserOption = (candidate: UserSearchResult) => {
+    const avatarUri = getAvatarUri(candidate);
+    const isSelected = selectedUser?.id === candidate.id;
+    
+    return (
+      <TouchableOpacity
+        key={candidate.id}
+        style={[
+          styles.memberCard,
+          isSelected && styles.memberCardSelected,
+        ]}
+        onPress={() => handleSelectUser(candidate)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.memberAvatar}>
+          {avatarUri ? (
+            <Image 
+              source={{ uri: avatarUri }} 
+              style={styles.memberAvatarImage}
+            />
+          ) : (
+            <Text style={styles.memberInitial}>{getUserInitial(candidate)}</Text>
+          )}
+        </View>
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{getUserName(candidate)}</Text>
+          {candidate.email && <Text style={styles.memberEmail}>{candidate.email}</Text>}
+        </View>
+        {isSelected && (
+          <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderFamilySection = () => {
     if (!familyId) {
@@ -365,17 +421,48 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             </Text>
           </View>
 
+          {/* Selected User Display - Simple row */}
+          {selectedUser && (
+            <View style={styles.selectedUserRow}>
+              <View style={styles.selectedUserAvatarSmall}>
+                {getAvatarUri(selectedUser) ? (
+                  <Image 
+                    source={{ uri: getAvatarUri(selectedUser)! }} 
+                    style={styles.selectedUserAvatarImageSmall}
+                  />
+                ) : (
+                  <Text style={styles.selectedUserInitialSmall}>{getUserInitial(selectedUser)}</Text>
+                )}
+              </View>
+              <View style={styles.selectedUserInfo}>
+                <Text style={styles.selectedUserNameText}>{getUserName(selectedUser)}</Text>
+                {selectedUser.email && (
+                  <Text style={styles.selectedUserEmailText}>{selectedUser.email}</Text>
+                )}
+              </View>
+              <TouchableOpacity 
+                style={styles.selectedUserClearBtn}
+                onPress={() => setSelectedUser(null)}
+              >
+                <Ionicons name="close-circle" size={20} color="#047857" />
+              </TouchableOpacity>
+            </View>
+          )}
+
           <View style={styles.searchSection}>
             <Text style={styles.messageLabel}>Send to a family member</Text>
+            
+            {/* Search Input */}
             <View style={styles.searchInputWrapper}>
               <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Type a name or email"
+                placeholder="Search by name or email..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCorrect={false}
                 autoCapitalize="none"
+                placeholderTextColor="#9CA3AF"
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
@@ -383,49 +470,138 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
                 </TouchableOpacity>
               )}
             </View>
-            {selectedUser && (
-              <View style={styles.selectedRecipient}>
-                <Ionicons name="person-circle" size={32} color="#10B981" />
-                <View style={styles.selectedRecipientInfo}>
-                  <Text style={styles.selectedRecipientLabel}>Selected recipient</Text>
-                  <Text style={styles.selectedRecipientName}>{getUserName(selectedUser)}</Text>
-                  {selectedUser.email && (
-                    <Text style={styles.selectedRecipientEmail}>{selectedUser.email}</Text>
-                  )}
+            
+            {/* Vertical Family Members List */}
+            <ScrollView 
+              style={styles.membersList}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.membersListContent}
+            >
+              {familyLoading && (
+                <View style={styles.loadingContainerSmall}>
+                  <ActivityIndicator size="small" color="#10B981" />
+                  <Text style={styles.loadingTextSmall}>Loading...</Text>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setSelectedUser(null)}
-                  style={styles.selectedRecipientClear}
-                >
-                  <Ionicons name="close" size={18} color="#6B7280" />
-                </TouchableOpacity>
-              </View>
-            )}
+              )}
+
+              {!familyId && !familyLoading && (
+                <View style={styles.emptyContainerSmall}>
+                  <Ionicons name="people-outline" size={32} color="#D1D5DB" />
+                  <Text style={styles.emptyTextSmall}>No family connected</Text>
+                </View>
+              )}
+
+              {familyId && !familyLoading && familyMembers.length === 0 && !familyError && (
+                <View style={styles.emptyContainerSmall}>
+                  <Ionicons name="people-circle-outline" size={32} color="#D1D5DB" />
+                  <Text style={styles.emptyTextSmall}>No family members available</Text>
+                </View>
+              )}
+
+              {familyError && (
+                <Text style={styles.errorText}>{familyError}</Text>
+              )}
+
+              {hasSearchQuery && filteredFamilyMembers.length === 0 && familyMembers.length > 0 && (
+                <View style={styles.emptyContainerSmall}>
+                  <Ionicons name="search-outline" size={32} color="#D1D5DB" />
+                  <Text style={styles.emptyTextSmall}>No matching members found</Text>
+                </View>
+              )}
+
+              {!familyLoading && (hasSearchQuery ? filteredFamilyMembers : familyMembers).map((member) => {
+                const avatarUri = getAvatarUri(member);
+                const isSelected = selectedUser?.id === member.id;
+                return (
+                  <TouchableOpacity
+                    key={member.id}
+                    style={[
+                      styles.memberCard,
+                      isSelected && styles.memberCardSelected,
+                    ]}
+                    onPress={() => handleSelectUser(member)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.memberAvatar}>
+                      {avatarUri ? (
+                        <Image 
+                          source={{ uri: avatarUri }} 
+                          style={styles.memberAvatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.memberInitial}>{getUserInitial(member)}</Text>
+                      )}
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <Text style={styles.memberName}>{getUserName(member)}</Text>
+                      {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                    </View>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
-          <ScrollView
-            style={styles.membersList}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>
-                {hasSearchQuery ? 'Matching family members' : 'Family members'}
-              </Text>
-              {renderFamilySection()}
-            </View>
-          </ScrollView>
-
+          {/* Message Section with Plus Button */}
           <View style={styles.messageSection}>
-            <Text style={styles.messageLabel}>Add a message (optional)</Text>
-            <TextInput
-              style={styles.messageInput}
-              placeholder="e.g., Try this amazing recipe!"
-              value={message}
-              onChangeText={setMessage}
-              maxLength={200}
-              multiline
-              numberOfLines={3}
-            />
+            <View style={styles.messageHeader}>
+              <Text style={styles.messageLabelSmall}>Add a message (optional)</Text>
+              <TouchableOpacity 
+                style={[
+                  styles.messageToggleButton,
+                  showMessageInput && styles.messageToggleButtonActive,
+                ]}
+                onPress={toggleMessageInput}
+                activeOpacity={0.7}
+              >
+                <Animated.View style={{
+                  transform: [{
+                    rotate: messageInputAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '45deg'],
+                    }),
+                  }],
+                }}>
+                  <Ionicons 
+                    name="add" 
+                    size={20} 
+                    color={showMessageInput ? '#FFF' : '#10B981'} 
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+            
+            {showMessageInput && (
+              <Animated.View 
+                style={[
+                  styles.messageInputContainer,
+                  {
+                    opacity: messageInputAnim,
+                    transform: [{
+                      translateY: messageInputAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-10, 0],
+                      }),
+                    }],
+                  },
+                ]}
+              >
+                <TextInput
+                  style={styles.messageInputCompact}
+                  placeholder="e.g., Try this amazing recipe!"
+                  value={message}
+                  onChangeText={setMessage}
+                  maxLength={200}
+                  multiline
+                  numberOfLines={2}
+                  placeholderTextColor="#9CA3AF"
+                />
+                <Text style={styles.messageCharCount}>{message.length}/200</Text>
+              </Animated.View>
+            )}
           </View>
 
           <View style={styles.buttonRow}>
@@ -484,10 +660,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
     paddingTop: 12,
-    maxHeight: '85%',
+    maxHeight: '80%',
   },
   modalHandle: {
     width: 40,
@@ -499,55 +675,211 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   modalIconContainer: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: '#ECFDF5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1F2937',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   modalSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9CA3AF',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  membersList: {
-    maxHeight: 300,
-    marginBottom: 20,
-  },
-  sectionContainer: {
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#111827',
+
+  // Selected User Display - Simple row
+  selectedUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 10,
+    padding: 10,
     marginBottom: 12,
   },
-  searchSection: {
+  selectedUserAvatarSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  selectedUserAvatarImageSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
+  selectedUserInitialSmall: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  selectedUserInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  selectedUserNameText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+  selectedUserEmailText: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 1,
+  },
+  selectedUserClearBtn: {
+    padding: 2,
+  },
+
+  // Legacy selected user styles (kept for compatibility)
+  selectedUserContainer: {
+    alignItems: 'center',
     marginBottom: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#10B981',
+  },
+  selectedUserAvatarContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  selectedUserAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: '#10B981',
+  },
+  selectedUserAvatarPlaceholder: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#059669',
+  },
+  selectedUserInitial: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  selectedUserClearBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  selectedUserName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#065F46',
+  },
+
+  // Avatar Row
+  avatarRow: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  avatarRowContent: {
+    paddingHorizontal: 4,
+    gap: 16,
+  },
+  avatarItem: {
+    alignItems: 'center',
+    width: 70,
+  },
+  avatarItemSelected: {
+    // Handled by child styles
+  },
+  avatarCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E5E7EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    borderWidth: 3,
+    borderColor: 'transparent',
+    position: 'relative',
+  },
+  avatarCircleSelected: {
+    borderColor: '#10B981',
+    backgroundColor: '#10B981',
+  },
+  avatarImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  avatarInitial: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  avatarCheckmark: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#10B981',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  avatarName: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  avatarNameSelected: {
+    color: '#10B981',
+    fontWeight: '600',
+  },
+
+  // Search Section
+  searchSection: {
+    marginBottom: 12,
   },
   searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   searchIcon: {
     marginRight: 6,
@@ -589,6 +921,31 @@ const styles = StyleSheet.create({
   selectedRecipientClear: {
     padding: 6,
   },
+
+  // Loading & Empty States (Small versions)
+  loadingContainerSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  loadingTextSmall: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
+  emptyContainerSmall: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  emptyTextSmall: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  
+  // Original loading/empty states (kept for compatibility)
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -620,13 +977,31 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+
+  // Member List (kept for compatibility)
+  membersList: {
+    maxHeight: 140,
+    marginTop: 12,
+  },
+  membersListContent: {
+    paddingBottom: 4,
+  },
+  sectionContainer: {
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#111827',
+    marginBottom: 12,
+  },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 8,
     borderWidth: 2,
     borderColor: 'transparent',
   },
@@ -635,16 +1010,22 @@ const styles = StyleSheet.create({
     borderColor: '#10B981',
   },
   memberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    overflow: 'hidden',
+  },
+  memberAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   memberInitial: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -661,14 +1042,59 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6B7280',
   },
+
+  // Message Section
   messageSection: {
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   messageLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 8,
+  },
+  messageLabelSmall: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  messageToggleButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ECFDF5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  messageToggleButtonActive: {
+    backgroundColor: '#10B981',
+  },
+  messageInputContainer: {
+    marginTop: 8,
+  },
+  messageInputCompact: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 10,
+    padding: 10,
+    fontSize: 14,
+    color: '#1F2937',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minHeight: 50,
+    textAlignVertical: 'top',
+  },
+  messageCharCount: {
+    fontSize: 11,
+    color: '#9CA3AF',
+    textAlign: 'right',
+    marginTop: 2,
   },
   messageInput: {
     backgroundColor: '#F9FAFB',
@@ -681,19 +1107,21 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+
+  // Buttons
   buttonRow: {
     flexDirection: 'row',
     gap: 12,
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     backgroundColor: '#F3F4F6',
-    borderRadius: 12,
+    borderRadius: 10,
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#6B7280',
   },
@@ -702,10 +1130,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
+    gap: 6,
+    paddingVertical: 12,
     backgroundColor: '#10B981',
-    borderRadius: 12,
+    borderRadius: 10,
     shadowColor: '#10B981',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
@@ -717,7 +1145,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
   },
   sendButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#FFFFFF',
   },

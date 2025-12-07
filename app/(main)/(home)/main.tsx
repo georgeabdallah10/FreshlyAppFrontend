@@ -280,12 +280,12 @@ const HomeDashboard = () => {
       onPress: () => router.push("/(main)/(home)/meals"),
     },
     {
-      id: "newchat",
-      title: "Grocery",
-      subtitle: "Upload All Grocery",
+      id: "groceryLists",
+      title: "Grocery Lists",
+      subtitle: "Shopping lists",
       iconSource: require("../../../assets/icons/grocery.png"),
       bgColor: "#F0F0F0",
-      onPress: () => router.push("/(main)/(home)/allGrocery"),
+      onPress: () => router.push("/(main)/(home)/groceryLists"),
     },
     {
       id: "Mealplanner",

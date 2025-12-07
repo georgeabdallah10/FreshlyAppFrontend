@@ -4,6 +4,7 @@ import MealDetailScreen from '@/components/meal/mealDetailScreen';
 import MealListScreen from '@/components/meal/mealListScreen';
 import { type Meal } from '@/components/meal/mealsData';
 import { getAllmealsforSignelUser } from '@/src/user/meals';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { StatusBar, StyleSheet, View } from 'react-native';
 type Screen = 'list' | 'detail';
@@ -18,6 +19,7 @@ interface ToastState {
 }
 
 const MealsDashboard: React.FC = () => {
+  const { scrollToEnd } = useLocalSearchParams<{ scrollToEnd?: string }>();
   const [currentScreen, setCurrentScreen] = useState<Screen>('list');
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -99,6 +101,7 @@ const MealsDashboard: React.FC = () => {
           isLoading={isLoading}
           hasError={hasError}
           onImageError={(msg) => showToast("error", msg, 4000)}
+          scrollToEnd={scrollToEnd === 'true'}
         />
       ) : (
         selectedMeal && <MealDetailScreen meal={selectedMeal} onBack={handleBack} />

@@ -310,11 +310,28 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
           ingredient_id: item.ingredient_id,
           quantity: item.quantity,
           unit: item.unit,
+          canonical_quantity: item.canonical_quantity,
+          canonical_unit: item.canonical_unit,
           family_id: item.family_id,
           owner_user_id: item.owner_user_id,
           scope: item.scope,
         });
       });
+
+      // Check for NULL canonical values in pantry
+      const pantryItemsWithNullCanonical = pantryItems.filter(
+        (item: PantryItem) =>
+          item.canonical_quantity === null ||
+          item.canonical_quantity === undefined ||
+          item.canonical_unit === null ||
+          item.canonical_unit === undefined
+      );
+      if (pantryItemsWithNullCanonical.length > 0) {
+        console.warn("\n[GroceryListContext] ⚠️ WARNING: Pantry items with NULL canonical values:");
+        pantryItemsWithNullCanonical.forEach((item: PantryItem) => {
+          console.warn(`  - ${item.ingredient_name}: canonical_quantity=${item.canonical_quantity}, canonical_unit=${item.canonical_unit}`);
+        });
+      }
 
       // ========== DEBUG: Compare ingredient_ids ==========
       console.log("\n[GroceryListContext] ========== INGREDIENT ID COMPARISON ==========");

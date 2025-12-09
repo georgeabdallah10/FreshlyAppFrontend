@@ -17,9 +17,7 @@ import {
     useDeleteListMutation,
     useFamilyGroceryLists,
     useGroceryList as useGroceryListQuery,
-    useMarkItemPurchasedMutation,
     usePersonalGroceryLists,
-    useRebuildFromMealPlanMutation,
     useRemoveItemMutation,
     useSyncPantryMutation,
     useToggleItemMutation,
@@ -30,14 +28,11 @@ import {
     type AddFromRecipeResponse,
     type AddGroceryListItemRequest,
     type GroceryListOut,
-    type GroceryListItemSummary,
-    type RebuildFromMealPlanResponse,
     type SyncWithPantryResponse,
     type UpdateGroceryListItemRequest,
     addFromRecipe as addFromRecipeApi,
     getGroceryListById
 } from "@/src/services/grocery.service";
-import { listMyPantryItems, type PantryItem } from "@/src/user/pantry";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { useUser } from "./usercontext";
@@ -79,11 +74,6 @@ type GroceryListContextType = {
   // Item management with optimistic updates
   addItem: (listId: number, item: AddGroceryListItemRequest) => Promise<void>;
   updateItem: (listId: number, itemId: number, updates: UpdateGroceryListItemRequest) => Promise<void>;
-  markItemPurchased: (itemId: number, isPurchased?: boolean) => Promise<void>;
-
-  // Phase F4: Rebuild from meal plan
-  rebuildFromMealPlan: (listId: number, mealPlanId: number) => Promise<RebuildFromMealPlanResponse>;
-  isRebuilding: boolean;
 
   // Sync modal controls
   closeSyncModal: () => void;
@@ -144,8 +134,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const syncPantryMutation = useSyncPantryMutation(user?.id, activeFamilyId ?? undefined);
   const clearCheckedMutation = useClearCheckedMutation();
   const deleteListMutation = useDeleteListMutation();
-  const markItemPurchasedMutation = useMarkItemPurchasedMutation();
-  const rebuildMutation = useRebuildFromMealPlanMutation();
 
   // ============================================
   // DERIVED STATE
@@ -163,7 +151,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const loading = myListsLoading || familyListsLoading;
   const error = myListsError?.message || familyListsError?.message || null;
   const isSyncing = syncPantryMutation.isPending;
-  const isRebuilding = rebuildMutation.isPending;
 
   // ============================================
   // ACTIONS
@@ -244,158 +231,8 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     const listBeforeSync = allLists.find((l) => l.id === listId);
     const itemsBefore = listBeforeSync?.items || [];
 
-    // ========== DEBUG: Log grocery list items BEFORE sync ==========
-    console.log("\n[GroceryListContext] ========== PRE-SYNC DEBUG ==========");
-    console.log("[GroceryListContext] User context:", {
-      userId: user?.id,
-      activeFamilyId,
-      isInFamily,
-    });
-    console.log("[GroceryListContext] List to sync:", {
-      listId,
-      scope: listBeforeSync?.scope,
-      family_id: listBeforeSync?.family_id,
-      owner_user_id: listBeforeSync?.owner_user_id,
-    });
-
-    console.log("\n[GroceryListContext] Grocery List Items:");
-    itemsBefore.forEach((item: GroceryListItemSummary, index: number) => {
-      console.log(`  [${index + 1}] ${item.ingredient_name}:`, {
-        id: item.id,
-        ingredient_id: item.ingredient_id,
-        quantity: item.quantity,
-        unit_code: item.unit_code,
-        canonical_quantity_needed: item.canonical_quantity_needed,
-        canonical_unit: item.canonical_unit,
-        is_manual: item.is_manual,
-        original_quantity: item.original_quantity,
-        original_unit: item.original_unit,
-      });
-    });
-
-    // Check for NULL canonical values
-    const itemsWithNullCanonical = itemsBefore.filter(
-      (item: GroceryListItemSummary) =>
-        item.canonical_quantity_needed === null ||
-        item.canonical_quantity_needed === undefined ||
-        item.canonical_unit === null ||
-        item.canonical_unit === undefined
-    );
-    if (itemsWithNullCanonical.length > 0) {
-      console.warn("\n[GroceryListContext] ⚠️ WARNING: Items with NULL canonical values:");
-      itemsWithNullCanonical.forEach((item: GroceryListItemSummary) => {
-        console.warn(`  - ${item.ingredient_name}: canonical_quantity_needed=${item.canonical_quantity_needed}, canonical_unit=${item.canonical_unit}`);
-      });
-    }
-
-    // ========== DEBUG: Fetch and log pantry items ==========
-    try {
-      // Determine which pantry to fetch based on list scope and family context
-      const shouldUseFamilyPantry = listBeforeSync?.scope === "family" && listBeforeSync?.family_id;
-      const pantryFamilyId = shouldUseFamilyPantry ? listBeforeSync.family_id : (isInFamily ? activeFamilyId : null);
-
-      console.log("\n[GroceryListContext] Fetching pantry with:", {
-        shouldUseFamilyPantry,
-        pantryFamilyId,
-        listScope: listBeforeSync?.scope,
-        listFamilyId: listBeforeSync?.family_id,
-      });
-
-      const pantryItems = await listMyPantryItems({ familyId: pantryFamilyId });
-
-      console.log(`\n[GroceryListContext] Pantry Items (${pantryItems.length} total):`);
-      pantryItems.forEach((item: PantryItem, index: number) => {
-        console.log(`  [${index + 1}] ${item.ingredient_name}:`, {
-          id: item.id,
-          ingredient_id: item.ingredient_id,
-          quantity: item.quantity,
-          unit: item.unit,
-          family_id: item.family_id,
-          owner_user_id: item.owner_user_id,
-          scope: item.scope,
-        });
-      });
-
-      // ========== DEBUG: Compare ingredient_ids ==========
-      console.log("\n[GroceryListContext] ========== INGREDIENT ID COMPARISON ==========");
-      const pantryIngredientIds = new Set(
-        pantryItems
-          .filter((p: PantryItem) => p.ingredient_id !== null && p.ingredient_id !== undefined)
-          .map((p: PantryItem) => p.ingredient_id)
-      );
-
-      console.log("[GroceryListContext] Pantry ingredient_ids:", Array.from(pantryIngredientIds));
-
-      itemsBefore.forEach((groceryItem: GroceryListItemSummary) => {
-        const inPantry = groceryItem.ingredient_id !== null &&
-                         groceryItem.ingredient_id !== undefined &&
-                         pantryIngredientIds.has(groceryItem.ingredient_id);
-        const matchingPantryItem = pantryItems.find((p: PantryItem) => p.ingredient_id === groceryItem.ingredient_id);
-
-        console.log(`  ${groceryItem.ingredient_name}:`, {
-          grocery_ingredient_id: groceryItem.ingredient_id,
-          foundInPantry: inPantry,
-          pantryMatch: matchingPantryItem ? {
-            pantry_ingredient_id: matchingPantryItem.ingredient_id,
-            pantry_quantity: matchingPantryItem.quantity,
-            pantry_unit: matchingPantryItem.unit,
-          } : null,
-        });
-      });
-
-      // Check for items with NULL ingredient_id
-      const groceryItemsWithNullIngredientId = itemsBefore.filter(
-        (item: GroceryListItemSummary) => item.ingredient_id === null || item.ingredient_id === undefined
-      );
-      if (groceryItemsWithNullIngredientId.length > 0) {
-        console.warn("\n[GroceryListContext] ⚠️ WARNING: Grocery items with NULL ingredient_id (won't match pantry):");
-        groceryItemsWithNullIngredientId.forEach((item: GroceryListItemSummary) => {
-          console.warn(`  - ${item.ingredient_name}`);
-        });
-      }
-
-      const pantryItemsWithNullIngredientId = pantryItems.filter(
-        (item: PantryItem) => item.ingredient_id === null || item.ingredient_id === undefined
-      );
-      if (pantryItemsWithNullIngredientId.length > 0) {
-        console.warn("\n[GroceryListContext] ⚠️ WARNING: Pantry items with NULL ingredient_id:");
-        pantryItemsWithNullIngredientId.forEach((item: PantryItem) => {
-          console.warn(`  - ${item.ingredient_name}`);
-        });
-      }
-
-    } catch (debugErr) {
-      console.error("[GroceryListContext] Error fetching pantry for debug:", debugErr);
-    }
-
-    console.log("\n[GroceryListContext] ========== CALLING SYNC API ==========");
-
     try {
       const response = await syncPantryMutation.mutateAsync({ listId });
-
-      // ========== DEBUG: Log sync response ==========
-      console.log("\n[GroceryListContext] ========== SYNC RESPONSE ==========");
-      console.log("[GroceryListContext] Response:", {
-        items_removed: response.items_removed,
-        items_updated: response.items_updated,
-        remaining_items_count: response.remaining_items?.length ?? 0,
-        message: response.message,
-      });
-
-      if (response.remaining_items && response.remaining_items.length > 0) {
-        console.log("\n[GroceryListContext] Remaining items after sync:");
-        response.remaining_items.forEach((item, index) => {
-          console.log(`  [${index + 1}] ${item.ingredient_name}:`, {
-            ingredient_id: item.ingredient_id,
-            quantity: item.quantity,
-            unit_code: item.unit_code,
-            canonical_quantity: item.canonical_quantity,
-            canonical_unit: item.canonical_unit,
-            note: item.note,
-          });
-        });
-      }
-      console.log("========== END SYNC DEBUG ==========\n");
 
       // Refetch to get updated list
       const updatedList = await getGroceryListById(listId);
@@ -417,7 +254,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       return response;
     } catch (err: any) {
-      console.error("[GroceryListContext] Sync error:", err);
       // Re-throw with status for proper error handling in UI
       if (err?.status === 403) {
         const error = new Error("You do not have permission to sync this list. Only the owner can sync pantry.");
@@ -426,7 +262,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
       throw err;
     }
-  }, [allLists, syncPantryMutation, user?.id, activeFamilyId, isInFamily]);
+  }, [allLists, syncPantryMutation]);
 
   // Delete grocery list
   const deleteList = useCallback(async (listId: number): Promise<void> => {
@@ -451,25 +287,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
   ): Promise<void> => {
     await updateItemMutation.mutateAsync({ listId, itemId, updates });
   }, [updateItemMutation]);
-
-  // Mark item as purchased (updates pantry automatically)
-  const markItemPurchased = useCallback(async (itemId: number, isPurchased: boolean = true): Promise<void> => {
-    if (!selectedListId) return;
-    await markItemPurchasedMutation.mutateAsync({
-      itemId,
-      listId: selectedListId,
-      isPurchased,
-    });
-  }, [selectedListId, markItemPurchasedMutation]);
-
-  // Phase F4: Rebuild grocery list from meal plan
-  const rebuildFromMealPlan = useCallback(async (
-    listId: number,
-    mealPlanId: number
-  ): Promise<RebuildFromMealPlanResponse> => {
-    const response = await rebuildMutation.mutateAsync({ listId, mealPlanId });
-    return response;
-  }, [rebuildMutation]);
 
   // Check if current user can sync the list
   // For both personal and family lists, only the owner can sync
@@ -518,9 +335,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     deleteList,
     addItem,
     updateItem,
-    markItemPurchased,
-    rebuildFromMealPlan,
-    isRebuilding,
     canSyncList,
     getListCreatorName,
     syncModalVisible,
@@ -547,9 +361,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     deleteList,
     addItem,
     updateItem,
-    markItemPurchased,
-    rebuildFromMealPlan,
-    isRebuilding,
     canSyncList,
     getListCreatorName,
     syncModalVisible,

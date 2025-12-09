@@ -1,19 +1,32 @@
-import React, { useCallback, useEffect, useState } from "react";
+import ToastBanner from "@/components/generalMessage";
+import SyncPantryButton from "@/components/grocery/SyncPantryButton";
+import SyncResultModal from "@/components/grocery/SyncResultModal";
+import { useGroceryList } from "@/context/groceryListContext";
+import { useUser } from "@/context/usercontext";
+import type { GroceryListItemSummary } from "@/src/services/grocery.service";
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    formatQuantityDisplay,
+    getItemCategory,
+    groupItemsByCategory,
+    SORT_OPTIONS,
+    sortItems,
+    type SortOption
+} from "@/src/utils/groceryListUtils";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Modal,
+    Pressable,
+    RefreshControl,
+    SectionList,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useGroceryList } from "@/context/groceryListContext";
-import ToastBanner from "@/components/generalMessage";
-import type { GroceryListItemSummary } from "@/src/services/grocery.service";
 
 type ToastType = "success" | "error" | "info";
 interface ToastState {
@@ -38,8 +51,108 @@ const COLORS = {
   danger: "#FF3B30",
 };
 
+// ============================================
+// SORT DROPDOWN COMPONENT
+// ============================================
+
+interface SortDropdownProps {
+  visible: boolean;
+  currentSort: SortOption;
+  onSelect: (option: SortOption) => void;
+  onClose: () => void;
+}
+
+const SortDropdown: React.FC<SortDropdownProps> = ({
+  visible,
+  currentSort,
+  onSelect,
+  onClose,
+}) => {
+  if (!visible) return null;
+
+  return (
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.dropdownOverlay} onPress={onClose}>
+        <View style={styles.dropdownContainer}>
+          <Text style={styles.dropdownTitle}>Sort By</Text>
+          {SORT_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.option}
+              style={[
+                styles.dropdownOption,
+                currentSort === option.option && styles.dropdownOptionSelected,
+              ]}
+              onPress={() => {
+                onSelect(option.option);
+                onClose();
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.dropdownOptionIcon}>{option.icon}</Text>
+              <Text
+                style={[
+                  styles.dropdownOptionText,
+                  currentSort === option.option && styles.dropdownOptionTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
+              {currentSort === option.option && (
+                <Text style={styles.dropdownCheckmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Pressable>
+    </Modal>
+  );
+};
+
+// ============================================
+// CATEGORY HEADER COMPONENT
+// ============================================
+
+interface CategoryHeaderProps {
+  category: string;
+  itemCount: number;
+  checkedCount: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+}
+
+const CategoryHeader: React.FC<CategoryHeaderProps> = ({
+  category,
+  itemCount,
+  checkedCount,
+  isExpanded,
+  onToggle,
+}) => {
+  return (
+    <TouchableOpacity
+      style={styles.categoryHeader}
+      onPress={onToggle}
+      activeOpacity={0.7}
+    >
+      <View style={styles.categoryHeaderLeft}>
+        <Text style={styles.categoryExpandIcon}>{isExpanded ? "▼" : "▶"}</Text>
+        <Text style={styles.categoryName}>{category}</Text>
+      </View>
+      <View style={styles.categoryHeaderRight}>
+        <Text style={styles.categoryCount}>
+          {checkedCount}/{itemCount}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 const GroceryListDetailScreen: React.FC = () => {
   const router = useRouter();
+  const { user } = useUser();
   const {
     selectedList,
     refreshSelectedList,
@@ -47,11 +160,27 @@ const GroceryListDetailScreen: React.FC = () => {
     removeItem,
     clearChecked,
     syncWithPantry,
+    deleteList,
+    canSyncList,
+    getListCreatorName,
+    syncModalVisible,
+    syncModalData,
+    closeSyncModal,
+    isSyncing,
+    markItemPurchased,
+    rebuildFromMealPlan,
+    isRebuilding,
   } = useGroceryList();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Sorting and grouping state
+  const [sortOption, setSortOption] = useState<SortOption>("category");
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [isGrouped, setIsGrouped] = useState(true);
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -81,6 +210,41 @@ const GroceryListDetailScreen: React.FC = () => {
     });
   }, []);
 
+  // Initialize expanded categories when list loads
+  useEffect(() => {
+    if (selectedList && expandedCategories.size === 0) {
+      const categories = new Set<string>();
+      selectedList.items.forEach((item) => {
+        categories.add(getItemCategory(item));
+      });
+      setExpandedCategories(categories);
+    }
+  }, [selectedList]);
+
+  // Process items with sorting and grouping
+  const processedData = useMemo(() => {
+    if (!selectedList) return { sections: [], flatItems: [] };
+
+    const items = selectedList.items;
+
+    if (isGrouped && sortOption === "category") {
+      // Group by category
+      const grouped = groupItemsByCategory(items, expandedCategories);
+      const sections = grouped.map((group) => ({
+        title: group.category,
+        data: group.isExpanded ? group.items : [],
+        itemCount: group.items.length,
+        checkedCount: group.items.filter((i) => i.checked).length,
+        isExpanded: group.isExpanded,
+      }));
+      return { sections, flatItems: [] };
+    } else {
+      // Flat list with sorting
+      const sorted = sortItems(items, sortOption);
+      return { sections: [], flatItems: sorted };
+    }
+  }, [selectedList, sortOption, isGrouped, expandedCategories]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -100,10 +264,25 @@ const GroceryListDetailScreen: React.FC = () => {
     }
   };
 
-  const handleRemoveItem = (itemId: number, itemName: string) => {
+  const handleMarkPurchased = async (itemId: number, itemName: string) => {
+    try {
+      await markItemPurchased(itemId, true);
+      showToast("success", `"${itemName}" added to pantry`);
+    } catch (err: any) {
+      showToast("error", err?.message || "Failed to mark item as purchased");
+    }
+  };
+
+  const handleRemoveItem = (itemId: number, itemName: string, isManual: boolean = true) => {
+    // Different confirmation for auto-generated items
+    const title = isManual ? "Remove Item" : "Remove Auto-Generated Item";
+    const message = isManual
+      ? `Remove "${itemName}" from the list?`
+      : `"${itemName}" was added from a recipe. Are you sure you want to remove it? It may be added back if you rebuild from the meal plan.`;
+
     Alert.alert(
-      "Remove Item",
-      `Remove "${itemName}" from the list?`,
+      title,
+      message,
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -155,26 +334,26 @@ const GroceryListDetailScreen: React.FC = () => {
     );
   };
 
-  const handleSyncWithPantry = async () => {
+  const handleDeleteList = () => {
     if (!selectedList) return;
 
     Alert.alert(
-      "Sync with Pantry",
-      "This will remove items you already have in your pantry. Continue?",
+      "Delete List",
+      `Are you sure you want to delete "${selectedList.title || "this grocery list"}"? This action cannot be undone.`,
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Sync",
+          text: "Delete",
+          style: "destructive",
           onPress: async () => {
             try {
-              setSyncing(true);
-              const response = await syncWithPantry(selectedList.id);
-              const message = response.message || `Removed ${response.items_removed} item${response.items_removed !== 1 ? "s" : ""}`;
-              showToast("success", message);
+              setDeleting(true);
+              await deleteList(selectedList.id);
+              showToast("success", "List deleted");
+              router.back();
             } catch (err: any) {
-              showToast("error", err?.message || "Failed to sync with pantry");
-            } finally {
-              setSyncing(false);
+              showToast("error", err?.message || "Failed to delete list");
+              setDeleting(false);
             }
           },
         },
@@ -182,61 +361,172 @@ const GroceryListDetailScreen: React.FC = () => {
     );
   };
 
+  // Phase F4: Rebuild grocery list from meal plan
+  const handleRebuildFromMealPlan = async () => {
+    if (!selectedList || !selectedList.meal_plan_id) {
+      showToast("info", "This list is not linked to a meal plan");
+      return;
+    }
+
+    Alert.alert(
+      "Rebuild Grocery List",
+      "This will refresh the list based on your current meal plan and pantry. Manual items will be kept.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Rebuild",
+          onPress: async () => {
+            try {
+              const response = await rebuildFromMealPlan(selectedList.id, selectedList.meal_plan_id!);
+              showToast("success", `Rebuilt list with ${response.items_rebuilt} items`);
+              await refreshSelectedList();
+            } catch (err: any) {
+              showToast("error", err?.message || "Failed to rebuild list");
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Phase F5: Open debug screen (hidden developer feature)
+  const handleOpenDebugMode = () => {
+    if (!selectedList?.meal_plan_id) {
+      showToast("info", "Debug mode requires a linked meal plan");
+      return;
+    }
+    router.push({
+      pathname: "/(main)/(home)/groceryDebug",
+      params: { mealPlanId: selectedList.meal_plan_id.toString() },
+    });
+  };
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  };
+
   const renderItem = ({ item }: { item: GroceryListItemSummary }) => {
-    const displayQuantity =
-      item.quantity !== null && item.unit_code
-        ? `${item.quantity} ${item.unit_code}`
-        : item.quantity !== null
-        ? `${item.quantity}`
-        : "";
+    // Use display utilities for quantity (prefers original values)
+    const displayQuantity = formatQuantityDisplay(item);
+
+    // Show category badge when not grouped
+    const showCategoryBadge = !isGrouped || sortOption !== "category";
+    const itemCategory = getItemCategory(item);
+
+    // Check if item is purchased
+    const isPurchased = item.is_purchased === true;
+
+    // Check if item is manual (Phase F3)
+    const isManual = item.is_manual === true;
 
     return (
-      <View style={styles.itemCard}>
+      <View style={[styles.itemCard, isPurchased && styles.itemCardPurchased]}>
+        {/* Checkbox - disabled if purchased */}
         <TouchableOpacity
           style={styles.itemCheckbox}
-          onPress={() => handleToggleItem(item.id)}
-          activeOpacity={0.7}
+          onPress={() => !isPurchased && handleToggleItem(item.id)}
+          activeOpacity={isPurchased ? 1 : 0.7}
+          disabled={isPurchased}
         >
           <View
             style={[
               styles.checkbox,
               item.checked && styles.checkboxChecked,
+              isPurchased && styles.checkboxPurchased,
             ]}
           >
-            {item.checked && <Text style={styles.checkIcon}>✓</Text>}
+            {(item.checked || isPurchased) && <Text style={styles.checkIcon}>✓</Text>}
           </View>
         </TouchableOpacity>
 
         <View style={styles.itemContent}>
-          <Text
-            style={[
-              styles.itemName,
-              item.checked && styles.itemNameChecked,
-            ]}
-            numberOfLines={2}
-          >
-            {item.ingredient_name}
-          </Text>
-          {displayQuantity && (
-            <Text style={styles.itemQuantity}>{displayQuantity}</Text>
-          )}
+          <View style={styles.itemNameRow}>
+            <Text
+              style={[
+                styles.itemName,
+                item.checked && styles.itemNameChecked,
+                isPurchased && styles.itemNamePurchased,
+              ]}
+              numberOfLines={2}
+            >
+              {item.ingredient_name}
+            </Text>
+            {/* Manual item badge (Phase F3) */}
+            {isManual && !isPurchased && (
+              <View style={styles.manualBadge}>
+                <Text style={styles.manualBadgeText}>Added by you</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.itemMeta}>
+            {displayQuantity ? (
+              <Text style={[styles.itemQuantity, isPurchased && styles.itemQuantityPurchased]}>
+                {displayQuantity}
+              </Text>
+            ) : null}
+            {isPurchased ? (
+              <View style={styles.purchasedBadge}>
+                <Text style={styles.purchasedBadgeText}>✓ In Pantry</Text>
+              </View>
+            ) : showCategoryBadge ? (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryBadgeText}>{itemCategory}</Text>
+              </View>
+            ) : null}
+          </View>
           {item.note && (
-            <Text style={styles.itemNote} numberOfLines={1}>
+            <Text style={[styles.itemNote, isPurchased && styles.itemNotePurchased]} numberOfLines={1}>
               {item.note}
             </Text>
           )}
         </View>
 
-        <TouchableOpacity
-          style={styles.removeButton}
-          onPress={() => handleRemoveItem(item.id, item.ingredient_name)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.removeButtonText}>×</Text>
-        </TouchableOpacity>
+        {/* Right side: Mark as Purchased button or Remove button */}
+        {isPurchased ? (
+          <View style={styles.purchasedIndicator}>
+            <Text style={styles.purchasedCheckIcon}>✓</Text>
+          </View>
+        ) : (
+          <View style={styles.itemActions}>
+            {/* Mark as Purchased button */}
+            <TouchableOpacity
+              style={styles.purchaseButton}
+              onPress={() => handleMarkPurchased(item.id, item.ingredient_name)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.purchaseButtonText}>🛒</Text>
+            </TouchableOpacity>
+            {/* Remove button - passes isManual for different confirmation (Phase F3) */}
+            <TouchableOpacity
+              style={styles.removeButton}
+              onPress={() => handleRemoveItem(item.id, item.ingredient_name, isManual)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.removeButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
+
+  const renderSectionHeader = ({ section }: { section: any }) => (
+    <CategoryHeader
+      category={section.title}
+      itemCount={section.itemCount}
+      checkedCount={section.checkedCount}
+      isExpanded={section.isExpanded}
+      onToggle={() => toggleCategory(section.title)}
+    />
+  );
 
   if (!selectedList) {
     return (
@@ -265,6 +555,25 @@ const GroceryListDetailScreen: React.FC = () => {
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
 
+      {/* Sync Result Modal */}
+      <SyncResultModal
+        visible={syncModalVisible}
+        data={syncModalData}
+        onClose={closeSyncModal}
+        onViewList={() => {
+          closeSyncModal();
+          handleRefresh();
+        }}
+      />
+
+      {/* Sort Dropdown */}
+      <SortDropdown
+        visible={showSortDropdown}
+        currentSort={sortOption}
+        onSelect={setSortOption}
+        onClose={() => setShowSortDropdown(false)}
+      />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -274,7 +583,12 @@ const GroceryListDetailScreen: React.FC = () => {
         >
           <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
+        {/* Long-press on title opens debug mode (Phase F5) */}
+        <Pressable
+          style={styles.headerCenter}
+          onLongPress={handleOpenDebugMode}
+          delayLongPress={800}
+        >
           <Text style={styles.headerTitle} numberOfLines={1}>
             {selectedList.title || "Grocery List"}
           </Text>
@@ -293,8 +607,19 @@ const GroceryListDetailScreen: React.FC = () => {
               {isFamily ? "Family" : "Personal"}
             </Text>
           </View>
-        </View>
-        <View style={styles.headerSpacer} />
+        </Pressable>
+        <TouchableOpacity
+          style={styles.deleteListButton}
+          onPress={handleDeleteList}
+          disabled={deleting}
+          activeOpacity={0.7}
+        >
+          {deleting ? (
+            <ActivityIndicator size="small" color={COLORS.danger} />
+          ) : (
+            <Text style={styles.deleteListButtonText}>Delete</Text>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Stats Bar */}
@@ -319,23 +644,56 @@ const GroceryListDetailScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionButtons}>
+      {/* Sorting Controls */}
+      <View style={styles.sortingBar}>
         <TouchableOpacity
-          style={[styles.actionButton, styles.actionButtonPrimary]}
-          onPress={handleSyncWithPantry}
-          disabled={syncing || totalItems === 0}
+          style={styles.sortButton}
+          onPress={() => setShowSortDropdown(true)}
           activeOpacity={0.7}
         >
-          {syncing ? (
-            <ActivityIndicator color={COLORS.white} size="small" />
-          ) : (
-            <>
-              <Text style={styles.actionButtonIcon}>🔄</Text>
-              <Text style={styles.actionButtonText}>Sync with Pantry</Text>
-            </>
-          )}
+          <Text style={styles.sortButtonIcon}>⇅</Text>
+          <Text style={styles.sortButtonText}>
+            {SORT_OPTIONS.find((o) => o.option === sortOption)?.label || "Sort"}
+          </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.groupToggle,
+            isGrouped && sortOption === "category" && styles.groupToggleActive,
+          ]}
+          onPress={() => {
+            if (sortOption !== "category") {
+              setSortOption("category");
+              setIsGrouped(true);
+            } else {
+              setIsGrouped(!isGrouped);
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.groupToggleIcon}>📂</Text>
+          <Text
+            style={[
+              styles.groupToggleText,
+              isGrouped && sortOption === "category" && styles.groupToggleTextActive,
+            ]}
+          >
+            Group
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionButtons}>
+        <SyncPantryButton
+          list={selectedList}
+          canSync={canSyncList(selectedList)}
+          creatorName={getListCreatorName(selectedList)}
+          onSync={syncWithPantry}
+          onSyncComplete={refreshSelectedList}
+          disabled={totalItems === 0 || isSyncing}
+        />
 
         <TouchableOpacity
           style={[styles.actionButton, styles.actionButtonSecondary]}
@@ -354,6 +712,30 @@ const GroceryListDetailScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Phase F4: Rebuild Button - Only show if list is linked to a meal plan */}
+      {selectedList.meal_plan_id && (
+        <View style={styles.rebuildButtonContainer}>
+          <TouchableOpacity
+            style={[
+              styles.rebuildButton,
+              (isRebuilding || isSyncing) && styles.rebuildButtonDisabled,
+            ]}
+            onPress={handleRebuildFromMealPlan}
+            disabled={isRebuilding || isSyncing}
+            activeOpacity={0.7}
+          >
+            {isRebuilding ? (
+              <ActivityIndicator color={COLORS.primary} size="small" />
+            ) : (
+              <>
+                <Text style={styles.rebuildButtonIcon}>🔄</Text>
+                <Text style={styles.rebuildButtonText}>Rebuild from Meal Plan</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Items List */}
       {totalItems === 0 ? (
         <View style={styles.emptyState}>
@@ -363,10 +745,29 @@ const GroceryListDetailScreen: React.FC = () => {
             Add a meal to add ingredients to this list
           </Text>
         </View>
-      ) : (
-        <FlatList
-          data={selectedList.items}
+      ) : isGrouped && sortOption === "category" ? (
+        <SectionList
+          sections={processedData.sections}
           renderItem={renderItem}
+          renderSectionHeader={renderSectionHeader}
+          keyExtractor={(item) => `item-${item.id}`}
+          contentContainerStyle={styles.listContainer}
+          stickySectionHeadersEnabled={true}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={COLORS.primary}
+              colors={[COLORS.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <SectionList
+          sections={[{ title: "", data: processedData.flatItems }]}
+          renderItem={renderItem}
+          renderSectionHeader={() => null}
           keyExtractor={(item) => `item-${item.id}`}
           contentContainerStyle={styles.listContainer}
           refreshControl={
@@ -383,6 +784,10 @@ const GroceryListDetailScreen: React.FC = () => {
     </SafeAreaView>
   );
 };
+
+// ============================================
+// STYLES
+// ============================================
 
 const styles = StyleSheet.create({
   container: {
@@ -424,8 +829,19 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     textAlign: "center",
   },
-  headerSpacer: {
-    width: 40,
+  deleteListButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: COLORS.background,
+    minWidth: 60,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteListButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.danger,
   },
   scopeBadge: {
     paddingHorizontal: 12,
@@ -476,9 +892,58 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
     marginHorizontal: 8,
   },
+  sortingBar: {
+    flexDirection: "row",
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  sortButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    gap: 6,
+  },
+  sortButtonIcon: {
+    fontSize: 14,
+  },
+  sortButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  groupToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: COLORS.background,
+    gap: 6,
+  },
+  groupToggleActive: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  groupToggleIcon: {
+    fontSize: 14,
+  },
+  groupToggleText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text,
+  },
+  groupToggleTextActive: {
+    color: COLORS.primary,
+  },
   actionButtons: {
     flexDirection: "row",
-    padding: 20,
+    padding: 16,
     gap: 12,
     backgroundColor: COLORS.white,
   },
@@ -492,9 +957,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
   },
-  actionButtonPrimary: {
-    backgroundColor: COLORS.primary,
-  },
   actionButtonSecondary: {
     backgroundColor: COLORS.background,
     borderWidth: 1,
@@ -503,11 +965,6 @@ const styles = StyleSheet.create({
   actionButtonIcon: {
     fontSize: 16,
   },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
   actionButtonTextSecondary: {
     fontSize: 14,
     fontWeight: "600",
@@ -515,6 +972,46 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 20,
+    paddingBottom: 40,
+  },
+  categoryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: COLORS.white,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 4,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  categoryHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  categoryExpandIcon: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+  },
+  categoryName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.text,
+  },
+  categoryHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  categoryCount: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.textMuted,
   },
   itemCard: {
     flexDirection: "row",
@@ -522,7 +1019,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 10,
     gap: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -554,25 +1051,62 @@ const styles = StyleSheet.create({
   itemContent: {
     flex: 1,
   },
+  // Phase F3: Item name row with manual badge
+  itemNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 4,
+  },
   itemName: {
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.text,
-    marginBottom: 4,
+    flexShrink: 1,
+  },
+  // Phase F3: Manual item badge
+  manualBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "#E3F2FD",
+  },
+  manualBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#1976D2",
   },
   itemNameChecked: {
     textDecorationLine: "line-through",
     color: COLORS.textMuted,
   },
+  itemMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   itemQuantity: {
     fontSize: 14,
     color: COLORS.textMuted,
-    marginBottom: 2,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: COLORS.background,
+  },
+  categoryBadgeText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: COLORS.textMuted,
   },
   itemNote: {
     fontSize: 13,
     color: COLORS.textMuted,
     fontStyle: "italic",
+    marginTop: 4,
   },
   removeButton: {
     width: 32,
@@ -586,6 +1120,94 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "300",
     color: COLORS.danger,
+  },
+  // Phase F2: Purchased item styles
+  itemCardPurchased: {
+    backgroundColor: "#F5F5F5",
+    opacity: 0.85,
+  },
+  checkboxPurchased: {
+    backgroundColor: COLORS.success,
+    borderColor: COLORS.success,
+  },
+  itemNamePurchased: {
+    textDecorationLine: "line-through",
+    color: "#999999",
+  },
+  itemQuantityPurchased: {
+    color: "#AAAAAA",
+  },
+  itemNotePurchased: {
+    color: "#AAAAAA",
+  },
+  purchasedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#E8F8F1",
+  },
+  purchasedBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.success,
+  },
+  purchasedIndicator: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: "#E8F8F1",
+  },
+  purchasedCheckIcon: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.success,
+  },
+  itemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  purchaseButton: {
+    width: 32,
+    height: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    backgroundColor: "#E8F8F1",
+  },
+  purchaseButtonText: {
+    fontSize: 16,
+  },
+  // Phase F4: Rebuild button styles
+  rebuildButtonContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: COLORS.white,
+  },
+  rebuildButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: COLORS.primaryLight,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    gap: 8,
+  },
+  rebuildButtonDisabled: {
+    opacity: 0.5,
+  },
+  rebuildButtonIcon: {
+    fontSize: 14,
+  },
+  rebuildButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -619,6 +1241,62 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     textAlign: "center",
     lineHeight: 22,
+  },
+  // Dropdown styles
+  dropdownOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 40,
+  },
+  dropdownContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
+    width: "100%",
+    maxWidth: 300,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dropdownTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: COLORS.text,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  dropdownOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  dropdownOptionSelected: {
+    backgroundColor: COLORS.primaryLight,
+  },
+  dropdownOptionIcon: {
+    fontSize: 16,
+    marginRight: 12,
+  },
+  dropdownOptionText: {
+    fontSize: 15,
+    color: COLORS.text,
+    flex: 1,
+  },
+  dropdownOptionTextSelected: {
+    fontWeight: "600",
+    color: COLORS.primary,
+  },
+  dropdownCheckmark: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontWeight: "700",
   },
 });
 

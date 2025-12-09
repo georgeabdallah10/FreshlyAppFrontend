@@ -210,11 +210,14 @@ class ApiClient {
   private normalizeError(error: AxiosError): ApiError {
     if (error.response) {
       // Server responded with error
+      const responseData = error.response.data as any;
+
       return {
-        message: (error.response.data as any)?.message || error.message || 'An error occurred',
+        // Prefer backend-provided message/detail when available
+        message: responseData?.message || responseData?.detail || error.message || 'An error occurred',
         status: error.response.status,
-        code: (error.response.data as any)?.code,
-        data: error.response.data,
+        code: responseData?.code,
+        data: responseData,
       };
     } else if (error.request) {
       // Request made but no response

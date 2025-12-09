@@ -21,6 +21,9 @@ export type PantryItem = {
   ingredient_name?: string | null; // backend creates/finds by name if id not sent
   quantity?: number | null | string;
   unit?: string | null;
+  // Canonical fields for sync comparison (backend sync uses these)
+  canonical_quantity?: number | null;
+  canonical_unit?: string | null; // 'g' | 'ml' | 'count' | null
   expires_at?: string | null; // ISO date string
   created_at?: string;
   updated_at?: string;
@@ -60,6 +63,8 @@ export async function listMyPantryItems(
     ? `${BASE_URL}/pantry-items/family/${familyId}`
     : `${BASE_URL}/pantry-items/me`;
 
+  console.log(`[pantry.ts] Fetching pantry: ${url}`);
+
   const res = await fetch(url, { headers });
   if (!res.ok) {
     const text = await res.text();
@@ -67,9 +72,21 @@ export async function listMyPantryItems(
   }
 
   const data = await res.json();
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
-  return [];
+  let items: PantryItem[] = [];
+  if (Array.isArray(data)) {
+    items = data;
+  } else if (Array.isArray(data?.items)) {
+    items = data.items;
+  }
+
+  console.log(`[pantry.ts] Fetched ${items.length} pantry items`);
+
+  // DEBUG: Log first few items to see structure
+  if (items.length > 0) {
+    console.log("[pantry.ts] Sample pantry item structure:", JSON.stringify(items[0], null, 2));
+  }
+
+  return items;
 }
 
 export async function createMyPantryItem(

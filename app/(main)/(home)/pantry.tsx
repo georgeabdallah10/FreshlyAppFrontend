@@ -205,6 +205,10 @@ const PantryDashboard = () => {
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
 
+  // Phase F6: Grocery sync visual feedback
+  const [isGrocerySyncing, setIsGrocerySyncing] = useState(false);
+  const grocerySyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Animations
   const dropdownAnim = useRef(new Animated.Value(0)).current;
   const productSheetAnim = useRef(new Animated.Value(0)).current;
@@ -267,6 +271,32 @@ const PantryDashboard = () => {
     },
     [logout, router, showToast]
   );
+
+  // Phase F6: Show grocery sync visual feedback after pantry changes
+  const showGrocerySyncFeedback = useCallback(() => {
+    // Clear any existing timeout
+    if (grocerySyncTimeoutRef.current) {
+      clearTimeout(grocerySyncTimeoutRef.current);
+    }
+    
+    // Show syncing indicator
+    setIsGrocerySyncing(true);
+    
+    // After a brief delay, show completion toast and hide indicator
+    grocerySyncTimeoutRef.current = setTimeout(() => {
+      setIsGrocerySyncing(false);
+      showToast("info", "Grocery list updated based on pantry changes", 2500);
+    }, 1500);
+  }, [showToast]);
+
+  // Cleanup grocery sync timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (grocerySyncTimeoutRef.current) {
+        clearTimeout(grocerySyncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const formatExpiration = (dateStr?: string | null) => {
     if (!dateStr) return null;
@@ -499,6 +529,8 @@ const PantryDashboard = () => {
             : gi
         )
       );
+      // Phase F6: Show grocery sync feedback after quantity update
+      showGrocerySyncFeedback();
     } catch (err) {
       console.log("adjust quantity error", err);
       if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
@@ -597,6 +629,8 @@ const PantryDashboard = () => {
         }
         await updatePantryItem(Number(editingItemId), updatePayload);
         showToast("success", "Item updated.");
+        // Phase F6: Show grocery sync feedback after update
+        showGrocerySyncFeedback();
       } else {
         const result = await upsertPantryItemByName(
           {
@@ -612,6 +646,8 @@ const PantryDashboard = () => {
           "success",
           result.merged ? "Item quantity updated in pantry." : "Item added to pantry."
         );
+        // Phase F6: Show grocery sync feedback after add
+        showGrocerySyncFeedback();
       }
 
       await refreshList(true); // Force reload after adding/updating item
@@ -652,6 +688,8 @@ const PantryDashboard = () => {
       await deletePantryItem(id);
       await refreshList(true); // Force reload after deleting item
       showToast("success", "Item deleted successfully.");
+      // Phase F6: Show grocery sync feedback after delete
+      showGrocerySyncFeedback();
     } catch (err: any) {
       console.log("deletePantryItem error", err);
       if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
@@ -766,6 +804,14 @@ const PantryDashboard = () => {
         onHide={() => setToast((t) => ({ ...t, visible: false }))}
         topOffset={60}
       />
+      
+      {/* Phase F6: Grocery sync indicator */}
+      {isGrocerySyncing && (
+        <View style={styles.grocerySyncBanner}>
+          <ActivityIndicator size="small" color={COLORS.primary} />
+          <Text style={styles.grocerySyncText}>Updating grocery list...</Text>
+        </View>
+      )}
       
       {/* Header */}
       <View style={styles.header}>
@@ -1427,6 +1473,8 @@ const PantryDashboard = () => {
                   "success",
                   mergeResult.merged ? "Item quantity updated from scan." : "Item added from scan."
                 );
+                // Phase F6: Show grocery sync feedback after scan add
+                showGrocerySyncFeedback();
               } catch (err) {
                 console.log("scan approve error", err);
                 if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
@@ -1491,6 +1539,21 @@ const styles = StyleSheet.create({
   container: { 
     flex: 1, 
     backgroundColor: COLORS.white,
+  },
+  // Phase F6: Grocery sync banner styles
+  grocerySyncBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: COLORS.primaryLight,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  grocerySyncText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
   },
   header: {
     flexDirection: "row",

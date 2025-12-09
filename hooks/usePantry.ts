@@ -73,6 +73,7 @@ export function useExpiringSoonItems(days: number = 7, options?: Omit<UseQueryOp
 
 /**
  * Create a new pantry item
+ * Also invalidates grocery queries since pantry changes affect grocery needs
  */
 export function useCreatePantryItem(options?: UseMutationOptions<PantryItem, ApiError, CreatePantryItemInput>) {
   const queryClient = useQueryClient();
@@ -81,6 +82,7 @@ export function useCreatePantryItem(options?: UseMutationOptions<PantryItem, Api
     mutationFn: (input: CreatePantryItemInput) => pantryApi.createPantryItem(input),
     onSuccess: () => {
       invalidateQueries.pantry();
+      invalidateQueries.grocery(); // Pantry changes affect grocery list calculations
     },
     ...options,
   });
@@ -88,6 +90,7 @@ export function useCreatePantryItem(options?: UseMutationOptions<PantryItem, Api
 
 /**
  * Update an existing pantry item
+ * Also invalidates grocery queries since pantry changes affect grocery needs
  */
 export function useUpdatePantryItem(options?: UseMutationOptions<PantryItem, ApiError, UpdatePantryItemInput>) {
   const queryClient = useQueryClient();
@@ -114,6 +117,7 @@ export function useUpdatePantryItem(options?: UseMutationOptions<PantryItem, Api
     },
     onSuccess: () => {
       invalidateQueries.pantry();
+      invalidateQueries.grocery(); // Pantry changes affect grocery list calculations
     },
     ...options,
   });
@@ -121,6 +125,7 @@ export function useUpdatePantryItem(options?: UseMutationOptions<PantryItem, Api
 
 /**
  * Delete a pantry item
+ * Also invalidates grocery queries since pantry changes affect grocery needs
  */
 export function useDeletePantryItem(options?: UseMutationOptions<void, ApiError, number>) {
   const queryClient = useQueryClient();
@@ -142,6 +147,7 @@ export function useDeletePantryItem(options?: UseMutationOptions<void, ApiError,
     },
     onSuccess: () => {
       invalidateQueries.pantry();
+      invalidateQueries.grocery(); // Pantry changes affect grocery list calculations
     },
     ...options,
   });
@@ -149,12 +155,14 @@ export function useDeletePantryItem(options?: UseMutationOptions<void, ApiError,
 
 /**
  * Batch create pantry items
+ * Also invalidates grocery queries since pantry changes affect grocery needs
  */
 export function useBatchCreatePantryItems(options?: UseMutationOptions<PantryItem[], ApiError, CreatePantryItemInput[]>) {
   return useMutation<PantryItem[], ApiError, CreatePantryItemInput[]>({
     mutationFn: (items: CreatePantryItemInput[]) => pantryApi.batchCreatePantryItems(items),
     onSuccess: () => {
       invalidateQueries.pantry();
+      invalidateQueries.grocery(); // Pantry changes affect grocery list calculations
     },
     ...options,
   });

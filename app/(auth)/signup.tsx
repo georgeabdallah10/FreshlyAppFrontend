@@ -7,25 +7,25 @@ import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import {
-    authenticateWithOAuth,
-    loginUser,
-    registerUser,
-    sendVerificationCode,
-    type OAuthProvider,
+  authenticateWithOAuth,
+  loginUser,
+  registerUser,
+  sendVerificationCode,
+  type OAuthProvider,
 } from "../../src/auth/auth";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -490,7 +490,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
       setOauthLoading(provider);
 
       const redirectTo = AuthSession.makeRedirectUri({
-        scheme: "myapp",
+        scheme: "SAVR",
       });
 
       const { data, error } = await supabase.auth.signInWithOAuth({

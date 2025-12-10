@@ -324,7 +324,7 @@ export default function LoginScreen(): React.JSX.Element {
       setOauthLoading(provider);
 
       const redirectTo = AuthSession.makeRedirectUri({
-        scheme: "myapp",
+        scheme: "SAVR",
       });
 
       const { data, error } = await supabase.auth.signInWithOAuth({

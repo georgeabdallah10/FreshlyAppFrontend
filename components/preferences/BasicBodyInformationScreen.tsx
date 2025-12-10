@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    Animated,
+    Modal,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type BasicBodyInformationScreenProps = {
@@ -50,6 +51,27 @@ const BasicBodyInformationScreen: React.FC<
   const [heightInches, setHeightInches] = useState("");
   const [weightLbsInput, setWeightLbsInput] = useState("");
   const [weightKgInput, setWeightKgInput] = useState("");
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  // Entrance animation - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleHeightUnitChange = (unit: HeightUnit) => {
     setHeightUnit(unit);

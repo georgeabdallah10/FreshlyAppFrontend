@@ -228,13 +228,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meal Plans</Text>
-        <TouchableOpacity
-          style={styles.groceryButton}
-          activeOpacity={0.8}
-          onPress={() => router.push("/(main)/(home)/groceryLists")}
-        >
-          <Text style={styles.groceryButtonIcon}>🛒</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -487,29 +480,30 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    justifyContent: "center",
   },
   backButton: {
+    position: "absolute",
+    left: 20,
     width: 44,
     height: 44,
     borderRadius: 22,
     backgroundColor: COLORS.primaryLight,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
+    zIndex: 1,
   },
   backIcon: { fontSize: 22, color: COLORS.primary, fontWeight: "600" },
   headerTitle: {
     fontSize: 28,
     fontWeight: "800",
     color: COLORS.text,
-    flex: 1,
     textAlign: "center",
-    marginRight: 0,
   },
   groceryButton: {
     width: 44,

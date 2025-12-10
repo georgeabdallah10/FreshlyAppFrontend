@@ -6,35 +6,34 @@ import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-    listFamilyMembers,
-    regenerateInviteCode,
-    removeFamilyMember,
-    updateFamilyMemberRole,
+  listFamilyMembers,
+  regenerateInviteCode,
+  removeFamilyMember,
+  updateFamilyMemberRole,
 } from "@/src/user/family";
 import { createMealForSignleUser } from "@/src/user/meals";
-import MemberMealsOverlay from "./MemberMealsOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    Clipboard,
-    Image,
-    Modal,
-    ScrollView,
-    Share,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Clipboard,
+  Image,
+  Modal,
+  Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
+import MemberMealsOverlay from "./MemberMealsOverlay";
 
 
 interface OwnerViewProps {
@@ -144,6 +143,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const [showMemberMealsOverlay, setShowMemberMealsOverlay] = useState(false);
   const [memberForMealsOverlay, setMemberForMealsOverlay] = useState<FamilyMember | null>(null);
   
+  // Animation values for entrance
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   // Keep local list in sync when parent provides normalized members
   useEffect(() => {
     if (members && members.length) {
@@ -213,6 +216,23 @@ const OwnerView: React.FC<OwnerViewProps> = ({
     // Load on mount and when family changes
     loadMembers();
   }, [loadMembers]);
+
+  // Entrance animations - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const apiRegenerateCode = useCallback(async (): Promise<string> => {
     if (!resolvedFamilyData?.id) return "";
@@ -522,8 +542,14 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[
+          styles.scrollView,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -633,7 +659,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
             );
           })}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
 
       <MemberActionModal
         visible={actionModalVisible && !!selectedMember}
@@ -676,13 +702,16 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       />
 
       {/* Member Meals Overlay */}
-      {selectedMember && (
+      {memberForMealsOverlay && (
         <MemberMealsOverlay
           visible={showMemberMealsOverlay}
-          memberName={selectedMember.name}
-          memberId={selectedMember.id}
+          memberName={memberForMealsOverlay.name}
+          memberId={memberForMealsOverlay.id}
           familyId={resolvedFamilyData?.id || ""}
-          onClose={() => setShowMemberMealsOverlay(false)}
+          onClose={() => {
+            setShowMemberMealsOverlay(false);
+            setMemberForMealsOverlay(null);
+          }}
           onSaveMeal={handleSaveMealCopy}
         />
       )}

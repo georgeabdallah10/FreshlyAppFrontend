@@ -1,9 +1,10 @@
 import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/auth";
+import { supabase } from "@/src/supabase/client";
 import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
 import { listMyPantryItems } from "@/src/user/pantry";
 import { getMyprefrences, type UserPreferenceOut } from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
 type PantryItem = {
   id: number;
@@ -72,6 +73,35 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 
   useEffect(() => {
     refreshUser();
+
+    // Set up Supabase auth state listener
+    console.log("[UserContext] Setting up auth state listener");
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[UserContext] Auth state changed: ${event}`);
+      
+      if (event === 'SIGNED_IN' && session) {
+        console.log("[UserContext] User signed in via OAuth, refreshing user data");
+        // Refresh user data when signed in via OAuth
+        await refreshUser();
+      } else if (event === 'SIGNED_OUT') {
+        console.log("[UserContext] User signed out, clearing session");
+        // Clear local state on sign out
+        setUser(null);
+        setPrefrences(null);
+        setPantryItems([]);
+        setActiveFamilyId(null);
+        setFamilies([]);
+        setIsInFamily(false);
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log("[UserContext] Token refreshed successfully");
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => {
+      console.log("[UserContext] Cleaning up auth state listener");
+      subscription.unsubscribe();
+    };
   }, []);
 
   const updateUserInfo = async (

@@ -1,7 +1,5 @@
 import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
-import { createMealForSignleUser, type CreateMealInput } from "@/src/user/meals";
-import { getMealImage } from "@/src/services/mealImageService";
 import {
   createConversation,
   deleteConversation,
@@ -11,11 +9,13 @@ import {
   updateConversationTitle,
   type Conversation
 } from "@/src/home/chat";
-import { validateChatMessage, getCharacterCount, MAX_MESSAGE_LENGTH } from "@/src/utils/chatValidation";
+import { getMealImage } from "@/src/services/mealImageService";
+import { createMealForSignleUser, type CreateMealInput } from "@/src/user/meals";
+import { getCharacterCount, MAX_MESSAGE_LENGTH, validateChatMessage } from "@/src/utils/chatValidation";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -1960,7 +1960,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 16,
@@ -1969,19 +1969,24 @@ const styles = StyleSheet.create({
     borderBottomColor: "#F0F0F0",
   },
   backButton: {
+    position: "absolute",
+    left: 16,
     padding: 4,
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
     color: "#000",
-    flex: 1,
     textAlign: "center",
   },
   headerActions: {
+    position: "absolute",
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    zIndex: 1,
   },
   headerButton: {
     padding: 4,

@@ -1,5 +1,7 @@
+import IconButton from "@/components/iconComponent";
 import NotificationBell from "@/components/NotificationBell";
 import { AddProductModal } from "@/components/quickAddModal";
+import HomeTutorial, { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import { useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -14,8 +16,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import IconButton from "@/components/iconComponent";
-import HomeTutorial, { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
 
 // 🔧 DEV MODE: Set to true to always show tutorial (for testing)
 const TUTORIAL_DEV_MODE = false;
@@ -198,6 +198,12 @@ const HomeDashboard = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [targetMeasurements, setTargetMeasurements] = useState<Record<string, TargetMeasurements>>({});
 
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const welcomeFadeAnim = useRef(new Animated.Value(0)).current;
+
   // Refs for measuring positions
   const pantryRef = useRef<View>(null);
   const mealPlansRef = useRef<View>(null);
@@ -235,6 +241,41 @@ const HomeDashboard = () => {
     };
 
     checkAndShowTutorial();
+  }, []);
+
+  // Entrance animations - super fast and snappy
+  useEffect(() => {
+    Animated.sequence([
+      // Header fades in first
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      // Then welcome text
+      Animated.timing(welcomeFadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Menu items and chat section fade in together
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 220,
+        delay: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        delay: 100,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   // Measure all target positions
@@ -316,52 +357,68 @@ const HomeDashboard = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-            <ScrollView
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!showTutorial}
       >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.menuButton}
-          activeOpacity={0.6}
-          onPress={() => router.push("/(main)/(home)/faq")}
-          disabled={showTutorial}
+        <Animated.View 
+          style={{
+            opacity: headerFadeAnim,
+          }}
         >
-          <View style={styles.menuIcon}>
-            <Image
-              source={require("../../../assets/icons/q&a.png")}
-              style={styles.menuCardIcon}
-              resizeMode="contain"
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.menuButton}
+              activeOpacity={0.6}
+              onPress={() => router.push("/(main)/(home)/faq")}
+              disabled={showTutorial}
+            >
+              <View style={styles.menuIcon}>
+                <Image
+                  source={require("../../../assets/icons/q&a.png")}
+                  style={styles.menuCardIcon}
+                  resizeMode="contain"
+                />
+              </View>
+            </TouchableOpacity>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require("../../../assets/images/logo.png")} // Update with your image path
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </View>
+            <NotificationBell
+              iconSize={24}
+              iconColor="#1F2937"
+              badgeColor="#FF3B30"
+              onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
+              extraCount={pendingShareCount}
+              containerStyle={styles.notificationButton}
             />
           </View>
-        </TouchableOpacity>
-        <View style={styles.logoContainer}>
-          <Image
-            source={require("../../../assets/images/logo.png")} // Update with your image path
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
-        <NotificationBell
-          iconSize={24}
-          iconColor="#1F2937"
-          badgeColor="#FF3B30"
-          onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
-          extraCount={pendingShareCount}
-          containerStyle={styles.notificationButton}
-        />
-      </View>
+        </Animated.View>
 
         {/* Welcome Text */}
-        <View>
+        <Animated.View
+          style={{
+            opacity: welcomeFadeAnim,
+          }}
+        >
           <Text style={styles.welcomeText}>
             <Text style={{ color: "#00A86B" }}> Smarter Shopping.</Text> {"\n"}
             <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
           </Text>
-        </View>
+        </Animated.View>
         {/* Menu Grid */}
-        <View style={styles.menuGrid}>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
+        >
+          <View style={styles.menuGrid}>
           {menuItems.map((item) => {
             // Assign refs based on menu item title
             let itemRef;
@@ -397,9 +454,16 @@ const HomeDashboard = () => {
             );
           })}
         </View>
+        </Animated.View>
 
         {/* Start New Chat Section */}
-        <View ref={allFeaturesRef} style={styles.chatSection}>
+        <Animated.View
+          style={{
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          }}
+        >
+          <View ref={allFeaturesRef} style={styles.chatSection}>
           <View style={styles.chatIconContainer}>
             <Image
               source={chatIconSource}
@@ -419,6 +483,7 @@ const HomeDashboard = () => {
             <Text style={styles.startChatArrow}>→</Text>
           </TouchableOpacity>
         </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Bottom Navigation Component */}

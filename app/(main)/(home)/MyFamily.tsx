@@ -10,8 +10,8 @@ import {
     removeFamilyMember,
 } from "@/src/user/family";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import FamilyMemberFlow from "../../(auth)/familyAuth";
 
 type UserRole = "owner" | "admin" | "member" | "user";
@@ -51,6 +51,10 @@ const FamilyManagementScreen = () => {
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>("user");
   const [currentUserId, setCurrentUserId] = useState<string>(user?.id ? String(user.id) : "");
   const [members, setMembers] = useState<FamilyMember[]>([]);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   const familyData: FamilyData | null = selectedFamily
     ? {
@@ -129,6 +133,23 @@ const FamilyManagementScreen = () => {
 
     fetchMembers();
   }, [families.length, selectedFamily, user?.email, user?.id, user?.name]);
+
+  // Entrance animations - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const handleRegenerateCode = async () => {
     if (!familyData) return;
@@ -210,7 +231,15 @@ const FamilyManagementScreen = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
       {currentUserRole === "owner" ? (
         <OwnerView
           familyData={familyData ?? undefined}
@@ -239,7 +268,7 @@ const FamilyManagementScreen = () => {
           }}
         />
       )}
-    </View>
+    </Animated.View>
   );
 };
 

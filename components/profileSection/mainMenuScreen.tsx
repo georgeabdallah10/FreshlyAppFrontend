@@ -1,17 +1,30 @@
 // ==================== screens/MainMenuScreen.tsx ====================
-import React, { useEffect, useMemo } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  StyleSheet,
-  Image,
-} from "react-native";
-import Icon from "./components/icon";
-import { useRouter } from "expo-router";
 import { useUser } from "@/context/usercontext";
+import { useRouter } from "expo-router";
+import React, { useEffect, useMemo, useRef } from "react";
+import {
+  Animated,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from "react-native";
+
+const COLORS = {
+  primary: "#00A86B",
+  primaryLight: "#E8F8F1",
+  accent: "#FD8100",
+  accentLight: "#FFF3E6",
+  charcoal: "#4C4D59",
+  charcoalLight: "#F0F0F2",
+  white: "#FFFFFF",
+  background: "#F7F8FB",
+  text: "#0A0A0A",
+  textMuted: "#6B7280",
+  border: "#E9ECF2",
+};
 
 type Props = {
   onNavigate: (
@@ -28,7 +41,34 @@ type MenuItem = {
 
 const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
   const router = useRouter(); 
-  const { user, logout} = useUser();
+  const { user } = useUser();
+  
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    // Entrance animation - super fast and snappy
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   // Accept whichever key your backend/context uses for the avatar URL
   useEffect(() => {
@@ -72,20 +112,6 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
     //{ id: "aboutApp", icon: "info", label: "About App", screen: "aboutApp" },
   ];
 
-  const handleLogoutConfirm = async () => {
-    try {
-      await logout();
-      router.replace("/(auth)/Login");
-      console.log("Logged out");
-    } catch (e) {
-      console.warn("Logout failed", e);
-    }
-  };
-
-  const handleLogout = async () => {
-    await handleLogoutConfirm();
-  };
-
   return (
     <View style={styles.screen}>
       {/* Sticky Header */}
@@ -107,7 +133,18 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.profileCard}>
+        <Animated.View 
+          style={[
+            styles.profileCard,
+            {
+              opacity: fadeAnim,
+              transform: [
+                { translateY: slideAnim },
+                { scale: scaleAnim }
+              ]
+            }
+          ]}
+        >
           <View style={styles.avatarContainer}>
             {avatarUrl ? (
               <Image
@@ -123,24 +160,41 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
           <Text style={styles.userName}>{user?.name}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
 
-          <View style={styles.statusBadge}>
+          {/*<View style={styles.statusBadge}>
             <Text style={styles.statusText}>{(user as any)?.status}</Text>
-          </View>
-        </View>
+          </View>*/}
+        </Animated.View>
 
-        <View style={styles.menuList}>
-          {menuItems.map((item) => (
+        <Animated.View 
+          style={[
+            styles.menuList,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          {menuItems.map((item, index) => (
             <TouchableOpacity
               key={item.id}
-              style={styles.menuItem}
+              style={[
+                styles.menuItem,
+                index === 0 && styles.menuItemFirst
+              ]}
               onPress={() => onNavigate(item.screen)}
               activeOpacity={0.7}
             >
               <View style={styles.menuItemLeft}>
-                <View style={styles.iconContainer}>
+                <View style={[
+                  styles.iconContainer,
+                  { backgroundColor: index === 0 ? COLORS.primaryLight : COLORS.accentLight }
+                ]}>
                   <Image
                     source={item.icon}
-                    style={styles.menuCardIcon}
+                    style={[
+                      styles.menuCardIcon,
+                      { tintColor: index === 0 ? COLORS.primary : COLORS.accent }
+                    ]}
                     resizeMode="contain"
                   />
                 </View>
@@ -149,29 +203,16 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
               <Text style={styles.chevron}>›</Text>
             </TouchableOpacity>
           ))}
-        </View>
-
-        <TouchableOpacity
-          style={styles.logoutButton}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-        >
-          <Image
-            source={require("../../assets/icons/logout.png")}
-            style={styles.menuCardIcon}
-            resizeMode="contain"
-          />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: "#F7F8FA",
+  screen: { 
+    flex: 1, 
+    backgroundColor: COLORS.background,
     paddingTop: 50,
   },
   mainMenu: {
@@ -180,8 +221,8 @@ const styles = StyleSheet.create({
   headerBar: {
     height: 56,
     paddingHorizontal: 16,
-    backgroundColor: "#fff",
-    borderBottomColor: "#EAEAEA",
+    backgroundColor: COLORS.white,
+    borderBottomColor: COLORS.border,
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     alignItems: "center",
@@ -191,7 +232,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -205,11 +246,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: COLORS.text,
     textAlign: "center",
   },
   profileCard: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     borderRadius: 20,
     padding: 24,
     marginHorizontal: 20,
@@ -220,17 +261,21 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   avatarContainer: {
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.charcoalLight,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
     position: "relative",
     overflow: "hidden",
+    borderWidth: 3,
+    borderColor: COLORS.primaryLight,
   },
   avatarImage: {
     width: "100%",
@@ -239,41 +284,23 @@ const styles = StyleSheet.create({
   avatarInitials: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#1A1A1A",
-  },
-  verifiedBadge: {
-    position: "absolute",
-    bottom: 11,
-    right: 11,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#00A86B",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-  },
-  verifiedText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
+    color: COLORS.primary,
   },
   userName: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: COLORS.text,
     marginBottom: 4,
   },
   userEmail: {
     fontSize: 14,
-    color: "#666",
+    color: COLORS.textMuted,
     marginBottom: 12,
   },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F0FFF4",
+    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -282,21 +309,20 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#00A86B",
+    color: COLORS.primary,
   },
   menuList: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     borderRadius: 20,
     marginHorizontal: 20,
     marginBottom: 20,
-    paddingTop: 20,
+    paddingVertical: 8,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-    gap: 10,
   },
   menuItem: {
     flexDirection: "row",
@@ -304,7 +330,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F5F5F5",
+    borderBottomColor: COLORS.border,
+  },
+  menuItemFirst: {
+    borderTopWidth: 0,
   },
   menuItemLeft: {
     flexDirection: "row",
@@ -315,44 +344,24 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
   menuItemText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#1A1A1A",
+    color: COLORS.text,
   },
   chevron: {
     fontSize: 24,
-    color: "#CCC",
+    color: COLORS.textMuted,
     fontWeight: "300",
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    marginHorizontal: 20,
-    marginBottom: 40,
-    padding: 16,
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: "600",
-  color: "#FF3B30",
   },
   headerIcon: {
     fontSize: 20,
-    color: "#1A1A1A",
+    color: COLORS.primary,
+    fontWeight: "600",
   },
   menuCardIcon: {
     width: 26,

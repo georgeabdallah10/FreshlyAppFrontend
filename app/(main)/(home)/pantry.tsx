@@ -1053,55 +1053,58 @@ const PantryDashboard = () => {
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
+            pointerEvents="box-none"
           >
-            <TouchableOpacity
-              activeOpacity={1}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <Animated.View
-                style={[
-                  styles.modalContent,
-                  {
-                    opacity: categorySheetAnim,
-                    transform: [
-                      {
-                        translateY: categorySheetAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [40, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
+            <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
               >
-                <View style={styles.modalHandle} />
-                <Text style={styles.modalTitle}>Add Category</Text>
-                <View style={styles.modalInput}>
-                  <Image
-                    source={require("../../../assets/icons/category.png")}
-                    style={styles.menuCardIcon}
-                    resizeMode="contain"
-                  />
-                  <TextInput
-                    style={styles.modalTextInput}
-                    placeholder="Enter category name"
-                    placeholderTextColor="#B0B0B0"
-                    value={newCategoryName}
-                    onChangeText={setNewCategoryName}
-                  />
-                </View>
-                <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
-                  <LinearGradient
-                    colors={[COLORS.primary, "#008F5C"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.buttonGradient}
-                  >
-                    <Text style={styles.modalButtonText}>Add</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </Animated.View>
-            </TouchableOpacity>
+                <Animated.View
+                  style={[
+                    styles.modalContent,
+                    {
+                      opacity: categorySheetAnim,
+                      transform: [
+                        {
+                          translateY: categorySheetAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [40, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <View style={styles.modalHandle} />
+                  <Text style={styles.modalTitle}>Add Category</Text>
+                  <View style={styles.modalInput}>
+                    <Image
+                      source={require("../../../assets/icons/category.png")}
+                      style={styles.menuCardIcon}
+                      resizeMode="contain"
+                    />
+                    <TextInput
+                      style={styles.modalTextInput}
+                      placeholder="Enter category name"
+                      placeholderTextColor="#B0B0B0"
+                      value={newCategoryName}
+                      onChangeText={setNewCategoryName}
+                    />
+                  </View>
+                  <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
+                    <LinearGradient
+                      colors={[COLORS.primary, "#008F5C"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.buttonGradient}
+                    >
+                      <Text style={styles.modalButtonText}>Add</Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
           </KeyboardAvoidingView>
         </TouchableOpacity>
       </Modal>
@@ -1117,38 +1120,39 @@ const PantryDashboard = () => {
             behavior={Platform.OS === "ios" ? "padding" : "height"}
             style={{ flex: 1 }}
             keyboardVerticalOffset={0}
+            pointerEvents="box-none"
           >
-            <TouchableOpacity
-              activeOpacity={1}
-              style={{ flex: 1, justifyContent: 'flex-end' }}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
-                bounces={false}
+            <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={(e) => e.stopPropagation()}
               >
-                <Animated.View
-                  style={[
-                    styles.modalContent,
-                    {
-                      opacity: productSheetAnim,
-                      transform: [
-                        {
-                          translateY: productSheetAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [40, 0],
-                          }),
-                        },
-                      ],
-                    },
-                  ]}
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+                  bounces={false}
                 >
-                  <View style={styles.modalHandle} />
-                  <Text style={styles.modalTitle}>
-                    {editingItemId ? "Edit Product" : "Add Product"}
-                  </Text>
+                  <Animated.View
+                    style={[
+                      styles.modalContent,
+                      {
+                        opacity: productSheetAnim,
+                        transform: [
+                          {
+                            translateY: productSheetAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [40, 0],
+                            }),
+                          },
+                        ],
+                      },
+                    ]}
+                  >
+                    <View style={styles.modalHandle} />
+                    <Text style={styles.modalTitle}>
+                      {editingItemId ? "Edit Product" : "Add Product"}
+                    </Text>
 
                   <TouchableOpacity
                     style={styles.modalInput}
@@ -1391,9 +1395,10 @@ const PantryDashboard = () => {
                 </Animated.View>
               </ScrollView>
             </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </TouchableOpacity>
-      </Modal>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableOpacity>
+    </Modal>
 
       {/* Scanner Modal */}
       <Modal visible={showQRScanner} transparent animationType="fade">

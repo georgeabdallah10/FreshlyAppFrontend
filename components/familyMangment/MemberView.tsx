@@ -6,24 +6,23 @@ import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
-  leaveFamily,
-  listFamilyMembers,
-  removeFamilyMember,
-  updateFamilyMemberRole,
+    leaveFamily,
+    listFamilyMembers,
+    removeFamilyMember,
+    updateFamilyMemberRole,
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
-  Image,
-  Modal,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    Image,
+    Modal,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 
@@ -117,6 +116,10 @@ const MemberView: React.FC<MemberViewProps> = ({
   const [removeActionMemberId, setRemoveActionMemberId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
+
+  // Animation values for entrance
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   useEffect(() => {
     if (resolvedFamilyData?.inviteCode) {
@@ -288,6 +291,23 @@ const MemberView: React.FC<MemberViewProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resolvedFamilyData?.id]);
 
+  // Entrance animations - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   useEffect(() => {
     if (showLeaveModal) {
       Animated.parallel([
@@ -348,8 +368,14 @@ const MemberView: React.FC<MemberViewProps> = ({
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[
+          styles.scrollView,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
@@ -478,7 +504,7 @@ const MemberView: React.FC<MemberViewProps> = ({
           <Ionicons name="exit-outline" size={20} color="#EF4444" />
           <Text style={styles.leaveButtonText}>Leave Family</Text>
         </TouchableOpacity>
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Leave Family Confirmation Modal */}
       <Modal

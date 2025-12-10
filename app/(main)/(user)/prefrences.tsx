@@ -4,25 +4,25 @@ import { useUser } from "@/context/usercontext";
 import { setPrefrences } from "@/src/user/setPrefrences";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
 } from "react";
 import {
-  Animated,
-  Image,
-  KeyboardAvoidingView,
-  LayoutAnimation,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  UIManager,
-  View,
+    Animated,
+    Image,
+    KeyboardAvoidingView,
+    LayoutAnimation,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    UIManager,
+    View,
 } from "react-native";
 
 type PreferenceOption = {
@@ -145,8 +145,8 @@ const OnboardingPreferences = () => {
     []
   );
 
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
   const optionScaleRefs = useRef<Record<string, Animated.Value>>({});
   const transitionLockRef = useRef(false);
@@ -394,6 +394,23 @@ const OnboardingPreferences = () => {
     setCulturalLifestylePreferences,
     setAllergies,
   ]);
+
+  // Entrance animation - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const hasSelection = useMemo(() => {
     if (isBodyStage) {

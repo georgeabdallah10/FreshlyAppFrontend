@@ -1,20 +1,35 @@
 // ==================== screens/MyProfileScreen.tsx ====================
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  StyleSheet,
-  Image,
-} from "react-native";
-import Icon from "./components/icon";
-import PasswordModal from "./components/passwordModal";
-import DeleteAccountModal from "./components/deleteAccountModal";
 import { useUser } from "@/context/usercontext";
 import { useRouter } from "expo-router";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  Animated,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import DeleteAccountModal from "./components/deleteAccountModal";
+import Icon from "./components/icon";
+import PasswordModal from "./components/passwordModal";
+
+const COLORS = {
+  primary: "#00A86B",
+  primaryLight: "#E8F8F1",
+  accent: "#FD8100",
+  accentLight: "#FFF3E6",
+  charcoal: "#4C4D59",
+  charcoalLight: "#F0F0F2",
+  white: "#FFFFFF",
+  background: "#F7F8FB",
+  text: "#0A0A0A",
+  textMuted: "#6B7280",
+  border: "#E9ECF2",
+};
 
 type Props = {
   onBack: () => void;
@@ -35,6 +50,10 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const { user, refreshUser, logout, updateUserInfo } = useUser();
   const router = useRouter();
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   const [profile, setProfile] = useState<Profile>({
     name: "",
@@ -64,6 +83,21 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
 
   useEffect(() => {
     refreshUser?.();
+    
+    // Entrance animation - super fast and snappy
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const handleSave = async () => {
@@ -150,7 +184,15 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.profileHeader}>
+        <Animated.View 
+          style={[
+            styles.profileHeader,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <View style={styles.avatarLarge}>
             {editedProfile.avatar_path ? (
               <Image
@@ -177,9 +219,17 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
               {editedProfile.status ?? ""}
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.section}>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Personal Information</Text>
 
           <View style={styles.inputGroup}>
@@ -236,9 +286,17 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
               placeholder="Enter your location"
             />
           </View>
-        </View>
+        </Animated.View>
 
-        <View style={styles.section}>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Update your prefrences</Text>
 
           <TouchableOpacity
@@ -257,9 +315,17 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
-        <View style={styles.section}>
+        <Animated.View 
+          style={[
+            styles.section,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
           <Text style={styles.sectionTitle}>Security</Text>
 
           <TouchableOpacity
@@ -267,26 +333,77 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.passwordLeft}>
-              <Icon name="lock" size={20} color="#666" />
+              <Icon name="lock" size={20} color={COLORS.primary} />
               <Text style={styles.passwordText}>Change Password</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
           </TouchableOpacity>
-                    <TouchableOpacity
-            style={styles.deleteAccoutnButton}
-            onPress={() => setShowDeleteModal(true)}
+
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={async () => {
+              try {
+                await logout();
+                router.replace("/(auth)/Login");
+              } catch (e) {
+                console.warn("Logout failed", e);
+              }
+            }}
+            activeOpacity={0.7}
           >
             <View style={styles.passwordLeft}>
-              <Icon name="trash" size={20} color="#ffffff" />
-              <Text style={[styles.passwordText, {color: "#ffffff"}]}>Delete Account</Text>
+              <Icon name="log-out" size={20} color="#FF6B35" />
+              <Text style={styles.logoutButtonText}>Logout</Text>
             </View>
-            <Text style={[styles.chevron,  {color: "#ffffff"}]}>›</Text>
+            <Text style={styles.logoutChevron}>›</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
+
+        <Animated.View 
+          style={[
+            styles.dangerSection,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <Text style={styles.dangerSectionTitle}>Danger Zone</Text>
+          <Text style={styles.dangerSectionSubtitle}>
+            This action cannot be undone
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={() => setShowDeleteModal(true)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.deleteButtonContent}>
+              <View style={styles.deleteIconContainer}>
+                <Icon name="trash" size={18} color="#FF3B30" />
+              </View>
+              <View style={styles.deleteTextContainer}>
+                <Text style={styles.deleteAccountText}>Delete Account</Text>
+                <Text style={styles.deleteAccountSubtext}>
+                  Permanently remove your account and data
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.deleteChevron}>›</Text>
+          </TouchableOpacity>
+        </Animated.View>
         
 
         {isEditing && (
-          <View style={styles.actionButtons}>
+          <Animated.View 
+            style={[
+              styles.actionButtons,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
             <TouchableOpacity
               style={styles.cancelButton}
               onPress={handleCancel}
@@ -296,7 +413,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
               <Text style={styles.saveButtonText}>Save Changes</Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         )}
       </ScrollView>
 
@@ -316,6 +433,7 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
     paddingTop: 90,
+    backgroundColor: COLORS.background,
   },
   headerBar: {
     flexDirection: "row",
@@ -323,18 +441,22 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 20,
     paddingTop: 10,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
   backButton: {
     width: 40,
     height: 40,
     alignItems: "center",
     justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryLight,
   },
   screenTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: COLORS.text,
   },
   editButton: {
     width: 40,
@@ -354,11 +476,13 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: "#F0F0F0",
+    backgroundColor: COLORS.charcoalLight,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
     position: "relative",
+    borderWidth: 4,
+    borderColor: COLORS.primaryLight,
   },
   avatarLargeEmoji: {
     fontSize: 50,
@@ -370,16 +494,16 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#00A86B",
+    backgroundColor: COLORS.primary,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 3,
-    borderColor: "#fff",
+    borderColor: COLORS.white,
   },
   statusBadgeLarge: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F0FFF4",
+    backgroundColor: COLORS.primaryLight,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -388,10 +512,10 @@ const styles = StyleSheet.create({
   statusTextLarge: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#00A86B",
+    color: COLORS.primary,
   },
   section: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -400,12 +524,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.primary,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: COLORS.text,
     marginBottom: 16,
   },
   inputGroup: {
@@ -414,30 +539,50 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#666",
+    color: COLORS.textMuted,
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.background,
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: "#1A1A1A",
+    color: COLORS.text,
     borderWidth: 1,
-    borderColor: "transparent",
+    borderColor: COLORS.border,
   },
   inputDisabled: {
-    backgroundColor: "#F9FAFB",
-    color: "#999",
+    backgroundColor: COLORS.charcoalLight,
+    color: COLORS.textMuted,
   },
   passwordButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 14,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.primaryLight,
     borderRadius: 12,
     marginBottom: 15,
+  },
+  logoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    backgroundColor: "#FFF5F0",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFE5DD",
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: "#FF6B35",
+  },
+  logoutChevron: {
+    fontSize: 24,
+    color: "#FF6B35",
+    fontWeight: "300",
   },
   deleteAccoutnButton: {
     flexDirection: "row",
@@ -448,6 +593,75 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 15,
   },
+  dangerSection: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    borderLeftWidth: 3,
+    borderLeftColor: "#FF3B30",
+  },
+  dangerSectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FF3B30",
+    marginBottom: 4,
+  },
+  dangerSectionSubtitle: {
+    fontSize: 13,
+    color: COLORS.textMuted,
+    marginBottom: 16,
+  },
+  deleteAccountButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    backgroundColor: "#FFF5F5",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FFE5E5",
+  },
+  deleteButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  deleteIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#FFE5E5",
+  },
+  deleteTextContainer: {
+    flex: 1,
+  },
+  deleteAccountText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FF3B30",
+    marginBottom: 2,
+  },
+  deleteAccountSubtext: {
+    fontSize: 12,
+    color: "#FF8A80",
+    fontWeight: "500",
+  },
+  deleteChevron: {
+    fontSize: 24,
+    color: "#FF8A80",
+    fontWeight: "300",
+  },
   passwordLeft: {
     flexDirection: "row",
     alignItems: "center",
@@ -456,11 +670,11 @@ const styles = StyleSheet.create({
   passwordText: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#1A1A1A",
+    color: COLORS.text,
   },
   chevron: {
     fontSize: 24,
-    color: "#CCC",
+    color: COLORS.textMuted,
     fontWeight: "300",
   },
   actionButtons: {
@@ -471,19 +685,21 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: COLORS.charcoalLight,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#666",
+    color: COLORS.textMuted,
   },
   saveButton: {
     flex: 1,
-    backgroundColor: "#00A86B",
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -491,7 +707,7 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: COLORS.white,
   },
   imgStyle: {
     width: 23,

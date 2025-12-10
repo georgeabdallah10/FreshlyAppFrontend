@@ -11,6 +11,8 @@ import {
     removeFamilyMember,
     updateFamilyMemberRole,
 } from "@/src/user/family";
+import { createMealForSignleUser } from "@/src/user/meals";
+import MemberMealsOverlay from "./MemberMealsOverlay";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, {
@@ -139,6 +141,8 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const [removeActionMemberId, setRemoveActionMemberId] = useState<string | null>(null);
   const [selectedMember, setSelectedMember] = useState<FamilyMember | null>(null);
   const [actionModalVisible, setActionModalVisible] = useState(false);
+  const [showMemberMealsOverlay, setShowMemberMealsOverlay] = useState(false);
+  const [memberForMealsOverlay, setMemberForMealsOverlay] = useState<FamilyMember | null>(null);
   
   // Keep local list in sync when parent provides normalized members
   useEffect(() => {
@@ -393,6 +397,48 @@ const OwnerView: React.FC<OwnerViewProps> = ({
     handleKickMember(selectedMember);
   }, [closeActionModal, handleKickMember, selectedMember]);
 
+  // Handler to open member meals overlay
+  const handleViewMemberMeals = useCallback(() => {
+    if (selectedMember) {
+      // Save member data for the overlay before closing modal
+      setMemberForMealsOverlay(selectedMember);
+      setShowMemberMealsOverlay(true);
+      closeActionModal();
+    }
+  }, [selectedMember, closeActionModal]);
+
+  // Handler to save a copy of member's meal to owner's collection
+  const handleSaveMealCopy = useCallback(async (meal: any) => {
+    try {
+      // Create a copy without the id (backend will assign new id)
+      const mealCopy = {
+        name: meal.name,
+        image: meal.image,
+        calories: meal.calories,
+        prepTime: meal.prepTime,
+        cookTime: meal.cookTime,
+        totalTime: meal.totalTime,
+        mealType: meal.mealType,
+        cuisine: meal.cuisine,
+        tags: meal.tags,
+        macros: meal.macros,
+        difficulty: meal.difficulty,
+        servings: meal.servings,
+        dietCompatibility: meal.dietCompatibility,
+        goalFit: meal.goalFit,
+        ingredients: meal.ingredients,
+        instructions: meal.instructions,
+        cookingTools: meal.cookingTools,
+        notes: meal.notes,
+        isFavorite: false, // Start as not favorite in owner's collection
+      };
+      await createMealForSignleUser(mealCopy as any);
+      showToast("success", `"${meal.name}" saved to your meals!`);
+    } catch (error: any) {
+      showToast("error", error?.message || "Failed to save meal");
+    }
+  }, [showToast]);
+
   const inviteSlideAnim = useRef(new Animated.Value(0)).current;
   const inviteFadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -609,9 +655,11 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           canManageMember(selectedMember) &&
           canRemoveMember(selectedMember)
         }
+        canViewMeals={!!selectedMember && canManageMember(selectedMember)}
         onPromote={handlePromoteSelected}
         onDemote={handleDemoteSelected}
         onRemove={handleRemoveSelected}
+        onViewMeals={handleViewMemberMeals}
         isPromoting={
           !!selectedMember &&
           roleActionMemberId === selectedMember.id &&
@@ -626,6 +674,18 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           !!selectedMember && removeActionMemberId === selectedMember.id
         }
       />
+
+      {/* Member Meals Overlay */}
+      {selectedMember && (
+        <MemberMealsOverlay
+          visible={showMemberMealsOverlay}
+          memberName={selectedMember.name}
+          memberId={selectedMember.id}
+          familyId={resolvedFamilyData?.id || ""}
+          onClose={() => setShowMemberMealsOverlay(false)}
+          onSaveMeal={handleSaveMealCopy}
+        />
+      )}
 
       {/* Invite Code Modal */}
       <Modal

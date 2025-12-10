@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 type MemberActionModalProps = {
   visible: boolean;
@@ -15,9 +16,11 @@ type MemberActionModalProps = {
   onPromote?: () => Promise<void> | void;
   onDemote?: () => Promise<void> | void;
   onRemove?: () => Promise<void> | void;
+  onViewMeals?: () => void;
   canPromote?: boolean;
   canDemote?: boolean;
   canRemove?: boolean;
+  canViewMeals?: boolean;
   isPromoting?: boolean;
   isDemoting?: boolean;
   isRemoving?: boolean;
@@ -31,14 +34,16 @@ const MemberActionModal: React.FC<MemberActionModalProps> = ({
   onPromote,
   onDemote,
   onRemove,
+  onViewMeals,
   canPromote = false,
   canDemote = false,
   canRemove = false,
+  canViewMeals = false,
   isPromoting = false,
   isDemoting = false,
   isRemoving = false,
 }) => {
-  const hasActions = canPromote || canDemote || canRemove;
+  const hasActions = canPromote || canDemote || canRemove || canViewMeals;
 
   return (
     <Modal
@@ -61,6 +66,15 @@ const MemberActionModal: React.FC<MemberActionModalProps> = ({
               No actions available for this member (role: {memberRole}).
             </Text>
           ) : null}
+          {canViewMeals && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.viewMealsButton]}
+              onPress={onViewMeals}
+            >
+              <Ionicons name="restaurant-outline" size={18} color="#0891B2" style={{ marginRight: 8 }} />
+              <Text style={styles.viewMealsText}>View Meals</Text>
+            </TouchableOpacity>
+          )}
           {canPromote && (
             <TouchableOpacity
               style={[
@@ -175,6 +189,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     color: "#DC2626",
+  },
+  viewMealsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    borderColor: "#A5F3FC",
+    backgroundColor: "#ECFEFF",
+  },
+  viewMealsText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#0891B2",
   },
   cancelButton: {
     marginTop: 8,

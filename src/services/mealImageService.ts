@@ -86,14 +86,15 @@ function sanitizeMealName(mealName: string): string {
  * - Converts to JPEG with 0.75 quality
  * - Target: <300KB file size
  */
-async function compressImage(imageUrl: string): Promise<Uint8Array> {
+async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
   try {
     console.log(`[MealImageService] 🔧 Starting compression for image...`);
 
     // Step 1: Download to temp file (ImageManipulator needs file URI)
     const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
     if (!cacheDir) {
-      throw new Error('No cache directory available');
+      console.error('[MealImageService] No cache directory available');
+      return null;
     }
     const tempPath = `${cacheDir}temp-meal-${Date.now()}.png`;
     console.log(`[MealImageService] 📥 Downloading to temp: ${tempPath}`);
@@ -101,12 +102,14 @@ async function compressImage(imageUrl: string): Promise<Uint8Array> {
     const downloadResult = await FileSystem.downloadAsync(imageUrl, tempPath);
 
     if (downloadResult.status !== 200) {
-      throw new Error(`Download failed with status ${downloadResult.status}`);
+      console.error(`[MealImageService] Download failed with status ${downloadResult.status}`);
+      return null;
     }
 
     const originalInfo = await FileSystem.getInfoAsync(downloadResult.uri);
     if (!originalInfo.exists || !originalInfo.size) {
-      throw new Error('Downloaded file is invalid');
+      console.error('[MealImageService] Downloaded file is invalid');
+      return null;
     }
 
     const originalSizeMB = (originalInfo.size / (1024 * 1024)).toFixed(2);
@@ -155,7 +158,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array> {
     return bytes;
   } catch (error) {
     console.error(`[MealImageService] ❌ Compression failed:`, error);
-    throw error;
+    return null;
   }
 }
 
@@ -295,8 +298,10 @@ async function uploadImageToBucket(
       // Compress the image (downloads, resizes, compresses to JPEG)
       const compressedBytes = await compressImage(imageUrl);
 
-      if (compressedBytes.length === 0) {
-        throw new Error("Compressed image is empty");
+      if (!compressedBytes || compressedBytes.length === 0) {
+        console.error("[MealImageService] Compressed image is empty or null");
+        lastError = new Error("Compressed image is empty");
+        continue; // Retry
       }
 
       const sizeMB = (compressedBytes.length / (1024 * 1024)).toFixed(2);
@@ -346,7 +351,9 @@ async function uploadImageToBucket(
       const publicUrl = urlData?.publicUrl;
 
       if (!publicUrl) {
-        throw new Error("Failed to get public URL after upload");
+        console.error("[MealImageService] Failed to get public URL after upload");
+        lastError = new Error("Failed to get public URL after upload");
+        continue; // Retry
       }
 
       console.log(`[MealImageService] ✅ Image uploaded successfully on attempt ${attempt}/${retries}`);

@@ -59,12 +59,13 @@ export async function uploadImageUri({
   
   if (bucketError) {
     console.error('[uploadImageUri] Failed to list buckets:', bucketError);
-    throw new Error('Failed to connect to storage');
+    return { path, publicUrl: undefined };
   }
 
   const bucketExists = buckets?.some(b => b.name === bucket);
   if (!bucketExists) {
-    throw new Error(`Bucket "${bucket}" does not exist. Available: ${buckets?.map(b => b.name).join(', ')}`);
+    console.error(`[uploadImageUri] Bucket "${bucket}" does not exist. Available: ${buckets?.map(b => b.name).join(', ')}`);
+    return { path, publicUrl: undefined };
   }
 
   // Read bytes from the local/remote URI

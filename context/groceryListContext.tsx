@@ -11,31 +11,31 @@
 
 import type { SyncModalData } from "@/components/grocery/SyncResultModal";
 import {
-    groceryQueryKeys,
-    useAddItemMutation,
-    useClearCheckedMutation,
-    useDeleteListMutation,
-    useFamilyGroceryLists,
-    useGroceryList as useGroceryListQuery,
-    useMarkItemPurchasedMutation,
-    usePersonalGroceryLists,
-    useRebuildFromMealPlanMutation,
-    useRemoveItemMutation,
-    useSyncPantryMutation,
-    useToggleItemMutation,
-    useUpdateItemMutation,
+  groceryQueryKeys,
+  useAddItemMutation,
+  useClearCheckedMutation,
+  useDeleteListMutation,
+  useFamilyGroceryLists,
+  useGroceryList as useGroceryListQuery,
+  useMarkItemPurchasedMutation,
+  usePersonalGroceryLists,
+  useRebuildFromMealPlanMutation,
+  useRemoveItemMutation,
+  useSyncPantryMutation,
+  useToggleItemMutation,
+  useUpdateItemMutation,
 } from "@/src/hooks/grocery";
 import {
-    type AddFromRecipeRequest,
-    type AddFromRecipeResponse,
-    type AddGroceryListItemRequest,
-    type GroceryListOut,
-    type GroceryListItemSummary,
-    type RebuildFromMealPlanResponse,
-    type SyncWithPantryResponse,
-    type UpdateGroceryListItemRequest,
-    addFromRecipe as addFromRecipeApi,
-    getGroceryListById
+  addFromRecipe as addFromRecipeApi,
+  getGroceryListById,
+  type AddFromRecipeRequest,
+  type AddFromRecipeResponse,
+  type AddGroceryListItemRequest,
+  type GroceryListItemSummary,
+  type GroceryListOut,
+  type RebuildFromMealPlanResponse,
+  type SyncWithPantryResponse,
+  type UpdateGroceryListItemRequest
 } from "@/src/services/grocery.service";
 import { listMyPantryItems, type PantryItem } from "@/src/user/pantry";
 import { useQueryClient } from "@tanstack/react-query";
@@ -122,6 +122,26 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     refetch: refetchMyLists,
   } = usePersonalGroceryLists();
 
+  // DEBUG: Log personal lists when they change
+  React.useEffect(() => {
+    if (myLists.length > 0) {
+      console.log("\n========== PERSONAL GROCERY LISTS DEBUG ==========");
+      console.log(`[GroceryListContext] Loaded ${myLists.length} personal lists`);
+      myLists.forEach((list, index) => {
+        console.log(`[${index + 1}] List "${list.title}":`, {
+          id: list.id,
+          scope: list.scope,
+          status: list.status,
+          owner_user_id: list.owner_user_id,
+          created_by_user_id: list.created_by_user_id,
+          family_id: list.family_id,
+          meal_plan_id: list.meal_plan_id,
+        });
+      });
+      console.log("==================================================\n");
+    }
+  }, [myLists]);
+
   // Family lists query
   const {
     data: familyLists = [],
@@ -129,6 +149,26 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     error: familyListsError,
     refetch: refetchFamilyLists,
   } = useFamilyGroceryLists(isInFamily ? activeFamilyId : null);
+
+  // DEBUG: Log family lists when they change
+  React.useEffect(() => {
+    if (familyLists.length > 0) {
+      console.log("\n========== FAMILY GROCERY LISTS DEBUG ==========");
+      console.log(`[GroceryListContext] Loaded ${familyLists.length} family lists`);
+      familyLists.forEach((list, index) => {
+        console.log(`[${index + 1}] List "${list.title}":`, {
+          id: list.id,
+          scope: list.scope,
+          status: list.status,
+          owner_user_id: list.owner_user_id,
+          created_by_user_id: list.created_by_user_id,
+          family_id: list.family_id,
+          meal_plan_id: list.meal_plan_id,
+        });
+      });
+      console.log("==================================================\n");
+    }
+  }, [familyLists]);
 
   // Selected list query
   const {
@@ -435,6 +475,8 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return response;
     } catch (err: any) {
       console.error("[GroceryListContext] Sync error:", err);
+      console.log("HELLLO")
+      console.log(err)
       // Re-throw with status for proper error handling in UI
       if (err?.status === 403) {
         const error = new Error("You do not have permission to sync this list. Only the owner can sync pantry.");
@@ -489,10 +531,26 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
   }, [rebuildMutation]);
 
   // Check if current user can sync the list
-  // For both personal and family lists, only the owner can sync
+  // Use owner_user_id for permission checks
   const canSyncList = useCallback((list: GroceryListOut): boolean => {
-    if (!user?.id) return false;
-    return list.owner_user_id === user.id;
+    if (!user?.id) {
+      console.log("[canSyncList] No user ID available");
+      return false;
+    }
+    
+    console.log("\n========== CAN SYNC CHECK ==========");
+    console.log(`[canSyncList] Checking list "${list.title}" (ID: ${list.id})`);
+    console.log(`[canSyncList] List scope: ${list.scope}`);
+    console.log(`[canSyncList] List owner_user_id: ${list.owner_user_id} (type: ${typeof list.owner_user_id})`);
+    console.log(`[canSyncList] Current user ID: ${user.id} (type: ${typeof user.id})`);
+    console.log(`[canSyncList] List created_by_user_id: ${list.created_by_user_id}`);
+    
+    const canSync = list.owner_user_id === user.id;
+    
+    console.log(`[canSyncList] Result: ${canSync}`);
+    console.log("====================================\n");
+    
+    return canSync;
   }, [user?.id]);
 
   // Get the creator name for display

@@ -1,9 +1,12 @@
 import { Storage } from "../utils/storage";
 import { BASE_URL } from "../env/baseUrl";
 
-async function getAuthHeaders() {
+async function getAuthHeaders(): Promise<Record<string, string> | null> {
   const token = await Storage.getItem("access_token");
-  if (!token) throw new Error("Not authenticated: missing access token");
+  if (!token) {
+    console.error("[pantry.ts] Not authenticated: missing access token");
+    return null;
+  }
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
@@ -58,6 +61,8 @@ export async function listMyPantryItems(
   options: PantryQueryOptions = {}
 ): Promise<PantryItem[]> {
   const headers = await getAuthHeaders();
+  if (!headers) return [];
+
   const familyId = options.familyId ?? null;
   const url = familyId
     ? `${BASE_URL}/pantry-items/family/${familyId}`
@@ -67,8 +72,9 @@ export async function listMyPantryItems(
 
   const res = await fetch(url, { headers });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`List pantry failed (${res.status}): ${text}`);
+    const text = await res.text().catch(() => "");
+    console.error("[pantry.ts] List pantry failed:", { status: res.status, error: text });
+    return [];
   }
 
   const data = await res.json();
@@ -92,8 +98,10 @@ export async function listMyPantryItems(
 export async function createMyPantryItem(
   input: CreatePantryItemInput,
   options: PantryQueryOptions = {}
-): Promise<PantryItem> {
+): Promise<PantryItem | null> {
   const headers = await getAuthHeaders();
+  if (!headers) return null;
+
   const familyId = options.familyId ?? null;
   const scope: PantryScope = familyId ? "family" : "personal";
 
@@ -122,8 +130,9 @@ export async function createMyPantryItem(
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Create pantry item failed (${res.status}): ${text}`);
+    const text = await res.text().catch(() => "");
+    console.error("[pantry.ts] Create pantry item failed:", { status: res.status, error: text });
+    return null;
   }
   return res.json();
 }
@@ -131,8 +140,10 @@ export async function createMyPantryItem(
 export async function updatePantryItem(
   itemId: number,
   updates: UpdatePantryItemInput
-): Promise<PantryItem> {
+): Promise<PantryItem | null> {
   const headers = await getAuthHeaders();
+  if (!headers) return null;
+
   const payload: Record<string, any> = {};
 
   if (updates.ingredient_name !== undefined || updates.name !== undefined) {
@@ -149,22 +160,27 @@ export async function updatePantryItem(
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Update pantry item failed (${res.status}): ${text}`);
+    const text = await res.text().catch(() => "");
+    console.error("[pantry.ts] Update pantry item failed:", { status: res.status, error: text });
+    return null;
   }
   return res.json();
 }
 
-export async function deletePantryItem(itemId: number): Promise<void> {
+export async function deletePantryItem(itemId: number): Promise<boolean> {
   const headers = await getAuthHeaders();
+  if (!headers) return false;
+
   const res = await fetch(`${BASE_URL}/pantry-items/${itemId}`, {
     method: "DELETE",
     headers,
   });
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Delete pantry item failed (${res.status}): ${text}`);
+    const text = await res.text().catch(() => "");
+    console.error("[pantry.ts] Delete pantry item failed:", { status: res.status, error: text });
+    return false;
   }
+  return true;
 }
 
 type PantryMergeItem = PantryItem & {
@@ -196,7 +212,7 @@ export type UpsertPantryItemOptions = {
 };
 
 export type UpsertPantryItemResult = {
-  item: PantryItem;
+  item: PantryItem | null;
   merged: boolean;
   snapshot: PantryMergeItem[];
 };
@@ -207,7 +223,9 @@ export async function upsertPantryItemByName(
 ): Promise<UpsertPantryItemResult> {
   const normalizedIncoming = normalizePantryItemName(input.ingredient_name);
   if (!normalizedIncoming) {
-    throw new Error("Ingredient name is required to add pantry items.");
+    // Keep this as user-facing validation error
+    console.error("[pantry.ts] Ingredient name is required to add pantry items.");
+    return { item: null, merged: false, snapshot: [] };
   }
 
   const snapshot: PantryMergeItem[] = options.existingItems
@@ -248,6 +266,9 @@ export async function upsertPantryItemByName(
       }
 
       const updated = await updatePantryItem(matchId, updatePayload);
+      if (!updated) {
+        return { item: null, merged: false, snapshot };
+      }
       snapshot[matchIndex] = {
         ...match,
         ...updated,
@@ -263,7 +284,9 @@ export async function upsertPantryItemByName(
   const created = await createMyPantryItem(input, {
     familyId: options.familyId ?? null,
   });
-  snapshot.push(created);
+  if (created) {
+    snapshot.push(created);
+  }
   return { item: created, merged: false, snapshot };
 }
 /*export async function GetItemByBarcode(barcode_number: any) {

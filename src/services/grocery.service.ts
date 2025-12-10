@@ -1,7 +1,18 @@
 /**
  * ============================================
- * GROCERY API SERVICE
- * ============================================
+ * GROCERY API SERVIexport interface GroceryListOut {
+  id: number;
+  family_id: number | null;
+  owner_user_id: number | null; // The user who owns this list - use for permission checks
+  created_by_user_id: number; // The user who created this list
+  scope: GroceryListScope;
+  meal_plan_id?: number | null;
+  title: string | null;
+  status: GroceryListStatus;
+  created_at: string;
+  updated_at: string; // Last update timestamp
+  items: GroceryListItemSummary[];
+}=====================================
  */
 
 import { apiClient } from '../client/apiClient';
@@ -73,8 +84,8 @@ export interface GroceryListItemSummary {
 export interface GroceryListOut {
   id: number;
   family_id: number | null;
-  owner_user_id: number | null;
-  created_by_user_id: number; // User who created the list (required for sync permission check)
+  owner_user_id: number | null; // For personal lists only. NULL for family lists
+  created_by_user_id: number; // Always set. Use this for family lists to check permissions
   scope: GroceryListScope;
   meal_plan_id?: number | null;
   title: string | null;

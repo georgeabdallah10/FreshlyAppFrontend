@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   listCardTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "700",
     color: COLORS.text,
     flex: 1,

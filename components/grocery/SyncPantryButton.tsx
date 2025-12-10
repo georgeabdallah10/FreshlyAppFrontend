@@ -1,14 +1,12 @@
 import type { GroceryListOut, SyncRemainingItem, SyncWithPantryResponse } from "@/src/services/grocery.service";
-import { getDisplayQuantity } from "@/src/services/grocery.service";
 import React, { useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 
 const COLORS = {
@@ -46,8 +44,7 @@ interface SyncResult {
  * SyncPantryButton Component
  *
  * Displays a sync button that respects permission rules:
- * - Personal lists: only owner can sync
- * - Family lists: only creator (created_by_user_id) can sync
+ * - Only the owner (owner_user_id) can sync the list
  *
  * Shows appropriate UI based on permissions:
  * - If canSync: Shows sync button
@@ -190,7 +187,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
       </TouchableOpacity>
 
       {/* Show last sync result */}
-      {lastResult && (
+      {/*lastResult && (
         <View
           style={[
             styles.resultBanner,
@@ -201,7 +198,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
         >
           <Text style={styles.resultText}>{lastResult.message}</Text>
           
-          {/* Show sync stats if available */}
+          {/* Show sync stats if available }
           {lastResult.type !== "error" && (lastResult.itemsRemoved !== undefined || lastResult.itemsUpdated !== undefined) && (
             <View style={styles.syncStats}>
               {(lastResult.itemsRemoved ?? 0) > 0 && (
@@ -217,7 +214,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
             </View>
           )}
 
-          {/* Show remaining items summary */}
+          {/* Show remaining items summary }
           {lastResult.remainingItems && lastResult.remainingItems.length > 0 && (
             <View style={styles.remainingSection}>
               <Text style={styles.remainingTitle}>
@@ -245,7 +242,6 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
             </View>
           )}
 
-          {/* Dismiss button */}
           <TouchableOpacity
             style={styles.dismissButton}
             onPress={() => setLastResult(null)}
@@ -253,7 +249,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
             <Text style={styles.dismissButtonText}>Dismiss</Text>
           </TouchableOpacity>
         </View>
-      )}
+      )*/}
 
       {/* Show creator info */}
       <Text style={styles.creatorInfo}>

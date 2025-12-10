@@ -78,8 +78,8 @@ export async function createMealForSignleUser(input: CreateMealInput) {
 
 if (!res.ok) {
   const errText = await res.text().catch(() => "");
-  console.log("Create meal failed:", res.status, errText);
-  throw new Error(`Create meal failed: ${res.status}`);
+  console.error("[meals.ts] Create meal failed:", { status: res.status, error: errText });
+  return null;
 }
 
   return res.json(); // server returns MealOut
@@ -145,8 +145,8 @@ export async function updateMealForSignleUser(mealId: number, input: CreateMealI
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.log("Update meal failed:", res.status, errText);
-    throw new Error(`Update meal failed: ${res.status}`);
+    console.error("[meals.ts] Update meal failed:", { status: res.status, error: errText });
+    return null;
   }
 
   return res.json(); // MealOut
@@ -164,8 +164,8 @@ export async function deleteMealForSignleUser(mealId: number) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.log("Delete meal failed:", res.status, errText);
-    throw new Error(`Delete meal failed: ${res.status}`);
+    console.error("[meals.ts] Delete meal failed:", { status: res.status, error: errText });
+    return false;
   }
 
   // 204 No Content expected
@@ -194,8 +194,8 @@ export async function toggleMealFavorite(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.log("Toggle favorite failed:", res.status, errText);
-    throw new Error(`Toggle favorite failed: ${res.status}`);
+    console.error("[meals.ts] Toggle favorite failed:", { status: res.status, error: errText });
+    return null;
   }
 
   return res.json(); // MealOut

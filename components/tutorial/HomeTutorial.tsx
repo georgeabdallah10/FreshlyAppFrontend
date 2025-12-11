@@ -1,14 +1,14 @@
+import { Storage } from '@/src/utils/storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  Dimensions,
-  Platform,
+    Animated,
+    Dimensions,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { Storage } from '@/src/utils/storage';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -300,6 +300,8 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
 
   // For congratulations step, we don't need target measurements
   if (!isCongratulationsStep && !targetMeasurement) {
+    console.warn(`[HomeTutorial] Missing target measurement for step ${currentStepIndex + 1}: ${currentStep.targetKey}`);
+    console.warn('[HomeTutorial] Available measurements:', Object.keys(targetMeasurements));
     return null;
   }
 

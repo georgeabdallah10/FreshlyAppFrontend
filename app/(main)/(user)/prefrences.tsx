@@ -610,12 +610,12 @@ const OnboardingPreferences = () => {
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 200,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: exitToValue,
-          duration: 200,
+          duration: 150,
           useNativeDriver: true,
         }),
       ]).start(() => {
@@ -625,12 +625,13 @@ const OnboardingPreferences = () => {
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
-            duration: 300,
+            duration: 180,
             useNativeDriver: true,
           }),
-          Animated.timing(slideAnim, {
+          Animated.spring(slideAnim, {
             toValue: 0,
-            duration: 300,
+            friction: 8,
+            tension: 120,
             useNativeDriver: true,
           }),
         ]).start(() => {

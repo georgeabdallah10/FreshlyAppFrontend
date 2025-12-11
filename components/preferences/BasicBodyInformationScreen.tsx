@@ -177,7 +177,15 @@ const BasicBodyInformationScreen: React.FC<
   };
 
   return (
-    <View style={styles.card}>
+    <Animated.View 
+      style={[
+        styles.card,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
       <Text style={styles.cardTitle}>Basic Body Information</Text>
       <Text style={styles.cardSubtitle}>
         Please fill in all fields to continue. This helps us personalize your
@@ -463,7 +471,7 @@ const BasicBodyInformationScreen: React.FC<
           </View>
         </TouchableOpacity>
       </Modal>
-    </View>
+    </Animated.View>
   );
 };
 

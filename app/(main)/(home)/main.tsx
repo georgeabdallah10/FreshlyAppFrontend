@@ -283,8 +283,11 @@ const HomeDashboard = () => {
     const measureElement = (ref: React.RefObject<View | null>, key: string) => {
       if (ref.current) {
         ref.current.measureInWindow((x, y, width, height) => {
+          console.log(`[Tutorial] Measured ${key}:`, { x, y, width, height });
           setTargetMeasurements(prev => ({ ...prev, [key]: { x, y, width, height } }));
         });
+      } else {
+        console.warn(`[Tutorial] Failed to measure ${key}: ref.current is null`);
       }
     };
 
@@ -323,7 +326,7 @@ const HomeDashboard = () => {
     {
       id: "groceryLists",
       title: "Grocery Lists",
-      subtitle: "Shopping lists",
+      subtitle: "Upload Groceries",
       iconSource: require("../../../assets/icons/grocery.png"),
       bgColor: "#F0F0F0",
       onPress: () => router.push("/(main)/(home)/groceryLists"),
@@ -424,7 +427,7 @@ const HomeDashboard = () => {
             let itemRef;
             if (item.title === 'Pantry') itemRef = pantryRef;
             else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
-            else if (item.title === 'Grocery') itemRef = groceryRef;
+            else if (item.title === 'Grocery Lists') itemRef = groceryRef;
             else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
 
             return (

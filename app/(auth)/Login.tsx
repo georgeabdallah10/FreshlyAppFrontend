@@ -104,7 +104,7 @@ export default function LoginScreen(): React.JSX.Element {
     visible: false,
     type: "success",
     message: "",
-    duration: 5000,
+    duration: 3500,
     topOffset: 50,
   });
 
@@ -440,7 +440,7 @@ export default function LoginScreen(): React.JSX.Element {
       showToast("success", "Login successful! Redirecting...");
       router.replace("/(main)/(home)/main");
     } catch (error: any) {
-      console.error("[Login] OAuth login error:", error);
+      console.log("[Login] OAuth login error:", error);
       // Provide user-friendly messages for common OAuth errors
       let errorMessage = "Unable to complete login. Please try again.";
       if (error?.message) {

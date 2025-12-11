@@ -30,6 +30,8 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
   onCalorieTargetChange,
 }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -49,6 +51,22 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
     loop.start();
     return () => loop.stop();
   }, [pulseAnim]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const recommendedCalories = useMemo(() => {
     if (
@@ -130,7 +148,15 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
   };
 
   return (
-    <View style={styles.card}>
+    <Animated.View 
+      style={[
+        styles.card,
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }]
+        }
+      ]}
+    >
       <Text style={styles.cardTitle}>Your Recommended Calories</Text>
       <Text style={styles.cardSubtitle}>
         We’ll personalize this shortly. Adjustments and smart suggestions are
@@ -173,7 +199,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
           <Text style={styles.stepperLabel}>+</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

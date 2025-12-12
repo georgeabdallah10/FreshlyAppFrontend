@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "SAVR",
+    "scheme": "savr",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -30,6 +30,8 @@
         "NSLocationWhenInUseUsageDescription": "This app needs your location to find nearby grocery stores.",
         "NSCameraUsageDescription": "Allow SAVR to use the camera for barcode scanning.",
         "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification",
           "remote-notification",
           "remote-notification"
         ],
@@ -61,10 +63,38 @@
             "icon": "./assets/images/logo.png",
             "color": "#FD8100"
           }
+        ],
+        [
+          "expo-camera",
+          {
+            "cameraPermission": "Allow SAVR to use the camera for barcode scanning."
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/logo.png",
+            "color": "#FD8100"
+          }
+        ],
+        [
+          "expo-camera",
+          {
+            "cameraPermission": "Allow SAVR to use the camera for barcode scanning."
+          }
+        ],
+        [
+          "expo-notifications",
+          {
+            "icon": "./assets/images/logo.png",
+            "color": "#FD8100"
+          }
         ]
       ],
       "bundleIdentifier": "com.george.MyApp",
       "UIBackgroundModes": [
+        "remote-notification",
+        "remote-notification",
         "remote-notification",
         "remote-notification"
       ]
@@ -82,6 +112,9 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.POST_NOTIFICATIONS"
@@ -109,6 +142,9 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "owner": "abdallah08"
+    "owner": "abdallah08",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

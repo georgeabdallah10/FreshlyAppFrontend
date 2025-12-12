@@ -401,12 +401,13 @@ export default function SavrFeaturesScreen() {
             A simpler way to plan, shop, and eat—personal to you, powered by AI.
             Less stress, less waste, more time back every week.
           </Text>
+          {/*
           <CTAButton
             onPress={() => {
               // Example: open a marketing page or navigate to onboarding
               Linking.openURL("https://example.com/savr"); // replace with your deep link or route
             }}
-          />
+          />*/}
         </View>
 
         <View style={{ height: theme.space.xxl }} />

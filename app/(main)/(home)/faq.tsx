@@ -271,7 +271,7 @@ const FAQScreen = () => {
             onPress={() => console.log("Email sent")}
           >
             <Ionicons name="mail" size={18} color="#FFF" />
-            <Text style={styles.contactButtonText}>david@joinsavr.com</Text>
+            <Text style={styles.contactButtonText}>support@joinsavr.com</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

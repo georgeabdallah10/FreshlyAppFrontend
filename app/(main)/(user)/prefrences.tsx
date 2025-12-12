@@ -1244,19 +1244,22 @@ const styles = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 60,
     justifyContent: "space-between",
+    alignItems: "center",
   },
   welcomeTitle: {
     fontSize: 36,
     fontWeight: "700",
     color: COLORS.dark,
     lineHeight: 44,
+    textAlign: "center",
+    alignSelf: "center",
   },
   logoContainer: {
     alignItems: "center",
   },
   logoImage: {
-    width: 150,
-    height: 150,
+    width: 450,
+    height: 450,
   },
   scrollContent: {
     flexGrow: 1,

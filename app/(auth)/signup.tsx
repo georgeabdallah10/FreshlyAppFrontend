@@ -683,7 +683,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
             <Text style={styles.subtitle}>
               Please enter your details below.
             </Text>
-
+            {/*
             <View style={styles.oauthSection}>
               <TouchableOpacity
                 style={[
@@ -741,6 +741,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
               <Text style={styles.oauthDividerText}>or</Text>
               <View style={styles.oauthDivider} />
             </View>
+             */}
 
             {/* Username Input */}
             <View

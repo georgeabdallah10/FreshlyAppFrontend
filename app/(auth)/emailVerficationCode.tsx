@@ -1,9 +1,9 @@
 // ==================== app/(auth)/emailVerficationCode.tsx ====================
+import ToastBanner from "@/components/generalMessage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -38,6 +38,22 @@ const VerificationScreen = () => {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info" | "confirm";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({ visible: false, type: "info", message: "" });
+
+  const showToast = (type: "success" | "error" | "info", message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
+
   const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
@@ -64,10 +80,7 @@ const VerificationScreen = () => {
       const result = await sendVerificationCode(email);
       if (!mounted) return;
       if (!result.ok) {
-        Alert.alert(
-          "Send Code Error",
-          result.message || "Failed to send verification code."
-        );
+        showToast("error", result.message || "Failed to send verification code.", "Send Code Error");
       }
     })();
     return () => {
@@ -96,11 +109,11 @@ const VerificationScreen = () => {
   const onVerify = async () => {
     const joined = code.join("");
     if (joined.length !== CODE_LENGTH) {
-      Alert.alert("Incomplete", `Please enter the ${CODE_LENGTH}-digit code.`);
+      showToast("error", `Please enter the ${CODE_LENGTH}-digit code.`, "Incomplete");
       return;
     }
     if (!email) {
-      Alert.alert("Error", "No email found. Please log in again.");
+      showToast("error", "No email found. Please log in again.", "Error");
       return;
     }
 
@@ -117,7 +130,7 @@ const VerificationScreen = () => {
 
     try {
       setLoading(true);
-      
+
       const result = await verifyCode({ email, code: joined });
       if (!result.ok) {
         console.log(result.message || "Verification failed");
@@ -128,15 +141,18 @@ const VerificationScreen = () => {
         await refreshUser?.();
       } catch {}
 
-      Alert.alert("Success", "Email verified successfully.", [
-        { text: "OK", onPress: () => handleVerificationSuccess()},
-      ]);
+      setToast({
+        visible: true,
+        type: "success",
+        title: "Success",
+        message: "Email verified successfully.",
+        buttons: [
+          { text: "OK", style: "default", onPress: () => handleVerificationSuccess() },
+        ],
+      });
     } catch (err: any) {
-          console.log(`${email}, ${code}`)
-      Alert.alert(
-        "Verification Error",
-        err?.message || "Failed to verify code."
-      );
+      console.log(`${email}, ${code}`)
+      showToast("error", err?.message || "Failed to verify code.", "Verification Error");
     } finally {
       setLoading(false);
     }
@@ -144,7 +160,7 @@ const VerificationScreen = () => {
 
   const onResend = async () => {
     if (!email) {
-      Alert.alert("Error", "No email found. Please log in again.");
+      showToast("error", "No email found. Please log in again.", "Error");
       return;
     }
     try {
@@ -153,15 +169,12 @@ const VerificationScreen = () => {
       if (!result.ok) {
         console.log(result.message || "Failed to resend code");
       }
-      Alert.alert(
-        "Sent",
-        "A new verification code has been sent to your email."
-      );
+      showToast("success", "A new verification code has been sent to your email.", "Sent");
       // Clear inputs after resend
       setCode(Array(CODE_LENGTH).fill(""));
       inputRefs.current[0]?.focus();
     } catch (err: any) {
-      Alert.alert("Resend Error", err?.message || "Failed to resend code.");
+      showToast("error", err?.message || "Failed to resend code.", "Resend Error");
     } finally {
       setResending(false);
     }
@@ -169,6 +182,14 @@ const VerificationScreen = () => {
 
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <KeyboardAvoidingView
         behavior={Platform.select({ ios: "padding", android: undefined })}
         style={{ flex: 1 }}

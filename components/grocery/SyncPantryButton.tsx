@@ -1,8 +1,8 @@
+import ToastBanner from "@/components/generalMessage";
 import type { GroceryListOut, SyncRemainingItem, SyncWithPantryResponse } from "@/src/services/grocery.service";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -30,7 +30,20 @@ interface SyncPantryButtonProps {
   disabled?: boolean;
 }
 
-type ToastType = "success" | "error" | "info";
+type ToastType = "success" | "error" | "info" | "confirm";
+type ToastButton = {
+  text: string;
+  onPress: () => void;
+  style?: "default" | "destructive" | "cancel";
+};
+
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+  title?: string;
+  buttons?: ToastButton[];
+}
 
 interface SyncResult {
   type: ToastType;
@@ -60,6 +73,70 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
 }) => {
   const [syncing, setSyncing] = useState(false);
   const [lastResult, setLastResult] = useState<SyncResult | null>(null);
+  const [toast, setToast] = useState<ToastState>({ visible: false, type: "info", message: "" });
+
+  const performSync = async () => {
+    try {
+      setSyncing(true);
+      setLastResult(null);
+
+      const response = await onSync(list.id);
+
+      // Determine result type based on what happened
+      const hasChanges = response.items_removed > 0 || response.items_updated > 0;
+      const remainingCount = response.remaining_items?.length ?? 0;
+      const allCovered = remainingCount === 0;
+
+      if (!hasChanges && !allCovered) {
+        // No changes and still have items to buy
+        setLastResult({
+          type: "info",
+          message: "Pantry already synced. No updates needed.",
+          remainingItems: response.remaining_items,
+          itemsRemoved: response.items_removed,
+          itemsUpdated: response.items_updated,
+        });
+      } else if (allCovered) {
+        // All items are covered by pantry!
+        setLastResult({
+          type: "success",
+          message: "All items are covered by your pantry!",
+          remainingItems: [],
+          itemsRemoved: response.items_removed,
+          itemsUpdated: response.items_updated,
+        });
+      } else {
+        // Some items removed/updated, some remaining
+        setLastResult({
+          type: "success",
+          message: response.message || `Sync complete: ${response.items_removed} removed, ${response.items_updated} updated`,
+          remainingItems: response.remaining_items,
+          itemsRemoved: response.items_removed,
+          itemsUpdated: response.items_updated,
+        });
+      }
+
+      // Refetch the list to get fresh data
+      await onSyncComplete();
+    } catch (err: any) {
+      // Handle 403 permission error
+      if (err?.status === 403) {
+        setLastResult({
+          type: "error",
+          message: "You do not have permission to sync this list. Only the owner can sync pantry.",
+          remainingItems: undefined,
+        });
+      } else {
+        setLastResult({
+          type: "error",
+          message: err?.message || "Failed to sync with pantry",
+          remainingItems: undefined,
+        });
+      }
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleSync = () => {
     if (!canSync || disabled) return;
@@ -77,78 +154,20 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
       itemCount: list.items?.length ?? 0,
     });
 
-    Alert.alert(
-      "Sync with Pantry",
-      "This will compare your grocery list with your pantry and remove items you already have. Only items you still need to buy will remain.",
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Sync with Pantry",
+      message: "This will compare your grocery list with your pantry and remove items you already have. Only items you still need to buy will remain.",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Sync",
-          onPress: async () => {
-            try {
-              setSyncing(true);
-              setLastResult(null);
-
-              const response = await onSync(list.id);
-
-              // Determine result type based on what happened
-              const hasChanges = response.items_removed > 0 || response.items_updated > 0;
-              const remainingCount = response.remaining_items?.length ?? 0;
-              const allCovered = remainingCount === 0;
-
-              if (!hasChanges && !allCovered) {
-                // No changes and still have items to buy
-                setLastResult({
-                  type: "info",
-                  message: "Pantry already synced. No updates needed.",
-                  remainingItems: response.remaining_items,
-                  itemsRemoved: response.items_removed,
-                  itemsUpdated: response.items_updated,
-                });
-              } else if (allCovered) {
-                // All items are covered by pantry!
-                setLastResult({
-                  type: "success",
-                  message: "🎉 All items are covered by your pantry!",
-                  remainingItems: [],
-                  itemsRemoved: response.items_removed,
-                  itemsUpdated: response.items_updated,
-                });
-              } else {
-                // Some items removed/updated, some remaining
-                setLastResult({
-                  type: "success",
-                  message: response.message || `Sync complete: ${response.items_removed} removed, ${response.items_updated} updated`,
-                  remainingItems: response.remaining_items,
-                  itemsRemoved: response.items_removed,
-                  itemsUpdated: response.items_updated,
-                });
-              }
-
-              // Refetch the list to get fresh data
-              await onSyncComplete();
-            } catch (err: any) {
-              // Handle 403 permission error
-              if (err?.status === 403) {
-                setLastResult({
-                  type: "error",
-                  message: "You do not have permission to sync this list. Only the owner can sync pantry.",
-                  remainingItems: undefined,
-                });
-              } else {
-                setLastResult({
-                  type: "error",
-                  message: err?.message || "Failed to sync with pantry",
-                  remainingItems: undefined,
-                });
-              }
-            } finally {
-              setSyncing(false);
-            }
-          },
+          style: "default",
+          onPress: performSync,
         },
-      ]
-    );
+      ],
+    });
   };
 
   // If user cannot sync, show explanation instead of button
@@ -167,6 +186,14 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
 
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <TouchableOpacity
         style={[
           styles.syncButton,

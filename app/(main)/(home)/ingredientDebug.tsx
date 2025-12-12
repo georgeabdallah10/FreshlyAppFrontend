@@ -10,6 +10,7 @@
  * in grocery list calculations.
  */
 
+import ToastBanner from '@/components/generalMessage';
 import {
     useIngredientByName,
     useUpdateIngredientConversions,
@@ -24,7 +25,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     KeyboardAvoidingView,
     Platform,
     ScrollView,
@@ -185,6 +185,23 @@ const IngredientDetailScreen: React.FC = () => {
   const params = useLocalSearchParams<{ name?: string; id?: string }>();
   const ingredientName = params.name || '';
 
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'info' | 'confirm';
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'destructive' | 'cancel';
+    }>;
+  }>({ visible: false, type: 'info', message: '' });
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
+
   // State for editing
   const [canonicalUnit, setCanonicalUnit] = useState<CanonicalUnitType>('g');
   const [avgWeightPerUnit, setAvgWeightPerUnit] = useState<number | null>(null);
@@ -213,14 +230,16 @@ const IngredientDetailScreen: React.FC = () => {
 
   const handleGoBack = () => {
     if (hasChanges) {
-      Alert.alert(
-        'Unsaved Changes',
-        'You have unsaved changes. Discard them?',
-        [
-          { text: 'Cancel', style: 'cancel' },
+      setToast({
+        visible: true,
+        type: 'confirm',
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Discard them?',
+        buttons: [
+          { text: 'Cancel', style: 'cancel', onPress: () => {} },
           { text: 'Discard', style: 'destructive', onPress: () => router.back() },
-        ]
-      );
+        ],
+      });
     } else {
       router.back();
     }
@@ -239,9 +258,9 @@ const IngredientDetailScreen: React.FC = () => {
         },
       });
       setHasChanges(false);
-      Alert.alert('Success', 'Ingredient conversion data saved successfully.');
+      showToast('success', 'Ingredient conversion data saved successfully.');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save changes.');
+      showToast('error', err.message || 'Failed to save changes.');
     }
   };
 

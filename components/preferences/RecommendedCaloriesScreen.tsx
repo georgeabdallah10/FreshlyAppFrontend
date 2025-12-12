@@ -7,12 +7,26 @@ import {
     View,
 } from "react-native";
 
+type Goal = "lose-weight" | "weight-gain" | "muscle-gain" | "balanced" | "leaner";
+
+type DietaryPreference =
+  | "halal"
+  | "kosher"
+  | "vegetarian"
+  | "vegan"
+  | "pescatarian";
+
+type TrainingLevel = "light" | "casual" | "intense";
+
 type RecommendedCaloriesScreenProps = {
   age: number | null;
   height: number | null;
   weight: number | null;
   gender: "male" | "female" | null;
-  goal: string;
+  goals: Goal[];
+  dietaryPreferences: DietaryPreference[];
+  isAthlete: boolean;
+  trainingLevel: TrainingLevel | null;
   calorieTarget: number | null;
   onCalorieTargetChange: (value: number) => void;
 };
@@ -20,12 +34,37 @@ type RecommendedCaloriesScreenProps = {
 const MIN_CALORIES = 1200;
 const MAX_CALORIES = 4000;
 
+const GOAL_MULTIPLIERS: Record<Goal, number> = {
+  "lose-weight": -0.15,
+  "weight-gain": 0.1,
+  "muscle-gain": 0.15,
+  balanced: 0,
+  leaner: 0,
+};
+
+const DIETARY_MULTIPLIERS: Record<DietaryPreference, number> = {
+  halal: 0,
+  kosher: 0,
+  vegetarian: -0.03,
+  vegan: -0.05,
+  pescatarian: -0.02,
+};
+
+const ATHLETE_MULTIPLIERS: Record<TrainingLevel, number> = {
+  light: 1.1,
+  casual: 1.15,
+  intense: 1.2,
+};
+
 const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
   age,
   height,
   weight,
   gender,
-  goal,
+  goals,
+  dietaryPreferences,
+  isAthlete,
+  trainingLevel,
   calorieTarget,
   onCalorieTargetChange,
 }) => {
@@ -81,54 +120,75 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
       return null;
     }
 
-    // Mifflin-St Jeor Equation for BMR
-    // Men: BMR = 10W + 6.25H - 5A + 5
-    // Women: BMR = 10W + 6.25H - 5A - 161
-    const bmrBase = 10 * weight + 6.25 * height - 5 * age;
+    const heightCm = height;
+    const weightKg = weight;
+
+    const bmrBase = 10 * weightKg + 6.25 * heightCm - 5 * age;
     const genderOffset = gender === "male" ? 5 : -161;
     const bmr = bmrBase + genderOffset;
 
-    const goalMultiplier = (() => {
-      switch (goal) {
-        case "lose-weight":
-          return 1.2;
-        case "muscle-gain":
-          return 1.55;
-        case "weight-gain":
-          return 1.45;
-        default:
-          return 1.35;
-      }
-    })();
+    const goalMultiplier = goals
+      .map((g) => GOAL_MULTIPLIERS[g] ?? 0)
+      .reduce((acc, val) => acc + val, 1);
+    const clampedGoalMultiplier = Math.min(Math.max(goalMultiplier, 0.8), 1.25);
+    const caloriesAfterGoals = bmr * clampedGoalMultiplier;
 
-    return Math.round(bmr * goalMultiplier);
-  }, [age, height, weight, gender, goal]);
+    const dietaryMultiplier = dietaryPreferences
+      .map((d) => DIETARY_MULTIPLIERS[d] ?? 0)
+      .reduce((acc, val) => acc + val, 1);
+    const clampedDietaryMultiplier = Math.min(
+      Math.max(dietaryMultiplier, 0.9),
+      1.05
+    );
+
+    const caloriesAfterDiet = caloriesAfterGoals * clampedDietaryMultiplier;
+
+    const athleteMultiplier =
+      isAthlete && trainingLevel
+        ? ATHLETE_MULTIPLIERS[trainingLevel] ?? 1
+        : 1;
+
+    const finalCalories = caloriesAfterDiet * athleteMultiplier;
+    return Math.round(finalCalories);
+  }, [age, height, weight, gender, goals, dietaryPreferences, isAthlete, trainingLevel]);
 
   const { minCalories, maxCalories } = useMemo(() => {
     if (!recommendedCalories) {
       return { minCalories: null, maxCalories: null };
     }
-    const min = Math.max(MIN_CALORIES, Math.round(recommendedCalories * 0.75));
-    const max = Math.min(MAX_CALORIES, Math.round(recommendedCalories * 1.35));
+    let min = Math.round(recommendedCalories * 0.85);
+    let max = Math.round(recommendedCalories * 1.2);
+    if (dietaryPreferences.includes("vegan")) {
+      max = Math.round(max * 1.05);
+    }
+    min = Math.max(MIN_CALORIES, min);
+    max = Math.min(MAX_CALORIES, max);
     return { minCalories: min, maxCalories: max };
-  }, [recommendedCalories]);
+  }, [recommendedCalories, dietaryPreferences]);
+
+  const prevRecommendedRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (recommendedCalories && calorieTarget === null) {
-      const clamped = clampCalorieValue(
-        recommendedCalories,
-        minCalories,
-        maxCalories
-      );
-      if (clamped !== null) onCalorieTargetChange(clamped);
+    if (recommendedCalories === null || minCalories === null || maxCalories === null) {
+      return;
     }
-  }, [
-    recommendedCalories,
-    calorieTarget,
-    minCalories,
-    maxCalories,
-    onCalorieTargetChange,
-  ]);
+    const clamped = clampCalorieValue(recommendedCalories, minCalories, maxCalories);
+    if (clamped === null) return;
+
+    const prev = prevRecommendedRef.current;
+    const changedFromInputs = prev !== null && prev !== recommendedCalories;
+    prevRecommendedRef.current = recommendedCalories;
+
+    const targetInvalid =
+      calorieTarget === null ||
+      calorieTarget <= 0 ||
+      calorieTarget < minCalories ||
+      calorieTarget > maxCalories;
+
+    if (targetInvalid || changedFromInputs) {
+      onCalorieTargetChange(clamped);
+    }
+  }, [recommendedCalories, minCalories, maxCalories, calorieTarget, onCalorieTargetChange]);
 
   const displayValue =
     calorieTarget ??

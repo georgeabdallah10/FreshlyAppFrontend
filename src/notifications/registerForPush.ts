@@ -23,12 +23,18 @@ export async function registerForPushNotifications(userId: number) {
     return null;
   }
 
-  // Expo push token
-  const tokenData = await Notifications.getExpoPushTokenAsync({
-    projectId: "YOUR_EXPO_PROJECT_ID",
-  });
-
-  const expoPushToken = tokenData.data;
+  // Expo push token (tolerate missing/invalid projectId while developing)
+  let expoPushToken: string | null = null;
+  try {
+    const tokenData = await Notifications.getExpoPushTokenAsync({
+      projectId: "YOUR_EXPO_PROJECT_ID",
+    });
+    expoPushToken = tokenData.data;
+  } catch (error) {
+    // Swallow validation errors so they don't crash the app during setup
+    console.warn("[Notifications] Unable to fetch Expo push token:", error);
+    return null;
+  }
 
   // Android channel
   if (Platform.OS === "android") {

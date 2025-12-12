@@ -1,9 +1,9 @@
 // ==================== screens/MyProfileScreen.tsx ====================
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Image,
   ScrollView,
@@ -54,6 +54,18 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const logout = userContext?.logout;
   const updateUserInfo = userContext?.updateUserInfo;
   const router = useRouter();
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info";
+    message: string;
+    title?: string;
+  }>({ visible: false, type: "info", message: "" });
+
+  const showToast = (type: "success" | "error" | "info", message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -123,7 +135,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       } // if backend ignores, it's fine
 
       if (Object.keys(payload).length === 0) {
-        Alert.alert("No changes", "There are no updates to save.");
+        showToast("info", "There are no updates to save.", "No changes");
         setIsEditing(false);
         return;
       }
@@ -135,11 +147,11 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       // Update local state optimistically and refresh from server
       setProfile({ ...editedProfile });
       setIsEditing(false);
-      Alert.alert("Success", "Profile updated successfully!");
+      showToast("success", "Profile updated successfully!");
       await refreshUser?.();
     } catch (err) {
       console.log("Error updating profile:", err);
-      Alert.alert("Error", "Failed to update profile. Please try again.");
+      showToast("error", "Failed to update profile. Please try again.", "Error");
     }
   };
 
@@ -160,6 +172,13 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
 
   return (
     <View style={styles.screenContainer}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Icon name="back" size={24} color="#333" />

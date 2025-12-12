@@ -1,4 +1,5 @@
 // ==================== FamilyMemberFlow.tsx ====================
+import ToastBanner from "@/components/generalMessage";
 import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import {
@@ -12,7 +13,6 @@ import * as Clipboard from "expo-clipboard";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   KeyboardAvoidingView,
   Modal,
@@ -44,7 +44,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
   const router = useRouter();
   const userContext = useUser();
   const familyContext = useFamilyContext();
-  
+
   const user = userContext?.user;
   const updateUserInfo = userContext?.updateUserInfo;
   const refreshFamilies = familyContext?.refreshFamilies;
@@ -64,6 +64,25 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
   const [generatedInviteCode, setGeneratedInviteCode] = useState("");
   const [currentFamilyId, setCurrentFamilyId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info" | "confirm";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({ visible: false, type: "info", message: "" });
+
+  const showToast = (
+    type: "success" | "error" | "info",
+    message: string,
+    title?: string
+  ) => {
+    setToast({ visible: true, type, message, title });
+  };
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -176,7 +195,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       }));
       setMembers(mapped);
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed to load members");
+      showToast("error", e.message || "Failed to load members", "Error");
     }
   };
 
@@ -187,12 +206,12 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
   const handleCreateSubmit = async () => {
     if (!familyName.trim()) {
-      Alert.alert("Missing Information", "Please enter a name for your family.");
+      showToast("error", "Please enter a name for your family.", "Missing Information");
       return;
     }
 
     if (familyName.trim().length < 2) {
-      Alert.alert("Invalid Name", "Family name must be at least 2 characters long.");
+      showToast("error", "Family name must be at least 2 characters long.", "Invalid Name");
       return;
     }
 
@@ -220,34 +239,24 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       setCurrentFamilyId(fid);
       setFamilyName("");
       setShowCreateModal(false);
-      setCurrentScreen("memberList");
-      if (fid) await refreshMembers(fid);
 
-      Alert.alert(
-        "Family Created!",
-        `Your family "${
-          res.display_name ?? familyName
-        }" has been created.\n\nInvite Code: ${invite}\n\nShare this code with family members to join.`,
-        [
-          {
-            text: "Copy Code",
-            onPress: () => invite && Clipboard.setStringAsync(invite),
-          },
-          { 
-            text: "OK", 
-            onPress: () => {
-              if (onComplete) {
-                onComplete();
-              } else {
-                router.replace('/(main)/(user)/prefrences');
-              }
-            }
-          },
-        ]
-      );
+      if (onComplete) {
+        onComplete();
+        return;
+      }
+
+      setToast({
+        visible: true,
+        type: "success",
+        title: "Success",
+        message: "Family created successfully.",
+      });
+      setTimeout(() => {
+        router.replace("/(main)/(user)/prefrences");
+      }, 300);
     } catch (e: any) {
       let errorMessage = "Unable to create your family. ";
-      
+
       if (e.message?.toLowerCase().includes("network")) {
         errorMessage = "No internet connection. Please check your network and try again.";
       } else if (e.message?.toLowerCase().includes("timeout")) {
@@ -261,8 +270,8 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       } else {
         errorMessage += "Please try again.";
       }
-      
-      Alert.alert("Unable to Create Family", errorMessage);
+
+      showToast("error", errorMessage, "Unable to Create Family");
     } finally {
       setIsLoading(false);
     }
@@ -277,12 +286,12 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
   const handleJoinSubmit = async () => {
     if (!joinCode.trim()) {
-      Alert.alert("Missing Code", "Please enter a family invite code.");
+      showToast("error", "Please enter a family invite code.", "Missing Code");
       return;
     }
 
     if (joinCode.trim().length < 6) {
-      Alert.alert("Invalid Code", "The invite code appears to be too short. Please check and try again.");
+      showToast("error", "The invite code appears to be too short. Please check and try again.", "Invalid Code");
       return;
     }
 
@@ -309,16 +318,19 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
       await refreshMembers(fid);
 
-      Alert.alert(
-        "Welcome to the Family!", 
-        "You have successfully joined the family.",
-        [
-          { 
-            text: "OK", 
+      setToast({
+        visible: true,
+        type: "success",
+        title: "Welcome to the Family!",
+        message: "You have successfully joined the family.",
+        buttons: [
+          {
+            text: "OK",
+            style: "default",
             onPress: () => {
-             if (onComplete) {
-               onComplete();
-             }
+              if (onComplete) {
+                onComplete();
+              }
               if (refreshFamilies) {
                 refreshFamilies();
               }
@@ -327,11 +339,11 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
               }
             }
           }
-        ]
-      );
+        ],
+      });
     } catch (e: any) {
       let errorMessage = "Unable to join the family. ";
-      
+
       if (e.message?.toLowerCase().includes("network")) {
         errorMessage = "No internet connection. Please check your network and try again.";
       } else if (e.message?.toLowerCase().includes("timeout")) {
@@ -349,8 +361,8 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       } else {
         errorMessage += "Please check the invite code and try again.";
       }
-      
-      Alert.alert("Unable to Join Family", errorMessage);
+
+      showToast("error", errorMessage, "Unable to Join Family");
     } finally {
       setIsLoading(false);
     }
@@ -365,20 +377,23 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       setMembers([...members, member]);
       setNewMember({ name: "", email: "", phone: "" });
       setShowAddModal(false);
-      Alert.alert("Success", "Member added successfully!");
+      showToast("success", "Member added successfully!");
     } else {
-      Alert.alert("Error", "Please fill in all fields");
+      showToast("error", "Please fill in all fields");
     }
   };
 
   const handleDeleteMember = (id: string) => {
-    Alert.alert(
-      "Delete Member",
-      "Are you sure you want to remove this member?",
-      [
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Delete Member",
+      message: "Are you sure you want to remove this member?",
+      buttons: [
         {
           text: "Cancel",
           style: "cancel",
+          onPress: () => {},
         },
         {
           text: "Delete",
@@ -387,8 +402,8 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
             setMembers(members.filter((m) => m.id !== id));
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderInitialScreen = () => (
@@ -479,9 +494,9 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
           onPress={() => {
             if (generatedInviteCode) {
               Clipboard.setStringAsync(generatedInviteCode);
-              Alert.alert("Copied", "Invite code copied to clipboard");
+              showToast("success", "Invite code copied to clipboard", "Copied");
             } else {
-              Alert.alert("No code", "Generate a code to share with members.");
+              showToast("info", "Generate a code to share with members.", "No code");
             }
           }}
           style={{ paddingHorizontal: 12, paddingVertical: 6 }}
@@ -495,9 +510,9 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
               const updated = await regenerateInviteCode(currentFamilyId);
               const newCode = updated.invite_code || updated.inviteCode || "";
               setGeneratedInviteCode(newCode);
-              Alert.alert("New Code", "A new invite code has been generated.");
+              showToast("success", "A new invite code has been generated.", "New Code");
             } catch (e: any) {
-              Alert.alert("Error", e.message || "Failed to regenerate invite code");
+              showToast("error", e.message || "Failed to regenerate invite code", "Error");
             } finally {
               setIsLoading(false);
             }
@@ -546,18 +561,19 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
 
       <TouchableOpacity
         style={styles.addMemberButton}
-onPress={() => {
-  if (!currentFamilyId) {
-    Alert.alert("Create or Join a Family", "Create or join a family first to invite members.");
-    return;
-  }
-  if (generatedInviteCode) {
-    Clipboard.setStringAsync(generatedInviteCode);
-    Alert.alert("Invite", "Invite code copied. Share it with your family.");
-  } else {
-    Alert.alert("Invite", "No invite code yet. Tap Regenerate to create one.");
-  }
-}}        activeOpacity={0.8}
+        onPress={() => {
+          if (!currentFamilyId) {
+            showToast("info", "Create or join a family first to invite members.", "Create or Join a Family");
+            return;
+          }
+          if (generatedInviteCode) {
+            Clipboard.setStringAsync(generatedInviteCode);
+            showToast("success", "Invite code copied. Share it with your family.", "Invite");
+          } else {
+            showToast("info", "No invite code yet. Tap Regenerate to create one.", "Invite");
+          }
+        }}
+        activeOpacity={0.8}
       >
         <Ionicons name="add" size={24} color="#10B981" />
         <Text style={styles.addMemberButtonText}>Add Member</Text>
@@ -566,8 +582,7 @@ onPress={() => {
       <TouchableOpacity
         style={styles.nextButton}
         onPress={() => {
-          Alert.alert("Success", "Family setup complete!");
-          router.replace('/(main)/(home)/main');
+          showToast("success", "Family setup complete!");
         }}
         activeOpacity={0.8}
       >
@@ -597,7 +612,8 @@ onPress={() => {
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+          style={styles.avoidingView}
         >
           <TouchableOpacity
             activeOpacity={1}
@@ -702,7 +718,8 @@ onPress={() => {
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+          style={styles.avoidingView}
         >
           <TouchableOpacity
             activeOpacity={1}
@@ -786,7 +803,8 @@ onPress={() => {
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 80 : 0}
+          style={styles.avoidingView}
         >
           <TouchableOpacity
             activeOpacity={1}
@@ -861,6 +879,14 @@ onPress={() => {
 
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       {currentScreen === "initial" && renderInitialScreen()}
       {currentScreen === "memberList" && renderMemberListScreen()}
       {renderAddMemberModal()}
@@ -879,7 +905,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 40,
+    paddingTop: 70,
   },
   title: {
     fontSize: 32,
@@ -1102,6 +1128,10 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
   modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  avoidingView: {
     flex: 1,
     justifyContent: "flex-end",
   },

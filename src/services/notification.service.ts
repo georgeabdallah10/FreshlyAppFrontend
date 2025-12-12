@@ -158,8 +158,6 @@ export async function getNotifications(query: NotificationsQuery = {}) {
 
 export async function getUnreadCount(): Promise<UnreadCountResponse> {
   const raw = await request<any>(`/notifications/unread-count`);
-  console.log("ERROR WITH NOTI")
-  console.log(raw)
 
   // Be resilient if backend returns weird schema sometimes
   if (typeof raw?.count === "number") return { count: raw.count };

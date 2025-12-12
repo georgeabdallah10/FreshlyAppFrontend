@@ -1,3 +1,4 @@
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import { upsertPantryItemByName } from "@/src/user/pantry";
 import { Ionicons } from "@expo/vector-icons";
@@ -5,7 +6,6 @@ import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Animated,
   Dimensions,
   Image,
@@ -59,6 +59,23 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info" | "confirm";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({ visible: false, type: "info", message: "" });
+
+  const showToast = (type: "success" | "error" | "info", message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
 
   const modalAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -171,10 +188,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
     if (status !== "granted") {
-      Alert.alert(
-        "Permission Denied",
-        "Camera permission is required to take photos."
-      );
+      showToast("error", "Camera permission is required to take photos.", "Permission Denied");
       return;
     }
 
@@ -186,12 +200,19 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
     if (!result.canceled) {
       setTimeout(() => {
-        Alert.alert("Success!", "12 items added successfully to your pantry", [
-          {
-            text: "OK",
-            onPress: () => onClose(),
-          },
-        ]);
+        setToast({
+          visible: true,
+          type: "success",
+          title: "Success!",
+          message: "12 items added successfully to your pantry",
+          buttons: [
+            {
+              text: "OK",
+              style: "default",
+              onPress: () => onClose(),
+            },
+          ],
+        });
       }, 800);
     }
   };
@@ -200,53 +221,53 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     // Check if button is disabled due to cooldown
     if (isButtonDisabled || isSubmitting) {
       if (cooldownRemaining > 0) {
-        Alert.alert(
-          "Please Wait",
-          `Please wait ${cooldownRemaining} seconds before adding another item.`
-        );
+        showToast("info", `Please wait ${cooldownRemaining} seconds before adding another item.`, "Please Wait");
       }
       return;
     }
 
     // Validation
     if (!productName?.trim()) {
-      Alert.alert("Missing Information", "Please enter a product name.");
+      showToast("error", "Please enter a product name.", "Missing Information");
       return;
     }
 
     if (!selectedCategory?.trim()) {
-      Alert.alert("Missing Information", "Please select a category.");
+      showToast("error", "Please select a category.", "Missing Information");
       return;
     }
 
     if (!productQuantity || productQuantity <= 0) {
-      Alert.alert("Invalid Quantity", "Please enter a valid quantity greater than 0.");
+      showToast("error", "Please enter a valid quantity greater than 0.", "Invalid Quantity");
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const result = await addsignleproduct();
 
-      Alert.alert(
-        "Success!",
-        result?.merged
+      setToast({
+        visible: true,
+        type: "success",
+        title: "Success!",
+        message: result?.merged
           ? `${productName} quantity updated in your pantry`
           : `${productName} added successfully to your pantry`,
-        [
+        buttons: [
           {
             text: "OK",
+            style: "default",
             onPress: () => {
               resetForm();
               onClose();
             },
           },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
       startCooldown(30);
-      Alert.alert("Unable to Add Item", error.message || "Please try again.");
+      showToast("error", error.message || "Please try again.", "Unable to Add Item");
     } finally {
       setIsSubmitting(false);
     }
@@ -499,6 +520,14 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="none">
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={{ flex: 1 }}

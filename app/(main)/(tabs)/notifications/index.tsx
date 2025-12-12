@@ -6,6 +6,7 @@
  * Features: Pull-to-refresh, filtering, mark as read, empty state
  */
 
+import ToastBanner from '@/components/generalMessage';
 import NotificationCard from '@/components/NotificationCard';
 import {
   useDeleteNotification,
@@ -19,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { MotiView } from 'moti';
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
   FlatList,
   RefreshControl,
   ScrollView,
@@ -56,6 +56,19 @@ const TABS: TabConfig[] = [
 export default function NotificationsScreen() {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
 
+  // Toast state
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'info' | 'confirm';
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'destructive' | 'cancel';
+    }>;
+  }>({ visible: false, type: 'info', message: '' });
+
   // Queries
   const { data: allNotifications = [], isLoading, refetch } = useNotifications();
   const { data: unreadCountData } = useUnreadCount();
@@ -91,15 +104,21 @@ export default function NotificationsScreen() {
 
   const handleMarkAllAsRead = useCallback(() => {
     if (unreadCount === 0) {
-      Alert.alert('No Unread Notifications', 'All notifications are already marked as read.');
+      setToast({
+        visible: true,
+        type: 'info',
+        message: 'All notifications are already marked as read.',
+      });
       return;
     }
 
-    Alert.alert(
-      'Mark All as Read',
-      `Mark all ${unreadCount} notifications as read?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
+    setToast({
+      visible: true,
+      type: 'confirm',
+      title: 'Mark All as Read',
+      message: `Mark all ${unreadCount} notifications as read?`,
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Mark as Read',
           style: 'default',
@@ -107,17 +126,19 @@ export default function NotificationsScreen() {
             markAllAsRead.mutate();
           },
         },
-      ]
-    );
+      ],
+    });
   }, [unreadCount, markAllAsRead]);
 
   const handleDelete = useCallback(
     (notificationId: number) => {
-      Alert.alert(
-        'Delete Notification',
-        'Are you sure you want to delete this notification?',
-        [
-          { text: 'Cancel', style: 'cancel' },
+      setToast({
+        visible: true,
+        type: 'confirm',
+        title: 'Delete Notification',
+        message: 'Are you sure you want to delete this notification?',
+        buttons: [
+          { text: 'Cancel', style: 'cancel', onPress: () => {} },
           {
             text: 'Delete',
             style: 'destructive',
@@ -125,8 +146,8 @@ export default function NotificationsScreen() {
               deleteNotification.mutate(notificationId);
             },
           },
-        ]
-      );
+        ],
+      });
     },
     [deleteNotification]
   );
@@ -134,11 +155,12 @@ export default function NotificationsScreen() {
   const handleEnableNotifications = useCallback(async () => {
     const granted = await requestPermissions();
     if (!granted) {
-      Alert.alert(
-        'Permissions Required',
-        'Please enable notifications in your device settings to receive important updates.',
-        [{ text: 'OK' }]
-      );
+      setToast({
+        visible: true,
+        type: 'info',
+        title: 'Permissions Required',
+        message: 'Please enable notifications in your device settings to receive important updates.',
+      });
     }
   }, [requestPermissions]);
 
@@ -148,6 +170,15 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
+
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Notifications</Text>

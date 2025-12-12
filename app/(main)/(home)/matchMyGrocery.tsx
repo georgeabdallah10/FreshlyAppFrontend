@@ -11,7 +11,6 @@ import {
   TextInput,
   Modal,
   Animated,
-  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -60,8 +59,14 @@ export default function MatchMyGroceryScreen() {
 
   const [toast, setToast] = useState<{
     visible: boolean;
-    type: "success" | "error" | "info";
+    type: "success" | "error" | "info" | "confirm";
     message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
     duration?: number;
     topOffset?: number;
   }>({ visible: false, type: "success", message: "", topOffset: 60 });
@@ -214,14 +219,16 @@ export default function MatchMyGroceryScreen() {
 
   const handleRemoveItem = (id: string) => {
     const target = groceryItems.find(i => i.id === id);
-    Alert.alert(
-      "Remove item",
-      `Are you sure you want to remove "${target?.name ?? "this item"}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Remove item",
+      message: `Are you sure you want to remove "${target?.name ?? "this item"}"?`,
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         { text: "Remove", style: "destructive", onPress: () => setGroceryItems(prev => prev.filter(i => i.id !== id)) }
-      ]
-    );
+      ],
+    });
   };
 
   const handleToggleAvailability = (id: string) => {
@@ -505,8 +512,8 @@ export default function MatchMyGroceryScreen() {
         <TouchableOpacity
           style={styles.mainButton}
           onPress={() => {
-            Alert.alert("Success", "Order placed successfully!");
-            router.back();
+            showToast("success", "Order placed successfully!");
+            setTimeout(() => router.back(), 500);
           }}
         >
           <Text style={styles.mainButtonText}>Order Now</Text>
@@ -521,6 +528,8 @@ export default function MatchMyGroceryScreen() {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
         onHide={() => setToast((t) => ({ ...t, visible: false }))}
         topOffset={toast.topOffset ?? 60}
       />

@@ -198,12 +198,6 @@ const HomeDashboard = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [targetMeasurements, setTargetMeasurements] = useState<Record<string, TargetMeasurements>>({});
 
-  // Animation values
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const headerFadeAnim = useRef(new Animated.Value(0)).current;
-  const welcomeFadeAnim = useRef(new Animated.Value(0)).current;
-
   // Refs for measuring positions
   const pantryRef = useRef<View>(null);
   const mealPlansRef = useRef<View>(null);
@@ -216,41 +210,6 @@ const HomeDashboard = () => {
   const chatButtonRef = useRef<View>(null);
   const familyButtonRef = useRef<View>(null);
   const settingsButtonRef = useRef<View>(null);
-
-  // Entrance animations - super fast and snappy
-  useEffect(() => {
-    Animated.sequence([
-      // Header fades in first
-      Animated.timing(headerFadeAnim, {
-        toValue: 1,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-      // Then welcome text
-      Animated.timing(welcomeFadeAnim, {
-        toValue: 1,
-        duration: 180,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    // Menu items and chat section fade in together
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 220,
-        delay: 100,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        delay: 100,
-        friction: 8,
-        tension: 120,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   // Check if tutorial should be shown - AFTER animations complete
   useEffect(() => {
@@ -373,128 +332,101 @@ const HomeDashboard = () => {
         showsVerticalScrollIndicator={false}
         scrollEnabled={!showTutorial}
       >
-        <Animated.View 
-          style={{
-            opacity: headerFadeAnim,
-          }}
-        >
-          <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.menuButton}
-              activeOpacity={0.6}
-              onPress={() => router.push("/(main)/(home)/faq")}
-              disabled={showTutorial}
-            >
-              <View style={styles.menuIcon}>
-                <Image
-                  source={require("../../../assets/icons/q&a.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
-            <View style={styles.logoContainer}>
-              <Image
-                source={require("../../../assets/images/logo.png")} // Update with your image path
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </View>
-            <NotificationBell
-              iconSize={24}
-              iconColor="#1F2937"
-              badgeColor="#FF3B30"
-              onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
-              extraCount={pendingShareCount}
-              containerStyle={styles.notificationButton}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            activeOpacity={0.6}
+            onPress={() => router.push("/(main)/(home)/faq")}
+            disabled={showTutorial}
+          >
+            <IconButton
+              iconName="accessibility-outline"
+              style={styles.headerIconButton}
+              iconContainerStyle={styles.headerIconContainer}
             />
-          </View>
-        </Animated.View>
-
-        {/* Welcome Text */}
-        <Animated.View
-          style={{
-            opacity: welcomeFadeAnim,
-          }}
-        >
-          <Text style={styles.welcomeText}>
-            <Text style={{ color: "#00A86B" }}> Smarter Shopping.</Text> {"\n"}
-            <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
-          </Text>
-        </Animated.View>
-        {/* Menu Grid */}
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
-        >
-          <View style={styles.menuGrid}>
-          {menuItems.map((item) => {
-            // Assign refs based on menu item title
-            let itemRef;
-            if (item.title === 'Pantry') itemRef = pantryRef;
-            else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
-            else if (item.title === 'Grocery Lists') itemRef = groceryRef;
-            else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
-
-            return (
-              <TouchableOpacity
-                key={item.id}
-                ref={itemRef}
-                style={[styles.menuCard, { backgroundColor: item.bgColor }]}
-                onPress={() => handleMenuPress(item)}
-                activeOpacity={0.8}
-                disabled={showTutorial}
-              >
-                <View style={styles.menuCardHeader}>
-                  <View style={styles.menuIconContainer}>
-                    <Image
-                      source={item.iconSource}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text style={styles.menuCardTitle}>{item.title}</Text>
-                </View>
-                <View style={styles.menuCardFooter}>
-                  <Text style={styles.menuCardSubtitle}>{item.subtitle}</Text>
-                  <Text style={styles.arrowIcon}>→</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        </Animated.View>
-
-        {/* Start New Chat Section */}
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }}
-        >
-          <View ref={allFeaturesRef} style={styles.chatSection}>
-          <View style={styles.chatIconContainer}>
+            <View style={styles.menuIcon}></View>
+          </TouchableOpacity>
+          <View style={styles.logoContainer}>
             <Image
-              source={chatIconSource}
-              style={styles.chatSectionIcon}
+              source={require("../../../assets/images/logo.png")} // Update with your image path
+              style={styles.logoImage}
               resizeMode="contain"
             />
           </View>
-          <Text style={styles.chatSectionTitle}>All features</Text>
-
-          <TouchableOpacity
-            style={styles.startChatButton}
-            onPress={handleStartChat}
-            activeOpacity={0.9}
-            disabled={showTutorial}
-          >
-            <Text style={styles.startChatButtonText}>Explore more</Text>
-            <Text style={styles.startChatArrow}>→</Text>
-          </TouchableOpacity>
+          <NotificationBell
+            iconSize={24}
+            iconColor="#1F2937"
+            badgeColor="#FF3B30"
+            onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
+            extraCount={pendingShareCount}
+            containerStyle={styles.notificationButton}
+          />
         </View>
-        </Animated.View>
+
+        {/* Welcome Text */}
+        <Text style={styles.welcomeText}>
+          <Text style={{ color: "#00A86B" }}> Smarter Shopping.</Text> {"\n"}
+          <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+        </Text>
+        {/* Menu Grid */}
+        <View style={styles.menuGrid}>
+        {menuItems.map((item) => {
+          // Assign refs based on menu item title
+          let itemRef;
+          if (item.title === 'Pantry') itemRef = pantryRef;
+          else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
+          else if (item.title === 'Grocery Lists') itemRef = groceryRef;
+          else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
+
+          return (
+            <TouchableOpacity
+              key={item.id}
+              ref={itemRef}
+              style={[styles.menuCard, { backgroundColor: item.bgColor }]}
+              onPress={() => handleMenuPress(item)}
+              activeOpacity={0.8}
+              disabled={showTutorial}
+            >
+              <View style={styles.menuCardHeader}>
+                <View style={styles.menuIconContainer}>
+                  <Image
+                    source={item.iconSource}
+                    style={styles.menuCardIcon}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.menuCardTitle}>{item.title}</Text>
+              </View>
+              <View style={styles.menuCardFooter}>
+                <Text style={styles.menuCardSubtitle}>{item.subtitle}</Text>
+                <Text style={styles.arrowIcon}>→</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+        {/* Start New Chat Section */}
+        <View ref={allFeaturesRef} style={styles.chatSection}>
+        <View style={styles.chatIconContainer}>
+          <Image
+            source={chatIconSource}
+            style={styles.chatSectionIcon}
+            resizeMode="contain"
+          />
+        </View>
+        <Text style={styles.chatSectionTitle}>All features</Text>
+
+        <TouchableOpacity
+          style={styles.startChatButton}
+          onPress={handleStartChat}
+          activeOpacity={0.9}
+          disabled={showTutorial}
+        >
+          <Text style={styles.startChatButtonText}>Explore more</Text>
+          <Text style={styles.startChatArrow}>→</Text>
+        </TouchableOpacity>
+      </View>
       </ScrollView>
 
       {/* Bottom Navigation Component */}
@@ -566,6 +498,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
     justifyContent: "center",
     alignItems: "center",
+  },
+  headerIconButton: {
+    padding: 0,
+    marginTop: 22
+  },
+  headerIconContainer: {
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "transparent",
   },
   notificationIcon: {
     fontSize: 24,

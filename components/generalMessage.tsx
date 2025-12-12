@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: "center",
-    zIndex: 999,
+    zIndex: 10001,
   },
   card: {
     maxWidth: 360,

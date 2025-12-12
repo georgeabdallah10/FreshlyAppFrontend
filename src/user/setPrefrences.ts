@@ -7,6 +7,8 @@ export type setPrefrencesInput = {
   disliked_ingredient_ids: number[];
   goal: string;
   calorie_target: number | null;
+  is_athlete?: boolean;
+  training_level?: "light" | "casual" | "intense" | null;
 };
 
 export type UserPreferenceOut = {
@@ -46,6 +48,9 @@ export async function setPrefrences(
       disliked_ingredient_ids: input.disliked_ingredient_ids,
       goal: input.goal,
       calorie_target: input.calorie_target,
+      is_athlete: input.is_athlete ?? false,
+      training_level:
+        input.is_athlete === false ? null : input.training_level ?? null,
     }),
   });
 

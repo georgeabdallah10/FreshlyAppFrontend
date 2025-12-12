@@ -3,7 +3,7 @@ import { useUser } from "@/context/usercontext";
 import type { ParsedAddress } from "@/hooks/useGooglePlaces";
 import type { LocationObject } from "expo-location";
 import * as Location from "expo-location";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -21,6 +21,8 @@ type LocationResult = {
 
 const LocationScreens = () => {
   const router = useRouter();
+  const { fromOnboarding } = useLocalSearchParams();
+  const isOnboarding = fromOnboarding === "true";
   const userContext = useUser();
   
   const user = userContext?.user;
@@ -155,7 +157,11 @@ const LocationScreens = () => {
       await refreshUser();
     }
     alert("Locatoin was succesfully set");
-    router.replace("/(main)/(home)/main");
+    if (isOnboarding) {
+      router.replace("/(auth)/familyAuth");
+    } else {
+      router.replace("/(main)/(home)/main");
+    }
   };
 
   const handleClearSearch = () => {
@@ -191,7 +197,11 @@ const LocationScreens = () => {
         await refreshUser();
       }
       alert("Location was successfully set");
-      router.replace("/(main)/(home)/main");
+      if (isOnboarding) {
+        router.replace("/(auth)/familyAuth");
+      } else {
+        router.replace("/(main)/(home)/main");
+      }
     } catch (error) {
       console.log("Error updating location:", error);
       alert("Failed to update location. Please try again.");

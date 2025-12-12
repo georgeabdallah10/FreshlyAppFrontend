@@ -103,16 +103,15 @@ interface HomeTutorialProps {
 // Check if tutorial has been completed
 export const checkTutorialCompleted = async (): Promise<boolean> => {
   // TEMPORARY: Always return false for testing - tutorial will show on every reload
-  return false;
   
   // TODO: Uncomment below for production
-  // try {
-  //   const value = await Storage.getItem(TUTORIAL_KEY);
-  //   return value === 'true';
-  // } catch (error) {
-  //   console.log('Error checking tutorial status:', error);
-  //   return false;
-  // }
+  try {
+     const value = await Storage.getItem(TUTORIAL_KEY);
+     return value === 'true';
+  } catch (error) {
+    console.log('Error checking tutorial status:', error);
+    return false;
+  }
 };
 
 // Mark tutorial as completed

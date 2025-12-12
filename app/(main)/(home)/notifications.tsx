@@ -14,7 +14,6 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
     ActivityIndicator,
-    Alert,
     LayoutAnimation,
     Platform,
     Pressable,
@@ -43,8 +42,14 @@ const NotificationsScreen = () => {
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [toast, setToast] = useState<{
     visible: boolean;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'confirm';
     message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'destructive' | 'cancel';
+    }>;
   }>({ visible: false, type: 'success', message: '' });
 
   const handleCategoryChange = (newCategory: CategoryFilter) => {
@@ -155,11 +160,13 @@ const NotificationsScreen = () => {
   };
 
   const handleDeleteAllRead = () => {
-    Alert.alert(
-      'Delete Read Notifications',
-      'Are you sure you want to delete all read notifications?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    setToast({
+      visible: true,
+      type: 'confirm',
+      title: 'Delete Read Notifications',
+      message: 'Are you sure you want to delete all read notifications?',
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: () => {} },
         {
           text: 'Delete',
           style: 'destructive',
@@ -180,8 +187,8 @@ const NotificationsScreen = () => {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleNotificationPress = async (notification: Notification) => {
@@ -242,6 +249,8 @@ const NotificationsScreen = () => {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
         onHide={() => setToast({ ...toast, visible: false })}
       />
 

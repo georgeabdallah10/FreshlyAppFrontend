@@ -10,7 +10,6 @@ import {
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Image,
   ScrollView,
@@ -53,11 +52,18 @@ const buildUpdateInputFromMeal = (m: Meal) => ({
   isFavorite: m.isFavorite,
 });
 
-type ToastType = "success" | "error";
+type ToastType = "success" | "error" | "confirm" | "info";
+type ToastButton = {
+  text: string;
+  onPress: () => void;
+  style?: "default" | "destructive" | "cancel";
+};
 interface ToastState {
   visible: boolean;
   type: ToastType;
   message: string;
+  title?: string;
+  buttons?: ToastButton[];
   duration?: number;
   topOffset?: number;
 }
@@ -155,9 +161,9 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       const payload = buildUpdateInputFromMeal(editedMeal);
       await updateMealForSignleUser(meal.id, payload as any);
       setIsEditing(false);
-      Alert.alert("Success", "Meal updated successfully!");
+      showToast("success", "Meal updated successfully!");
     } catch (e: any) {
-      Alert.alert("Update failed", e?.message ?? "Please try again.");
+      showToast("error", e?.message ?? "Update failed. Please try again.");
     } finally {
       setSaving(false);
     }
@@ -169,11 +175,13 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      "Delete meal",
-      "Are you sure you want to delete this meal?",
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Delete meal",
+      message: "Are you sure you want to delete this meal?",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Delete",
           style: "destructive",
@@ -181,18 +189,17 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             try {
               setDeleting(true);
               await deleteMealForSignleUser(meal.id);
-              Alert.alert("Deleted", "Meal deleted successfully.");
-              onBack();
+              showToast("success", "Meal deleted successfully.");
+              setTimeout(() => onBack(), 500);
             } catch (e: any) {
-              Alert.alert("Delete failed", e?.message ?? "Please try again.");
+              showToast("error", e?.message ?? "Delete failed. Please try again.");
             } finally {
               setDeleting(false);
             }
           },
         },
       ],
-      { cancelable: true }
-    );
+    });
   };
 
   const toggleFavorite = async () => {
@@ -515,6 +522,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         </View>
 
         {/* Tags */}
+        {/*0
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tags</Text>
           <View style={styles.tagsContainer}>
@@ -549,9 +557,10 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </View>*/}
 
         {/* Diet & Goals */}
+        {/*}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Diet & Goals</Text>
           <View style={styles.pillsContainer}>
@@ -574,7 +583,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               </View>
             ))}
           </View>
-        </View>
+        </View>*/}
 
         {/* Ingredients */}
         <View style={styles.section}>
@@ -652,12 +661,14 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         </View>
 
         {/* Grocery List Actions */}
+        {/*
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add to Grocery List</Text>
           <Text style={styles.sectionSubtitle}>
             Missing ingredients will be added automatically
           </Text>
           <View style={styles.groceryButtonsContainer}>
+            
             <TouchableOpacity
               style={[styles.groceryButton, styles.groceryButtonPersonal]}
               onPress={() => handleAddToGroceryList('personal')}
@@ -693,8 +704,10 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             )}
           </View>
         </View>
+        */}
 
         {/* Cooking Tools */}
+        {/*
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Cooking Tools</Text>
           <View style={styles.toolsContainer}>
@@ -717,7 +730,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
               </View>
             ))}
           </View>
-        </View>
+        </View>*/}
 
         {/* Instructions */}
         <View style={styles.section}>
@@ -796,7 +809,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           onClose={() => setShowShareModal(false)}
           onSuccess={() => {
             setShowShareModal(false);
-            Alert.alert("Success", "Share request sent successfully!");
+            showToast("success", "Share request sent successfully!");
           }}
         />
       )}
@@ -806,6 +819,8 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
         duration={toast.duration ?? 3000}
         topOffset={toast.topOffset ?? 40}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}

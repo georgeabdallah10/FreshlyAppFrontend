@@ -16,7 +16,6 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -28,11 +27,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-type ToastType = "success" | "error" | "info";
+type ToastType = "success" | "error" | "info" | "confirm";
+type ToastButton = {
+  text: string;
+  onPress: () => void;
+  style?: "default" | "destructive" | "cancel";
+};
 interface ToastState {
   visible: boolean;
   type: ToastType;
   message: string;
+  title?: string;
+  buttons?: ToastButton[];
   duration?: number;
   topOffset?: number;
 }
@@ -294,11 +300,13 @@ const GroceryListDetailScreen: React.FC = () => {
       ? `Remove "${itemName}" from the list?`
       : `"${itemName}" was added from a recipe. Are you sure you want to remove it? It may be added back if you rebuild from the meal plan.`;
 
-    Alert.alert(
+    setToast({
+      visible: true,
+      type: "confirm",
       title,
       message,
-      [
-        { text: "Cancel", style: "cancel" },
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Remove",
           style: "destructive",
@@ -311,8 +319,8 @@ const GroceryListDetailScreen: React.FC = () => {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleClearChecked = () => {
@@ -324,11 +332,13 @@ const GroceryListDetailScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
-      "Clear Checked Items",
-      `Remove ${checkedCount} checked item${checkedCount !== 1 ? "s" : ""}?`,
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Clear Checked Items",
+      message: `Remove ${checkedCount} checked item${checkedCount !== 1 ? "s" : ""}?`,
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Clear",
           style: "destructive",
@@ -344,18 +354,20 @@ const GroceryListDetailScreen: React.FC = () => {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleDeleteList = () => {
     if (!selectedList) return;
 
-    Alert.alert(
-      "Delete List",
-      `Are you sure you want to delete "${selectedList.title || "this grocery list"}"? This action cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Delete List",
+      message: `Are you sure you want to delete "${selectedList.title || "this grocery list"}"? This action cannot be undone.`,
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Delete",
           style: "destructive",
@@ -371,8 +383,8 @@ const GroceryListDetailScreen: React.FC = () => {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   // Phase F4: Rebuild grocery list from meal plan
@@ -382,13 +394,16 @@ const GroceryListDetailScreen: React.FC = () => {
       return;
     }
 
-    Alert.alert(
-      "Rebuild Grocery List",
-      "This will refresh the list based on your current meal plan and pantry. Manual items will be kept.",
-      [
-        { text: "Cancel", style: "cancel" },
+    setToast({
+      visible: true,
+      type: "confirm",
+      title: "Rebuild Grocery List",
+      message: "This will refresh the list based on your current meal plan and pantry. Manual items will be kept.",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Rebuild",
+          style: "default",
           onPress: async () => {
             try {
               const response = await rebuildFromMealPlan(selectedList.id, selectedList.meal_plan_id!);
@@ -399,8 +414,8 @@ const GroceryListDetailScreen: React.FC = () => {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   // Phase F5: Open debug screen (hidden developer feature)
@@ -564,6 +579,8 @@ const GroceryListDetailScreen: React.FC = () => {
         visible={toast.visible}
         type={toast.type}
         message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
         duration={toast.duration}
         topOffset={toast.topOffset}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}

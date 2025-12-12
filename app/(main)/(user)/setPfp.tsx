@@ -21,7 +21,7 @@ import {
 
 
 
-type Step = "initial" | "scanning" | "captured" | "success";
+type Step = "initial" | "scanning" | "success";
 type ToastType = "success" | "error";
 interface ToastState {
   visible: boolean;
@@ -198,12 +198,18 @@ export const SetPfp = () => {
 
   // Progress animation
   useEffect(() => {
+    Animated.timing(progressAnimation, {
+      toValue: progress,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+
     if (currentStep === "scanning") {
       const interval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 100) {
             clearInterval(interval);
-            setTimeout(() => setCurrentStep("captured"), 500);
+            setTimeout(() => setCurrentStep("success"), 500);
             return 100;
           }
           return prev + 2;
@@ -248,6 +254,8 @@ export const SetPfp = () => {
         return;
       }
 
+      setProgress(0);
+      progressAnimation.setValue(0);
       setCurrentStep("scanning");
       setUploading(true);
 
@@ -294,7 +302,7 @@ export const SetPfp = () => {
       }
 
       setUploading(false);
-      setCurrentStep("captured");
+      setCurrentStep("success");
     } catch (err: any) {
       setUploading(false);
       
@@ -340,6 +348,8 @@ export const SetPfp = () => {
         return;
       }
 
+      setProgress(0);
+      progressAnimation.setValue(0);
       setCurrentStep("scanning");
       setUploading(true);
 
@@ -386,7 +396,7 @@ export const SetPfp = () => {
       }
 
       setUploading(false);
-      setCurrentStep("captured");
+      setCurrentStep("success");
     } catch (err: any) {
       setUploading(false);
       
@@ -411,13 +421,12 @@ export const SetPfp = () => {
   const handleContinue = () => {
     if (fromProfile == "true") {
       router.back();
-    } else {
-      if (currentStep === "captured") {
-        setCurrentStep("success");
-      } else if (currentStep === "success") {
-        showToast("success", "Account created successfully!");
-        router.replace("/(auth)/familyAuth");
-      }
+    } else if (currentStep === "success") {
+      showToast("success", "Account created successfully!");
+      router.replace({
+        pathname: "/(main)/(user)/getLocation",
+        params: { fromOnboarding: "true" },
+      });
     }
   };
 
@@ -461,35 +470,63 @@ export const SetPfp = () => {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.scanButton, !userID && { opacity: 0.6 }]}
+          style={[styles.scanButton, (!userID || uploading) && { opacity: 0.6 }]}
           onPress={() => {
             console.log('[setPfp] Take Photo pressed, userID:', userID);
             if (!userID) {
               showToast("error", "Please wait, loading user information...");
               return;
             }
+            if (uploading) return;
             handleTakePhoto();
           }}
           activeOpacity={0.9}
-          disabled={!userID}
+          disabled={!userID || uploading}
         >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.fillOverlay,
+              {
+                width: progressAnimation.interpolate({
+                  inputRange: [0, 100],
+                  outputRange: ["0%", "100%"],
+                }),
+                opacity: uploading ? 1 : 0,
+              },
+            ]}
+          />
           <Icon name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
           <Text style={styles.scanButtonText}>Take Photo</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.galleryButton, !userID && { opacity: 0.6 }]}
+          style={[styles.galleryButton, (!userID || uploading) && { opacity: 0.6 }]}
           onPress={() => {
             console.log('[setPfp] Choose from Gallery pressed, userID:', userID);
             if (!userID) {
               showToast("error", "Please wait, loading user information...");
               return;
             }
+            if (uploading) return;
             handleChooseFromGallery();
           }}
           activeOpacity={0.9}
-          disabled={!userID}
+          disabled={!userID || uploading}
         >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.fillOverlayLight,
+              {
+                width: progressAnimation.interpolate({
+                  inputRange: [0, 100],
+                  outputRange: ["0%", "100%"],
+                }),
+                opacity: uploading ? 1 : 0,
+              },
+            ]}
+          />
           <Icon name="image" size={20} color="#00A86B" style={{ marginRight: 8 }} />
           <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
         </TouchableOpacity>
@@ -539,45 +576,15 @@ export const SetPfp = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.nextButton}
-          onPress={() => setCurrentStep("captured")}
+          style={[styles.nextButton, uploading && { opacity: 0.4 }]}
+          onPress={() => !uploading && setCurrentStep("success")}
+          disabled={uploading}
         >
           <Text style={styles.nextButtonText}>→</Text>
         </TouchableOpacity>
       </View>
     );
   };
-
-  const renderCapturedScreen = () => (
-    <View style={styles.content}>
-      <Text style={styles.title}>Profile Picture is set!</Text>
-      <Text style={styles.subtitle}>
-        Please put your phone in front{"\n"}of your face.
-      </Text>
-
-      <View style={styles.capturedImageContainer}>
-        <View style={styles.capturedImageCircle}>
-          {selectedImage ? (
-            <Image
-              source={{ uri: selectedImage }}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
-            />
-          ) : (
-            <Text style={styles.capturedImageEmoji}>👨</Text>
-          )}
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={styles.continueButton}
-        onPress={handleContinue}
-        activeOpacity={0.9}
-      >
-        <Text style={styles.continueButtonText}>→</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   const renderSuccessScreen = () => {
     const scale = successAnimation.interpolate({
@@ -635,7 +642,6 @@ export const SetPfp = () => {
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       {currentStep === "initial" && renderInitialScreen()}
       {currentStep === "scanning" && renderScanningScreen()}
-      {currentStep === "captured" && renderCapturedScreen()}
       {currentStep === "success" && renderSuccessScreen()}
       <ToastBanner
         visible={toast.visible}
@@ -740,6 +746,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F5F5F5",
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   galleryButtonText: {
     fontSize: 16,
@@ -833,42 +840,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
   },
-  capturedImageContainer: {
-    alignItems: "center",
-    marginBottom: 100,
-  },
-  capturedImageCircle: {
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    backgroundColor: "#f0f0f0",
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  capturedImageEmoji: {
-    fontSize: 120,
-  },
-  continueButton: {
-    position: "absolute",
-    bottom: 40,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#00A86B",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#00A86B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  continueButtonText: {
-    fontSize: 28,
-    color: "#fff",
-    fontWeight: "600",
-  },
   successContainer: {
     flex: 1,
     alignItems: "center",
@@ -946,6 +917,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     color: "#fff",
+  },
+  fillOverlay: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 28,
+  },
+  fillOverlayLight: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 168, 107, 0.1)",
+    borderRadius: 28,
   },
 });
 

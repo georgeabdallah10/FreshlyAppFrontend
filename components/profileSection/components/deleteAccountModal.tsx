@@ -1,10 +1,10 @@
+import ToastBanner from '@/components/generalMessage';
 import { useUser } from '@/context/usercontext';
 import { deleteUserAccount } from '@/src/services/user.service';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   StyleSheet,
   Text,
@@ -23,18 +23,33 @@ const DeleteAccountModal: React.FC<Props> = ({ visible, onClose }) => {
   const logout = userContext?.logout;
   const router = useRouter();
 
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'info' | 'confirm';
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: 'default' | 'destructive' | 'cancel';
+    }>;
+  }>({ visible: false, type: 'info', message: '' });
+
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
       await deleteUserAccount();
 
       // Account deleted successfully
-      Alert.alert(
-        'Account Deleted',
-        'Your account has been permanently deleted.',
-        [
+      setToast({
+        visible: true,
+        type: 'success',
+        title: 'Account Deleted',
+        message: 'Your account has been permanently deleted.',
+        buttons: [
           {
             text: 'OK',
+            style: 'default',
             onPress: async () => {
               onClose();
               // Logout and redirect to auth screen
@@ -44,14 +59,16 @@ const DeleteAccountModal: React.FC<Props> = ({ visible, onClose }) => {
               router.replace('/(auth)/Login');
             },
           },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
       console.log('Error deleting account:', error);
-      Alert.alert(
-        'Error',
-        error?.message || 'Failed to delete account. Please try again.'
-      );
+      setToast({
+        visible: true,
+        type: 'error',
+        title: 'Error',
+        message: error?.message || 'Failed to delete account. Please try again.',
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -64,6 +81,14 @@ const DeleteAccountModal: React.FC<Props> = ({ visible, onClose }) => {
       animationType="fade"
       onRequestClose={onClose}
     >
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <View style={styles.overlay}>
         <View style={styles.modalContainer}>
           <Text style={styles.title}>Delete Account</Text>

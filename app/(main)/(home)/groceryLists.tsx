@@ -52,7 +52,7 @@ const GroceryListsScreen: React.FC = () => {
   const isInFamily = userContext?.isInFamily ?? false;
   
   const [refreshing, setRefreshing] = useState(false);
-  const [mode, setMode] = useState<GroceryMode>("lists");
+  const [mode, setMode] = useState<GroceryMode>("upload");
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -266,6 +266,7 @@ const GroceryListsScreen: React.FC = () => {
       </Animated.View>
 
       {/* Mode Segmented Control */}
+      {/*
       <Animated.View 
         style={[
           styles.segmentedControl,
@@ -275,6 +276,7 @@ const GroceryListsScreen: React.FC = () => {
           }
         ]}
       >
+        
         <TouchableOpacity
           style={[
             styles.segmentButton,
@@ -311,6 +313,7 @@ const GroceryListsScreen: React.FC = () => {
           </Text>
         </TouchableOpacity>
       </Animated.View>
+      */}
 
       {/* Content */}
       <Animated.View 

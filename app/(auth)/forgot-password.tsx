@@ -1,3 +1,4 @@
+import ToastBanner from "@/components/generalMessage";
 import React, { useState, useRef, useEffect } from "react";
 import {
   View,
@@ -10,7 +11,6 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -24,6 +24,23 @@ const CODE_LENGTH = 6;
 
 export default function ForgotPasswordScreen(): React.JSX.Element {
   const router = useRouter();
+
+  // ----- toast state -----
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: "success" | "error" | "info" | "confirm";
+    message: string;
+    title?: string;
+    buttons?: Array<{
+      text: string;
+      onPress: () => void;
+      style?: "default" | "destructive" | "cancel";
+    }>;
+  }>({ visible: false, type: "info", message: "" });
+
+  const showToast = (type: "success" | "error" | "info", message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
 
   // ----- shared animations -----
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -92,17 +109,17 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
   const handleSendCode = async () => {
     pulseButton();
     if (!email.trim()) {
-      Alert.alert("Enter email", "Please enter your account email.");
+      showToast("error", "Please enter your account email.", "Enter email");
       return;
     }
     setLoading(true);
     const res = await requestPasswordReset(email.trim());
     setLoading(false);
     if (!res.ok) {
-      Alert.alert("Error", res.message || "Failed to send code.");
+      showToast("error", res.message || "Failed to send code.", "Error");
       return;
     }
-    Alert.alert("Check your email", "We sent you a 6-digit code.");
+    showToast("success", "We sent you a 6-digit code.", "Check your email");
     setStep("code");
   };
 
@@ -126,14 +143,14 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
     pulseButton();
     const joined = code.join("");
     if (joined.length !== CODE_LENGTH) {
-      Alert.alert("Incomplete", `Enter the ${CODE_LENGTH}-digit code.`);
+      showToast("error", `Enter the ${CODE_LENGTH}-digit code.`, "Incomplete");
       return;
     }
     setLoading(true);
     const res = await verifyPasswordResetCode(email.trim(), joined);
     setLoading(false);
     if (!res.ok || !res.data?.reset_token) {
-      Alert.alert("Invalid code, Please try again.");
+      showToast("error", "Invalid code, Please try again.");
       return;
     }
     setResetToken(res.data.reset_token);
@@ -146,10 +163,10 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
     const res = await requestPasswordReset(email.trim());
     setResending(false);
     if (!res.ok) {
-      Alert.alert("Resend failed", res.message || "Please try again.");
+      showToast("error", res.message || "Please try again.", "Resend failed");
       return;
     }
-    Alert.alert("Code resent", "Check your email again.");
+    showToast("success", "Check your email again.", "Code resent");
     setCode(Array(CODE_LENGTH).fill(""));
     codeRefs.current[0]?.focus();
   };
@@ -157,35 +174,46 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
   const handleResetPassword = async () => {
     pulseButton();
     if (!resetToken) {
-      Alert.alert(
-        "Error",
-        "Missing reset token. Go back and verify the code again."
-      );
+      showToast("error", "Missing reset token. Go back and verify the code again.", "Error");
       return;
     }
     if (password.length < 8) {
-      Alert.alert("Weak password", "Password must be at least 8 characters.");
+      showToast("error", "Password must be at least 8 characters.", "Weak password");
       return;
     }
     if (password !== confirm) {
-      Alert.alert("Mismatch", "Passwords do not match.");
+      showToast("error", "Passwords do not match.", "Mismatch");
       return;
     }
     setLoading(true);
     const res = await resetPassword(resetToken, password);
     setLoading(false);
     if (!res.ok) {
-      Alert.alert("Error", res.message || "Could not reset password.");
+      showToast("error", res.message || "Could not reset password.", "Error");
       return;
     }
-    Alert.alert("Success", "Your password has been reset.", [
-      { text: "Go to Login", onPress: () => router.replace("/(auth)/Login") },
-    ]);
+    setToast({
+      visible: true,
+      type: "success",
+      title: "Success",
+      message: "Your password has been reset.",
+      buttons: [
+        { text: "Go to Login", style: "default", onPress: () => router.replace("/(auth)/Login") },
+      ],
+    });
   };
 
   // -------------------- UI --------------------
   return (
     <View style={styles.container}>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}

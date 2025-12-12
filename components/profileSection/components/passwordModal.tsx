@@ -1,4 +1,4 @@
-
+import ToastBanner from '@/components/generalMessage';
 import React, { useState } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
-  Alert,
   StyleSheet,
 } from 'react-native';
 
@@ -17,19 +16,29 @@ type Props = {
 
 const PasswordModal: React.FC<Props> = ({ visible, onClose }) => {
   const [passwords, setPasswords] = useState({ new: '', confirm: '' });
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    type: 'success' | 'error' | 'info';
+    message: string;
+    title?: string;
+  }>({ visible: false, type: 'info', message: '' });
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string, title?: string) => {
+    setToast({ visible: true, type, message, title });
+  };
 
   const handleSubmit = () => {
     if (passwords.new !== passwords.confirm) {
-      Alert.alert('Error', 'Passwords do not match');
+      showToast('error', 'Passwords do not match', 'Error');
       return;
     }
     if (passwords.new.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      showToast('error', 'Password must be at least 6 characters', 'Error');
       return;
     }
-    Alert.alert('Success', 'Password updated successfully!');
+    showToast('success', 'Password updated successfully!');
     setPasswords({ new: '', confirm: '' });
-    onClose();
+    setTimeout(() => onClose(), 1000);
   };
 
   return (
@@ -39,6 +48,13 @@ const PasswordModal: React.FC<Props> = ({ visible, onClose }) => {
       animationType="fade"
       onRequestClose={onClose}
     >
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Change Password</Text>

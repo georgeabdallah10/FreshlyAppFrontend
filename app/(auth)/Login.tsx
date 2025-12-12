@@ -24,6 +24,8 @@ import {
   loginUser,
   type OAuthProvider,
 } from "../../src/auth/auth";
+import { useUser } from "@/context/usercontext";
+import { useFamilyContext } from "@/context/familycontext";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -44,7 +46,10 @@ const toErrorText = (err: any): string => {
     if (lowerErr.includes("request failed with status")) {
       return "Something went wrong. Please try again.";
     }
-    if (lowerErr.includes("network error") || lowerErr.includes("failed to fetch")) {
+    if (
+      lowerErr.includes("network error") ||
+      lowerErr.includes("failed to fetch")
+    ) {
       return "Unable to connect. Please check your internet connection.";
     }
     return err;
@@ -64,7 +69,9 @@ const toErrorText = (err: any): string => {
         return String(msg);
       })
       .filter(Boolean);
-    return messages.length > 0 ? messages.join(". ") : "Please check your information and try again.";
+    return messages.length > 0
+      ? messages.join(". ")
+      : "Please check your information and try again.";
   }
   if (typeof err === "object") {
     // Handle detail field from FastAPI
@@ -85,6 +92,8 @@ const toErrorText = (err: any): string => {
 
 export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
+  const userContext = useUser();
+  const familyContext = useFamilyContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -139,6 +148,22 @@ export default function LoginScreen(): React.JSX.Element {
     setCooldownRemaining(seconds);
   };
 
+  const hydrateSessionData = async () => {
+    try {
+      if (userContext?.refreshUser) {
+        await userContext.refreshUser();
+      }
+      if (userContext?.refreshFamilyMembership) {
+        await userContext.refreshFamilyMembership();
+      }
+      if (familyContext?.refreshFamilies) {
+        await familyContext.refreshFamilies();
+      }
+    } catch (err) {
+      console.log("[Login] Failed to hydrate session data:", err);
+    }
+  };
+
   async function onSubmit() {
     setIsLoggingIn(true);
     try {
@@ -152,6 +177,7 @@ export default function LoginScreen(): React.JSX.Element {
         setFailedAttempts(0);
         await Storage.setItem("access_token", result.data.access_token);
         await Storage.setItem("refresh_token", result.data.refresh_token);
+        await hydrateSessionData();
         showToast("success", "Login successful! Redirecting...");
         setTimeout(() => {
           setIsLoggingIn(false);
@@ -159,11 +185,11 @@ export default function LoginScreen(): React.JSX.Element {
         }, 500);
       } else {
         setIsLoggingIn(false);
-        
+
         // Track failed attempts and start cooldown after 3 failures
         const newFailedAttempts = failedAttempts + 1;
         setFailedAttempts(newFailedAttempts);
-        
+
         if (newFailedAttempts >= 3) {
           startCooldown(30);
           setFailedAttempts(0); // Reset counter after cooldown starts
@@ -191,18 +217,29 @@ export default function LoginScreen(): React.JSX.Element {
         } else {
           // Parse the message to provide better context
           const lowerMessage = (result.message || "").toLowerCase();
-          if (lowerMessage.includes("email") && lowerMessage.includes("password")) {
+          if (
+            lowerMessage.includes("email") &&
+            lowerMessage.includes("password")
+          ) {
             errorMessage = "Incorrect email or password. Please try again.";
           } else if (lowerMessage.includes("email")) {
-            errorMessage = "There's an issue with your email. Please check and try again.";
+            errorMessage =
+              "There's an issue with your email. Please check and try again.";
           } else if (lowerMessage.includes("password")) {
-            errorMessage = "There's an issue with your password. Please try again.";
-          } else if (lowerMessage.includes("invalid") || lowerMessage.includes("incorrect")) {
-            errorMessage = "Invalid login credentials. Please check your email and password.";
+            errorMessage =
+              "There's an issue with your password. Please try again.";
+          } else if (
+            lowerMessage.includes("invalid") ||
+            lowerMessage.includes("incorrect")
+          ) {
+            errorMessage =
+              "Invalid login credentials. Please check your email and password.";
           } else if (lowerMessage.includes("request failed with status")) {
-            errorMessage = "Login failed. Please check your credentials and try again.";
+            errorMessage =
+              "Login failed. Please check your credentials and try again.";
           } else {
-            errorMessage = "Login failed. Please check your credentials and try again.";
+            errorMessage =
+              "Login failed. Please check your credentials and try again.";
           }
         }
 
@@ -210,11 +247,11 @@ export default function LoginScreen(): React.JSX.Element {
       }
     } catch (error: any) {
       setIsLoggingIn(false);
-      
+
       // Track failed attempts and start cooldown after 3 failures
       const newFailedAttempts = failedAttempts + 1;
       setFailedAttempts(newFailedAttempts);
-      
+
       if (newFailedAttempts >= 3) {
         startCooldown(30);
         setFailedAttempts(0); // Reset counter after cooldown starts
@@ -374,20 +411,20 @@ export default function LoginScreen(): React.JSX.Element {
       const params = url.searchParams;
 
       // Check if we have the necessary tokens in the URL
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
 
       if (accessToken && refreshToken) {
-          console.log("[Login] Setting Supabase session from redirect tokens...");
-          const { error: setSessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+        console.log("[Login] Setting Supabase session from redirect tokens...");
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
 
-          if (setSessionError) {
-            console.log("[Login] Error setting session:", setSessionError);
-            console.log("Failed to establish session. Please try again.");
-          }
+        if (setSessionError) {
+          console.log("[Login] Error setting session:", setSessionError);
+          console.log("Failed to establish session. Please try again.");
+        }
       }
 
       // Give Supabase a moment to fully establish the session
@@ -397,10 +434,7 @@ export default function LoginScreen(): React.JSX.Element {
         await supabase.auth.getSession();
 
       if (sessionError) {
-        console.log(
-          "[Login] Failed to fetch Supabase session:",
-          sessionError
-        );
+        console.log("[Login] Failed to fetch Supabase session:", sessionError);
         console.log("Login failed. Please try again.");
       }
 
@@ -415,7 +449,7 @@ export default function LoginScreen(): React.JSX.Element {
         "[Login] Supabase token received, authenticating with backend..."
       );
 
-      // Use unified OAuth flow (tries signup 
+      // DFUse unified OAuth flow (tries signup
       //first, then login on 409)
       if (!supabaseToken) return;
       const backend = await authenticateWithOAuth(supabaseToken, provider);
@@ -431,9 +465,15 @@ export default function LoginScreen(): React.JSX.Element {
         } else if (backend.status === 404) {
           showToast("error", "No account found. Please sign up first.");
         } else if (backend.status === 429) {
-          showToast("error", "Too many attempts. Please wait a moment and try again.");
+          showToast(
+            "error",
+            "Too many attempts. Please wait a moment and try again."
+          );
         } else if (backend.status === -1) {
-          showToast("error", "Connection issue. Please check your internet and try again.");
+          showToast(
+            "error",
+            "Connection issue. Please check your internet and try again."
+          );
         } else {
           showToast("error", "Unable to sign you in. Please try again.");
         }
@@ -442,6 +482,7 @@ export default function LoginScreen(): React.JSX.Element {
 
       await Storage.setItem("access_token", backend.data.access_token);
       await Storage.setItem("refresh_token", backend.data.refresh_token);
+      await hydrateSessionData();
       console.log(
         "[Login] Backend authentication successful, user session stored"
       );
@@ -456,7 +497,8 @@ export default function LoginScreen(): React.JSX.Element {
         if (msg.includes("cancel")) {
           errorMessage = "Sign in was cancelled.";
         } else if (msg.includes("network") || msg.includes("connection")) {
-          errorMessage = "Connection issue. Please check your internet and try again.";
+          errorMessage =
+            "Connection issue. Please check your internet and try again.";
         } else if (msg.includes("session") || msg.includes("token")) {
           errorMessage = "Authentication session expired. Please try again.";
         }
@@ -518,7 +560,7 @@ export default function LoginScreen(): React.JSX.Element {
             <Text style={styles.subtitle}>
               Login to plan smarter, shop better, {"\n"} and eat healthier.
             </Text>
-
+            {/*} 
             <View style={styles.oauthSection}>
               <TouchableOpacity
                 style={[
@@ -540,7 +582,7 @@ export default function LoginScreen(): React.JSX.Element {
                   </Text>
                 </View>
               </TouchableOpacity>
-
+              {/*
               {isAppleAvailable && (
                 <TouchableOpacity
                   style={[
@@ -569,13 +611,15 @@ export default function LoginScreen(): React.JSX.Element {
                   </View>
                 </TouchableOpacity>
               )}
-            </View>
+            </View>*/}
+            {/* 
 
             <View style={styles.oauthDividerRow}>
               <View style={styles.oauthDivider} />
               <Text style={styles.oauthDividerText}>or sign in with email</Text>
               <View style={styles.oauthDivider} />
             </View>
+            */}
 
             {/* Email Input */}
             <Animated.View

@@ -5,7 +5,6 @@
  * Central type definitions for the notification system
  */
 
-import { NotificationType as APINotificationType, Notification as APINotification } from '../services/notification.service';
 
 // ============================================
 // NOTIFICATION CATEGORIES

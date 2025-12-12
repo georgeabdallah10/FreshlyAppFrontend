@@ -41,7 +41,8 @@ type MenuItem = {
 
 const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
   const router = useRouter(); 
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;

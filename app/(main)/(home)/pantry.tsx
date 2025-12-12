@@ -158,15 +158,15 @@ const formatQuantityDisplay = (value: string | number | null | undefined) => {
 
 const PantryDashboard = () => {
   const router = useRouter();
-  const {
-    activeFamilyId: contextFamilyId,
-    refreshFamilyMembership,
-    logout,
-    isInFamily,
-    families,
-    pantryItems: contextPantryItems,
-    loadPantryItems,
-  } = useUser();
+  const userContext = useUser();
+  
+  const contextFamilyId = userContext?.activeFamilyId;
+  const refreshFamilyMembership = userContext?.refreshFamilyMembership;
+  const logout = userContext?.logout;
+  const isInFamily = userContext?.isInFamily ?? false;
+  const families = userContext?.families ?? [];
+  const contextPantryItems = userContext?.pantryItems ?? [];
+  const loadPantryItems = userContext?.loadPantryItems;
 
   // UI state
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -264,7 +264,9 @@ const PantryDashboard = () => {
       if (authRedirectedRef.current) return true;
 
       authRedirectedRef.current = true;
-      await logout();
+      if (logout) {
+        await logout();
+      }
       showToast("error", message || "Session expired. Please log in again.");
       router.replace("/(auth)/Login");
       return true;
@@ -317,7 +319,9 @@ const PantryDashboard = () => {
 
   useEffect(() => {
     const checkFamilyStatus = async () => {
-      await refreshFamilyMembership();
+      if (refreshFamilyMembership) {
+        await refreshFamilyMembership();
+      }
       setFamilyStatusChecked(true);
     };
     checkFamilyStatus();
@@ -383,6 +387,8 @@ const PantryDashboard = () => {
   const isFamilyScope = isInFamily;
 
   const refreshList = useCallback(async (force: boolean = false) => {
+    if (!loadPantryItems) return;
+    
     try {
       setLoading(true);
       await loadPantryItems(force);

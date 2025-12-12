@@ -2,440 +2,217 @@
  * ============================================
  * NOTIFICATION API SERVICE
  * ============================================
- * Handles all notification-related API calls
+ * Single source of truth for notification API calls.
+ * - Attaches JWT auth automatically (secureTokenStore)
+ * - Forces no-store/no-cache to prevent stale notification UI
+ * - Returns strongly-typed, backend-aligned models (camelCase)
  */
 
 import { BASE_URL as API_URL } from "../env/baseUrl";
-import { Storage } from "../utils/storage";
+import secureTokenStore from "../utils/secureTokenStore"; // adjust path if needed
 
 // ============================================
-// TYPES
+// TYPES (MATCH BACKEND)
 // ============================================
 
-export type NotificationType = 
-  | 'meal_share_request' 
-  | 'meal_share_accepted' 
-  | 'meal_share_declined'
-  | 'system'
-  | 'family';
+export type NotificationType =
+  | "meal_share_request"
+  | "meal_share_accepted"
+  | "meal_share_declined"
+  | "family_member_joined"
+  | "family_invite"
+  | "system";
 
-export interface Notification {
+export interface NotificationOut {
   id: number;
-  user_id: number;
+  userId: number;
   type: NotificationType;
   title: string;
   message: string;
-  is_read: boolean;
-  related_id?: number; // Meal share request ID if applicable
-  created_at: string;
-  updated_at: string;
+
+  relatedMealId: number | null;
+  relatedUserId: number | null;
+  relatedFamilyId: number | null;
+  relatedShareRequestId: number | null;
+
+  isRead: boolean;
+  createdAt: string;
+  readAt: string | null;
+
+  relatedUserName: string | null;
+  relatedMealName: string | null;
+  relatedFamilyName: string | null;
+}
+
+export interface UnreadCountResponse {
+  count: number;
 }
 
 export interface NotificationStats {
   total: number;
   unread: number;
-  read: number;
-  by_type: Record<NotificationType, number>;
+  unreadByType: Record<string, number>;
 }
 
 export interface NotificationsQuery {
-  is_read?: boolean;
+  unreadOnly?: boolean;
   type?: NotificationType;
   skip?: number;
   limit?: number;
 }
 
 // ============================================
-// HELPER FUNCTIONS
+// HELPERS
 // ============================================
 
-async function getAuthHeader() {
-  const token = await Storage.getItem("access_token");
+async function buildHeaders(extra?: Record<string, string>) {
+  const token = await secureTokenStore.getAccessToken();
+  if (!token) console.log("Missing access token. Please log in again.");
+
   return {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
+    "Cache-Control": "no-store",
+    Pragma: "no-cache",
+    ...(extra ?? {}),
   };
 }
 
-// ============================================
-// API FUNCTIONS
-// ============================================
-
-/**
- * Get all notifications for current user
- */
-export async function getNotifications(
-  query: NotificationsQuery = {}
-): Promise<Notification[]> {
-  const headers = await getAuthHeader();
-
+async function parseJsonSafe(res: Response) {
+  const text = await res.text().catch(() => "");
+  if (!text) return null;
   try {
-    const params = new URLSearchParams();
-    if (query.is_read !== undefined) params.append("is_read", String(query.is_read));
-    if (query.type) params.append("type", query.type);
-    if (query.skip !== undefined) params.append("skip", query.skip.toString());
-    if (query.limit !== undefined) params.append("limit", query.limit.toString());
-
-    const url = `${API_URL}/notifications${
-      params.toString() ? `?${params.toString()}` : ""
-    }`;
-
-    const res = await fetch(url, { headers });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to fetch notifications";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      } else if (errorText) {
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.error || errorData.detail || errorMessage;
-        } catch {
-          errorMessage = errorText.substring(0, 100);
-        }
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
+    return JSON.parse(text);
+  } catch {
+    return text;
   }
 }
 
-/**
- * Get count of unread notifications
- */
-export async function getUnreadCount(): Promise<{ count: number }> {
-  const headers = await getAuthHeader();
+function buildErrorMessage(status: number, data: any, fallback: string) {
+  if (status === 401) return "Session expired. Please log in again.";
+  if (status === 429) return "Too many requests. Please wait before trying again.";
+  if (status === 404) return "Not found.";
+  if (status >= 500) return "Server error. Please try again later.";
 
-  try {
-    const res = await fetch(`${API_URL}/notifications/unread-count`, { headers });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to fetch unread count";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
+  if (data && typeof data === "object") {
+    return data.error || data.detail || data.message || fallback;
   }
+  if (typeof data === "string" && data.trim()) return data.slice(0, 120);
+
+  return fallback;
 }
 
-/**
- * Get notification statistics
- */
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = await buildHeaders(init?.headers as Record<string, string> | undefined);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      headers,
+    });
+  } catch (e: any) {
+    console.log("Network error. Please check your internet connection.");
+    throw new Error("Network error. Please check your internet connection.");
+  }
+  console.log(res)
+
+  // 204 No Content (delete endpoints)
+  if (res.status === 204) return undefined as T;
+
+  const data = await parseJsonSafe(res);
+  console.log(data)
+
+  if (!res.ok) {
+    console.log("ERROR< IDK LINE !@&")
+    console.log(buildErrorMessage(res.status, data, "Request failed"));
+  }
+
+  return data as T;
+}
+
+function toQuery(params: Record<string, any>) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v === undefined || v === null || v === "") return;
+    qs.set(k, String(v));
+  });
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+// ============================================
+// API METHODS (MATCH BACKEND ENDPOINTS)
+// ============================================
+
+export async function getNotifications(query: NotificationsQuery = {}) {
+  return request<NotificationOut[]>(
+    `/notifications${toQuery({
+      unreadOnly: query.unreadOnly ?? false,
+      type: query.type,
+      skip: query.skip ?? 0,
+      limit: query.limit ?? 50,
+    })}`
+  );
+}
+
+export async function getUnreadCount(): Promise<UnreadCountResponse> {
+  const raw = await request<any>(`/notifications/unread-count`);
+  console.log("ERROR WITH NOTI")
+  console.log(raw)
+
+  // Be resilient if backend returns weird schema sometimes
+  if (typeof raw?.count === "number") return { count: raw.count };
+  if (typeof raw === "number") return { count: raw };
+  return { count: 0 };
+}
+
 export async function getNotificationStats(): Promise<NotificationStats> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/stats`, { headers });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to fetch notification stats";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+  return request<NotificationStats>(`/notifications/stats`);
 }
 
-/**
- * Get a specific notification by ID
- */
-export async function getNotification(notificationId: number): Promise<Notification> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/${notificationId}`, { headers });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to fetch notification";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 404) {
-        errorMessage = "Notification not found.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function getNotification(notificationId: number): Promise<NotificationOut> {
+  return request<NotificationOut>(`/notifications/${notificationId}`);
 }
 
-/**
- * Mark notification as read
- */
-export async function markNotificationAsRead(notificationId: number): Promise<Notification> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/${notificationId}/read`, {
-      method: "PATCH",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to mark notification as read";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 404) {
-        errorMessage = "Notification not found.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function markNotificationAsRead(notificationId: number): Promise<NotificationOut> {
+  return request<NotificationOut>(`/notifications/${notificationId}/read`, {
+    method: "PATCH",
+  });
 }
 
-/**
- * Mark notification as unread
- */
-export async function markNotificationAsUnread(notificationId: number): Promise<Notification> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/${notificationId}/unread`, {
-      method: "PATCH",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to mark notification as unread";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 404) {
-        errorMessage = "Notification not found.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function markNotificationAsUnread(notificationId: number): Promise<NotificationOut> {
+  return request<NotificationOut>(`/notifications/${notificationId}/unread`, {
+    method: "PATCH",
+  });
 }
 
-/**
- * Mark all notifications as read
- */
-export async function markAllNotificationsAsRead(): Promise<{ count: number }> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/mark-all-read`, {
-      method: "POST",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to mark all notifications as read";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function markAllNotificationsAsRead(): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>(`/notifications/mark-all-read`, {
+    method: "POST",
+  });
 }
 
-/**
- * Delete a notification
- */
 export async function deleteNotification(notificationId: number): Promise<void> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/${notificationId}`, {
-      method: "DELETE",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to delete notification";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 404) {
-        errorMessage = "Notification not found.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+  return request<void>(`/notifications/${notificationId}`, {
+    method: "DELETE",
+  });
 }
 
-/**
- * Delete all read notifications
- */
-export async function deleteAllReadNotifications(): Promise<{ count: number }> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/read/all`, {
-      method: "DELETE",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to delete read notifications";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function deleteAllReadNotifications(): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>(`/notifications/read/all`, {
+    method: "DELETE",
+  });
 }
 
-/**
- * Delete all notifications
- */
-export async function deleteAllNotifications(): Promise<{ count: number }> {
-  const headers = await getAuthHeader();
-
-  try {
-    const res = await fetch(`${API_URL}/notifications/all`, {
-      method: "DELETE",
-      headers,
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      let errorMessage = "Failed to delete all notifications";
-
-      if (res.status === 401) {
-        errorMessage = "Session expired. Please log in again.";
-      } else if (res.status === 429) {
-        errorMessage = "Too many requests. Please wait before trying again.";
-      } else if (res.status >= 500) {
-        errorMessage = "Server error. Please try again later.";
-      }
-
-      throw new Error(errorMessage);
-    }
-
-    return await res.json();
-  } catch (error: any) {
-    if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
-    }
-    throw error;
-  }
+export async function deleteAllNotifications(): Promise<{ message: string; count: number }> {
+  return request<{ message: string; count: number }>(`/notifications/all`, {
+    method: "DELETE",
+  });
 }
 
 // ============================================
-// EXPORT ALL
+// EXPORT
 // ============================================
 
 export const notificationService = {

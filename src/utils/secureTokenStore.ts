@@ -33,8 +33,8 @@ export async function saveAccessToken(token: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS_TOKEN, token);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to save access token:', error);
-    throw new Error('Failed to save access token');
+    console.log('[SecureTokenStore] Failed to save access token:', error);
+    console.log('Failed to save access token');
   }
 }
 
@@ -45,7 +45,7 @@ export async function getAccessToken(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS_TOKEN);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to get access token:', error);
+    console.log('[SecureTokenStore] Failed to get access token:', error);
     return null;
   }
 }
@@ -57,7 +57,7 @@ export async function deleteAccessToken(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS_TOKEN);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to delete access token:', error);
+    console.log('[SecureTokenStore] Failed to delete access token:', error);
   }
 }
 
@@ -68,8 +68,8 @@ export async function saveRefreshToken(token: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH_TOKEN, token);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to save refresh token:', error);
-    throw new Error('Failed to save refresh token');
+    console.log('[SecureTokenStore] Failed to save refresh token:', error);
+    console.log('Failed to save refresh token');
   }
 }
 
@@ -80,7 +80,7 @@ export async function getRefreshToken(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH_TOKEN);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to get refresh token:', error);
+    console.log('[SecureTokenStore] Failed to get refresh token:', error);
     return null;
   }
 }
@@ -92,7 +92,7 @@ export async function deleteRefreshToken(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH_TOKEN);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to delete refresh token:', error);
+    console.log('[SecureTokenStore] Failed to delete refresh token:', error);
   }
 }
 
@@ -137,7 +137,7 @@ export async function saveUserId(userId: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(TOKEN_KEYS.USER_ID, userId);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to save user ID:', error);
+    console.log('[SecureTokenStore] Failed to save user ID:', error);
   }
 }
 
@@ -148,7 +148,7 @@ export async function getUserId(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(TOKEN_KEYS.USER_ID);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to get user ID:', error);
+    console.log('[SecureTokenStore] Failed to get user ID:', error);
     return null;
   }
 }
@@ -160,7 +160,7 @@ export async function deleteUserId(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEYS.USER_ID);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to delete user ID:', error);
+    console.log('[SecureTokenStore] Failed to delete user ID:', error);
   }
 }
 
@@ -171,7 +171,7 @@ export async function saveSessionId(sessionId: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(TOKEN_KEYS.SESSION_ID, sessionId);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to save session ID:', error);
+    console.log('[SecureTokenStore] Failed to save session ID:', error);
   }
 }
 
@@ -182,7 +182,7 @@ export async function getSessionId(): Promise<string | null> {
   try {
     return await SecureStore.getItemAsync(TOKEN_KEYS.SESSION_ID);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to get session ID:', error);
+    console.log('[SecureTokenStore] Failed to get session ID:', error);
     return null;
   }
 }
@@ -194,7 +194,7 @@ export async function deleteSessionId(): Promise<void> {
   try {
     await SecureStore.deleteItemAsync(TOKEN_KEYS.SESSION_ID);
   } catch (error) {
-    console.error('[SecureTokenStore] Failed to delete session ID:', error);
+    console.log('[SecureTokenStore] Failed to delete session ID:', error);
   }
 }
 

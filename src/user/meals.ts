@@ -78,7 +78,7 @@ export async function createMealForSignleUser(input: CreateMealInput) {
 
 if (!res.ok) {
   const errText = await res.text().catch(() => "");
-  console.error("[meals.ts] Create meal failed:", { status: res.status, error: errText });
+  console.log("[meals.ts] Create meal failed:", { status: res.status, error: errText });
   return null;
 }
 
@@ -145,7 +145,7 @@ export async function updateMealForSignleUser(mealId: number, input: CreateMealI
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.error("[meals.ts] Update meal failed:", { status: res.status, error: errText });
+    console.log("[meals.ts] Update meal failed:", { status: res.status, error: errText });
     return null;
   }
 
@@ -164,7 +164,7 @@ export async function deleteMealForSignleUser(mealId: number) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.error("[meals.ts] Delete meal failed:", { status: res.status, error: errText });
+    console.log("[meals.ts] Delete meal failed:", { status: res.status, error: errText });
     return false;
   }
 
@@ -194,7 +194,7 @@ export async function toggleMealFavorite(
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.error("[meals.ts] Toggle favorite failed:", { status: res.status, error: errText });
+    console.log("[meals.ts] Toggle favorite failed:", { status: res.status, error: errText });
     return null;
   }
 

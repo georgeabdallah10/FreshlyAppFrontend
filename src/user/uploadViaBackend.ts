@@ -14,7 +14,7 @@ export async function uploadAvatarViaProxy({
 
   const token = await Storage.getItem("access_token");
   if (!token) {
-    throw new Error('Not authenticated. Please log in again.');
+    console.log('Not authenticated. Please log in again.');
   }
 
   const formData = new FormData();
@@ -63,7 +63,7 @@ export async function uploadAvatarViaProxy({
       errorData = { message: errorText || 'Upload failed' };
     }
     
-    throw new Error(errorData.message || errorData.detail || `Upload failed with status ${res.status}`);
+    console.log(errorData.message || errorData.detail || `Upload failed with status ${res.status}`);
   }
 
   const result = await res.json();

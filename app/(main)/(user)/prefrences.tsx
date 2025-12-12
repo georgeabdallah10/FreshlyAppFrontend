@@ -4,25 +4,25 @@ import { useUser } from "@/context/usercontext";
 import { setPrefrences } from "@/src/user/setPrefrences";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    Image,
-    KeyboardAvoidingView,
-    LayoutAnimation,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    UIManager,
-    View,
+  Animated,
+  Image,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
 
 type PreferenceOption = {
@@ -106,7 +106,11 @@ if (
 const OnboardingPreferences = () => {
   const router = useRouter();
   const { fromProfile } = useLocalSearchParams();
-  const { user, prefrences, updateUserInfo } = useUser();
+  const userContext = useUser();
+  
+  const user = userContext?.user;
+  const prefrences = userContext?.prefrences;
+  const updateUserInfo = userContext?.updateUserInfo;
 
   const [currentStep, setCurrentStep] = useState(0);
   const [allergies, setAllergies] = useState<string[]>([]);
@@ -676,13 +680,15 @@ const OnboardingPreferences = () => {
           `allergy-${allergy.toLowerCase().replace(/\s+/g, "-")}`
         );
 
-        await updateUserInfo({
-          age: bodyInformation.age,
-          height: bodyInformation.height,
-          weight: bodyInformation.weight,
-          gender: bodyInformation.gender,
-          calories: calorieTarget,
-        });
+        if (updateUserInfo) {
+          await updateUserInfo({
+            age: bodyInformation.age,
+            height: bodyInformation.height,
+            weight: bodyInformation.weight,
+            gender: bodyInformation.gender,
+            calories: calorieTarget,
+          });
+        }
 
         const result = await setPrefrences({
           diet_codes: [...preferenceCodes, ...allergyCodes],
@@ -704,7 +710,7 @@ const OnboardingPreferences = () => {
           );
         }
       } catch (error) {
-        console.error("Error saving preferences:", error);
+        console.log("Error saving preferences:", error);
         alert(
           "Something went wrong while saving your preferences. Please try again."
         );

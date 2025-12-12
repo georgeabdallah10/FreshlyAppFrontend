@@ -1,18 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import {
-  Animated,
-  Easing,
-  LayoutAnimation,
-  Platform,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View,
-} from "react-native";
 import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    Animated,
+    Easing,
+    LayoutAnimation,
+    Platform,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View,
+} from "react-native";
 
 type MealType = "breakfast" | "lunch" | "dinner" | "snack" | "dessert" | string;
 
@@ -54,6 +54,11 @@ const RecipeItem: React.FC<Props> = ({
 }) => {
   const scale = useRef(new Animated.Value(1)).current;
   const router = useRouter();
+  
+  // Entrance animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  
   // Pretty label for meal type with safety & fallback
   const mealTypeLabel = useMemo(() => {
     const mt = (mealType ?? "").toString();
@@ -72,6 +77,23 @@ const RecipeItem: React.FC<Props> = ({
   const saveOpacity = useRef(new Animated.Value(1)).current;
   const checkmarkScale = useRef(new Animated.Value(0)).current;
   const errorShake = useRef(new Animated.Value(0)).current;
+
+  // Entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   const toggleExpand = useCallback(() => {
     Haptics.selectionAsync().catch(() => {});
@@ -223,7 +245,12 @@ const RecipeItem: React.FC<Props> = ({
   });
 
   return (
-    <View style={styles.row}>
+    <Animated.View 
+      style={[
+        styles.row,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+      ]}
+    >
       <Animated.View style={[styles.cardWrap, { transform: [{ scale }] }]}>
         <View style={[styles.card, disabled && { opacity: 0.6 }]}>
           <TouchableOpacity
@@ -355,7 +382,7 @@ const RecipeItem: React.FC<Props> = ({
           )}
         </TouchableOpacity>
       </Animated.View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -375,6 +402,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 12,
     shadowColor: "#000",

@@ -8,8 +8,8 @@
 
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
-import type { NotificationCategory } from './types';
 import { clearBadgeCount } from './registerForPush';
+import type { NotificationCategory } from './types';
 
 
 // ============================================
@@ -74,7 +74,7 @@ async function handleNotificationReceived(
     // - Updating badge count
     // - Refreshing data
   } catch (error) {
-    console.error('[NotificationHandler] Error handling received notification:', error);
+    console.log('[NotificationHandler] Error handling received notification:', error);
   }
 }
 
@@ -106,7 +106,7 @@ async function handleNotificationResponse(
       router.push('/(main)/(tabs)/notifications');
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error handling notification response:', error);
+    console.log('[NotificationHandler] Error handling notification response:', error);
     // Fallback: Navigate to notifications screen
     router.push('/(main)/(tabs)/notifications');
   }
@@ -188,7 +188,7 @@ async function handleMealRequestNotification(data: Record<string, any>): Promise
       router.push('/(main)/(tabs)/notifications');
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error handling meal request:', error);
+    console.log('[NotificationHandler] Error handling meal request:', error);
     router.push('/(main)/(tabs)/notifications');
   }
 }
@@ -212,7 +212,7 @@ async function handlePantryExpirationNotification(data: Record<string, any>): Pr
       router.push('/(main)/(home)/pantry');
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error handling pantry expiration:', error);
+    console.log('[NotificationHandler] Error handling pantry expiration:', error);
     router.push('/(main)/(home)/pantry');
   }
 }
@@ -242,7 +242,7 @@ async function handleUserMessageNotification(data: Record<string, any>): Promise
       router.push('/(main)/(home)/chat');
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error handling user message:', error);
+    console.log('[NotificationHandler] Error handling user message:', error);
     router.push('/(main)/(home)/chat');
   }
 }
@@ -259,7 +259,7 @@ async function handleFreshlyUpdateNotification(data: Record<string, any>): Promi
     // For now, navigate to notifications screen to show the update
     router.push('/(main)/(tabs)/notifications');
   } catch (error) {
-    console.error('[NotificationHandler] Error handling Freshly update:', error);
+    console.log('[NotificationHandler] Error handling Freshly update:', error);
     router.push('/(main)/(tabs)/notifications');
   }
 }
@@ -273,7 +273,7 @@ async function handleSystemNotification(data: Record<string, any>): Promise<void
     // Navigate to notifications screen
     router.push('/(main)/(tabs)/notifications');
   } catch (error) {
-    console.error('[NotificationHandler] Error handling system notification:', error);
+    console.log('[NotificationHandler] Error handling system notification:', error);
     router.push('/(main)/(tabs)/notifications');
   }
 }
@@ -343,7 +343,7 @@ export async function setupNotificationCategories(): Promise<void> {
     ]);
 
   } catch (error) {
-    console.error('[NotificationHandler] Error setting up notification categories:', error);
+    console.log('[NotificationHandler] Error setting up notification categories:', error);
   }
 }
 
@@ -377,7 +377,7 @@ export async function checkAndPromptForPermissions(): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('[NotificationHandler] Error checking permissions:', error);
+    console.log('[NotificationHandler] Error checking permissions:', error);
     return false;
   }
 }
@@ -395,7 +395,7 @@ export async function getLastNotificationResponse(): Promise<Notifications.Notif
     const response = await Notifications.getLastNotificationResponseAsync();
     return response;
   } catch (error) {
-    console.error('[NotificationHandler] Error getting last notification response:', error);
+    console.log('[NotificationHandler] Error getting last notification response:', error);
     return null;
   }
 }
@@ -412,7 +412,7 @@ export async function handlePendingNotification(): Promise<void> {
       await handleNotificationResponse(lastResponse);
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error handling pending notification:', error);
+    console.log('[NotificationHandler] Error handling pending notification:', error);
   }
 }
 
@@ -455,7 +455,7 @@ export function parseNotificationDeepLink(data: Record<string, any>): {
         };
     }
   } catch (error) {
-    console.error('[NotificationHandler] Error parsing deep link:', error);
+    console.log('[NotificationHandler] Error parsing deep link:', error);
     return null;
   }
 }

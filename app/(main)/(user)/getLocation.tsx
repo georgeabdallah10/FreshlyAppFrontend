@@ -21,7 +21,12 @@ type LocationResult = {
 
 const LocationScreens = () => {
   const router = useRouter();
-  const { user, refreshUser, updateUserInfo } = useUser();
+  const userContext = useUser();
+  
+  const user = userContext?.user;
+  const refreshUser = userContext?.refreshUser;
+  const updateUserInfo = userContext?.updateUserInfo;
+  
   const [currentScreen, setCurrentScreen] = useState<"permission" | "search">(
     "permission"
   );
@@ -141,10 +146,14 @@ const LocationScreens = () => {
       console.log("Country:", address.country);
       console.log("Postal Code:", address.postalCode);
     }
-    await updateUserInfo({
-      location: `${address.street} ${address.city} ${address.region} ${address.postalCode} ${address.country}`,
-    });
-    await refreshUser();
+    if (updateUserInfo) {
+      await updateUserInfo({
+        location: `${address.street} ${address.city} ${address.region} ${address.postalCode} ${address.country}`,
+      });
+    }
+    if (refreshUser) {
+      await refreshUser();
+    }
     alert("Locatoin was succesfully set");
     router.replace("/(main)/(home)/main");
   };
@@ -173,14 +182,18 @@ const LocationScreens = () => {
 
     try {
       // Update user location
-      await updateUserInfo({
-        location: fullAddress || address.formattedAddress,
-      });
-      await refreshUser();
+      if (updateUserInfo) {
+        await updateUserInfo({
+          location: fullAddress || address.formattedAddress,
+        });
+      }
+      if (refreshUser) {
+        await refreshUser();
+      }
       alert("Location was successfully set");
       router.replace("/(main)/(home)/main");
     } catch (error) {
-      console.error("Error updating location:", error);
+      console.log("Error updating location:", error);
       alert("Failed to update location. Please try again.");
     }
   };

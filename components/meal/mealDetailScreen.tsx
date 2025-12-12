@@ -3,22 +3,22 @@ import ToastBanner from "@/components/generalMessage";
 import { useGroceryList } from '@/context/groceryListContext';
 import { useUser } from '@/context/usercontext';
 import {
-    deleteMealForSignleUser,
-    toggleMealFavorite,
-    updateMealForSignleUser,
+  deleteMealForSignleUser,
+  toggleMealFavorite,
+  updateMealForSignleUser,
 } from "@/src/user/meals";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Animated,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Animated,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
@@ -73,8 +73,16 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [addingToGrocery, setAddingToGrocery] = useState(false);
   const favoriteAnimValue = useRef(new Animated.Value(1)).current;
 
-  const { addRecipeToList } = useGroceryList();
-  const { isInFamily, activeFamilyId } = useUser();
+  // Animation values for entrance
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const groceryContext = useGroceryList();
+  const userContext = useUser();
+  
+  const addRecipeToList = groceryContext?.addRecipeToList;
+  const isInFamily = userContext?.isInFamily ?? false;
+  const activeFamilyId = userContext?.activeFamilyId;
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -93,6 +101,23 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
     setToast({ visible: true, type, message, duration, topOffset });
   };
 
+  // Entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   React.useEffect(() => {
     let isMounted = true;
 
@@ -110,7 +135,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           setFamilyId(null);
         }
       } catch (error) {
-        console.error("[MealDetailScreen] Failed to load families:", error);
+        console.log("[MealDetailScreen] Failed to load families:", error);
         if (isMounted) {
           setFamilyId(null);
         }
@@ -218,6 +243,11 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   };
 
   const handleAddToGroceryList = async (scope: 'personal' | 'family') => {
+    if (!addRecipeToList) {
+      showToast('error', 'Grocery list feature is not available');
+      return;
+    }
+
     try {
       setAddingToGrocery(true);
 
@@ -274,7 +304,12 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
     (editedMeal.image.startsWith("http") || editedMeal.image.startsWith("data:"));
 
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+      ]}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -775,7 +810,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         topOffset={toast.topOffset ?? 40}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-    </View>
+    </Animated.View>
   );
 };
 
@@ -790,14 +825,19 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#fff",
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#E8F8F1",
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
-  backIcon: { fontSize: 24, color: "#1A1A1A" },
+  backIcon: { fontSize: 22, color: "#00A86B", fontWeight: "600" },
   headerActions: { flexDirection: "row", gap: 12 },
   iconButton: {
     width: 40,

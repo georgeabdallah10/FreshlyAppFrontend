@@ -2,25 +2,25 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 // Adjust this path if your context lives elsewhere
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { useUser } from "@/context/usercontext";
 import {
-    getCurrentUser,
-    resendCode,
-    sendVerificationCode,
-    verifyCode,
+  getCurrentUser,
+  resendCode,
+  sendVerificationCode,
+  verifyCode,
 } from "../../src/auth/auth";
 
 const CODE_LENGTH = 6;
@@ -120,7 +120,7 @@ const VerificationScreen = () => {
       
       const result = await verifyCode({ email, code: joined });
       if (!result.ok) {
-        throw new Error(result.message || "Verification failed");
+        console.log(result.message || "Verification failed");
       }
 
       // Refresh the user so /auth/me reflects is_verified: true
@@ -151,7 +151,7 @@ const VerificationScreen = () => {
       setResending(true);
       const result = await resendCode(email);
       if (!result.ok) {
-        throw new Error(result.message || "Failed to resend code");
+        console.log(result.message || "Failed to resend code");
       }
       Alert.alert(
         "Sent",

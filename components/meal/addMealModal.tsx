@@ -95,12 +95,12 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
-          duration: 300,
+          duration: 180,
           useNativeDriver: true,
         }),
         Animated.spring(slideAnim, {
           toValue: 1,
-          tension: 50,
+          tension: 120,
           friction: 8,
           useNativeDriver: true,
         }),
@@ -109,12 +109,12 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 0,
-          duration: 250,
+          duration: 150,
           useNativeDriver: true,
         }),
         Animated.timing(slideAnim, {
           toValue: 0,
-          duration: 250,
+          duration: 150,
           useNativeDriver: true,
         }),
       ]).start();

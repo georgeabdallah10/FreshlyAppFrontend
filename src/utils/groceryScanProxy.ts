@@ -18,7 +18,7 @@ export async function scanImageViaProxy({
 
   const token = await Storage.getItem("access_token");
   if (!token) {
-    throw new Error('Not authenticated. Please log in again.');
+    console.log('Not authenticated. Please log in again.');
   }
 
   const formData = new FormData();
@@ -70,10 +70,10 @@ export async function scanImageViaProxy({
     }
     
     if (res.status === 401) {
-      throw new Error('UNAUTHORIZED');
+      console.log('UNAUTHORIZED');
     }
     
-    throw new Error(errorData.message || errorData.detail || `Scan failed with status ${res.status}`);
+    console.log(errorData.message || errorData.detail || `Scan failed with status ${res.status}`);
   }
 
   const result = await res.json();

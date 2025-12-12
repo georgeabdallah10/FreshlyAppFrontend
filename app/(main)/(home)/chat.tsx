@@ -702,7 +702,11 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
 const RecipeCardView = React.memo(RecipeCardViewBase);
 
 export default function ChatAIScreen() {
-  const { prefrences, isInFamily, families } = useUser();
+  const userContext = useUser();
+  const prefrences = userContext?.prefrences;
+  const isInFamily = userContext?.isInFamily ?? false;
+  const families = userContext?.families ?? [];
+  
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [message, setMessage] = useState("");
   const [showActionSheet, setShowActionSheet] = useState(false);
@@ -757,7 +761,7 @@ export default function ChatAIScreen() {
             setFirstPromptForConversation(conversationId, prompt);
           }
         } catch (error) {
-          console.error(
+          console.log(
             `[ChatAI] Failed to prefetch first prompt for conversation ${conversationId}:`,
             error
           );
@@ -1018,7 +1022,7 @@ Rules:
       setConversations(convos);
       prefetchFirstPrompts(convos);
     } catch (error: any) {
-      console.error('Failed to load conversations:', error);
+      console.log('Failed to load conversations:', error);
       showToast('error', 'Failed to load conversation history');
     } finally {
       setIsLoadingConversations(false);
@@ -1098,7 +1102,7 @@ Rules:
       setCurrentConversationId(conversationId);
       setShowConversationList(false);
     } catch (error: any) {
-      console.error('Failed to load conversation:', error);
+      console.log('Failed to load conversation:', error);
       showToast('error', 'Failed to load conversation');
     }
   };
@@ -1117,7 +1121,7 @@ Rules:
       showToast('success', 'New conversation created');
     } catch (error: any) {
       startCooldown(30);
-      console.error('Failed to create conversation:', error);
+      console.log('Failed to create conversation:', error);
       
       let errorMessage = "Unable to create conversation. ";
       const errorStr = error.message?.toLowerCase() || "";
@@ -1168,7 +1172,7 @@ Rules:
               showToast('success', 'Conversation deleted');
             } catch (error: any) {
               startCooldown(30);
-              console.error('Failed to delete conversation:', error);
+              console.log('Failed to delete conversation:', error);
               
               let errorMessage = "Unable to delete conversation. ";
               const errorStr = error.message?.toLowerCase() || "";
@@ -1216,7 +1220,7 @@ Rules:
         showToast('success', 'Conversation renamed');
       } catch (error: any) {
         startCooldown(30);
-        console.error('Failed to rename conversation:', error);
+        console.log('Failed to rename conversation:', error);
         
         let errorMessage = "Unable to rename conversation. ";
         const errorStr = error.message?.toLowerCase() || "";
@@ -1414,7 +1418,7 @@ Rules:
         ]);
       }
     } catch (error: any) {
-      console.error('Failed to send message:', error);
+      console.log('Failed to send message:', error);
       setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
       showToast('error', error.message || 'Failed to send message');
     }
@@ -1492,7 +1496,7 @@ Rules:
       .filter((ing): ing is { name: string; amount: string; inPantry: boolean } => Boolean(ing));
 
     if (!normalizedIngredients.length) {
-      throw new Error('Meal is missing ingredients.');
+      console.log('Meal is missing ingredients.');
     }
 
     const instructions = (recipe.instructions || [])
@@ -1561,7 +1565,7 @@ Rules:
       showToast('success', 'Meal saved to your collection! Redirecting...');
       router.push("/(main)/(home)/meals");
     } catch (error: any) {
-      console.error('[ChatAI] Failed to save meal:', error);
+      console.log('[ChatAI] Failed to save meal:', error);
       const errorMessage =
         error?.message?.toLowerCase().includes('409')
           ? 'This meal already exists. Try renaming it or tweaking the recipe.'

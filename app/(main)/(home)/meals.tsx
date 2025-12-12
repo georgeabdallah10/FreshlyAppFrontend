@@ -5,8 +5,8 @@ import MealListScreen from '@/components/meal/mealListScreen';
 import { type Meal } from '@/components/meal/mealsData';
 import { getAllmealsforSignelUser } from '@/src/user/meals';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, StatusBar, StyleSheet } from 'react-native';
 type Screen = 'list' | 'detail';
 
 type ToastType = "success" | "error";
@@ -24,6 +24,10 @@ const MealsDashboard: React.FC = () => {
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -65,6 +69,23 @@ const MealsDashboard: React.FC = () => {
     setSelectedMeal(null);
   };
 
+  // Entrance animation
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   useEffect(() => {
     console.log("PRETEST");
     const test = async () => {
@@ -82,7 +103,7 @@ const MealsDashboard: React.FC = () => {
         console.log(data);
         // Don't show success toast on initial load, only on errors
       } catch (err: any) {
-        console.error("Error loading meals:", err);
+        console.log("Error loading meals:", err);
         showToast("error", err?.message ?? "Error loading meals.");
         setHasError(true);
       } finally {
@@ -93,7 +114,12 @@ const MealsDashboard: React.FC = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <Animated.View 
+      style={[
+        styles.container,
+        { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
+      ]}
+    >
       <StatusBar barStyle="dark-content" />
       {currentScreen === 'list' ? (
         <MealListScreen 
@@ -114,7 +140,7 @@ const MealsDashboard: React.FC = () => {
         topOffset={toast.topOffset ?? 40}
         onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
       />
-    </View>
+    </Animated.View>
   );
 };
 

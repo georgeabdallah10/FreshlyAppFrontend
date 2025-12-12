@@ -4,7 +4,7 @@ import { Storage } from "./storage";
 
 async function getAuthHeaders() {
   const token = await Storage.getItem("access_token");
-  if (!token) throw new Error("Not authenticated: missing access token");
+  if (!token) console.log("Not authenticated: missing access token");
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
@@ -64,7 +64,8 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
       console.log('[imageUriToBase64] Data URL detected, extracting base64...');
       const base64 = uri.split(',')[1];
       if (!base64) {
-        throw new Error('Invalid data URL format');
+        console.log('Invalid data URL format');
+        console.log('Invalid data URL format');
       }
       console.log('[imageUriToBase64] Base64 extracted, length:', base64.length);
       return base64;
@@ -76,7 +77,8 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
       const response = await fetch(uri);
       
       if (!response.ok) {
-        throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        console.log(`Failed to fetch image: ${response.status} ${response.statusText}`);
+        console.log(`Failed to fetch image: ${response.status} ${response.statusText}`);
       }
       
       console.log('[imageUriToBase64] Converting to blob...');
@@ -84,7 +86,8 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
       console.log('[imageUriToBase64] Blob size:', blob.size, 'type:', blob.type);
       
       if (blob.size === 0) {
-        throw new Error('Blob is empty - image may not have loaded');
+        console.log('Blob is empty - image may not have loaded');
+        console.log('Blob is empty - image may not have loaded');
       }
       
       console.log('[imageUriToBase64] Converting to base64...');
@@ -101,7 +104,8 @@ export const imageUriToBase64 = async (uri: string): Promise<string> => {
   } catch (error) {
     console.log('ERROR [imageUriToBase64] Error:', error);
     const errorMsg = error instanceof Error ? error.message : String(error);
-    throw new Error(`Failed to convert image: ${errorMsg}`);
+    console.log(`Failed to convert image: ${errorMsg}`);
+    throw error;
   }
 };
 
@@ -128,13 +132,13 @@ export async function scanGroceryImage(
 
   if (!response.ok) {
     if (response.status === 401) {
-      throw new Error('UNAUTHORIZED');
+      console.log('UNAUTHORIZED');
     }
     if (response.status === 503) {
-      throw new Error('Service temporarily unavailable. Please try again later.');
+      console.log('Service temporarily unavailable. Please try again later.');
     }
     const errorText = await response.text();
-    throw new Error(`Scan failed (${response.status}): ${errorText}`);
+    console.log(`Scan failed (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();

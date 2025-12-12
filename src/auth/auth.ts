@@ -134,15 +134,15 @@ export async function authenticateWithOAuth(accessToken: string, provider: OAuth
       }
 
       // Login failed after 409 from signup
-      console.error('[OAuth] Login failed after 409:', loginResult.message);
+      console.log('[OAuth] Login failed after 409:', loginResult.message);
       return loginResult;
     }
 
     // Step 3: Signup failed for reasons other than 409
-    console.error('[OAuth] Signup failed:', signupResult.message);
+    console.log('[OAuth] Signup failed:', signupResult.message);
     return signupResult;
   } catch (error: any) {
-    console.error('[OAuth] Unified flow error:', error);
+    console.log('[OAuth] Unified flow error:', error);
     return { ok: false, status: -1, message: error?.message || 'OAuth authentication failed' };
   }
 }
@@ -345,7 +345,8 @@ export const updateUserInfo = async (
     return user;
   } catch (error: any) {
     const msg = error?.message || `Failed to update profile`;
-    throw new Error(msg);
+    console.log(msg);
+    throw error;
   }
 };
 

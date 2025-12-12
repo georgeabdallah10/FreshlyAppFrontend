@@ -1,16 +1,17 @@
-import { Slot } from "expo-router";
-import { useEffect } from "react";
 import { useUser } from "@/context/usercontext";
 import {
-  setupNotificationResponseListener,
-  setupNotificationReceivedListener,
-  handlePendingNotification
+    handlePendingNotification,
+    setupNotificationCategories,
+    setupNotificationReceivedListener,
+    setupNotificationResponseListener
 } from "@/src/notifications/handleIncomingNotifications";
 import { registerForPushNotifications } from "@/src/notifications/registerForPush";
-import { setupNotificationCategories } from "@/src/notifications/handleIncomingNotifications";
+import { Slot } from "expo-router";
+import { useEffect } from "react";
 
 export default function MainLayout() {
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
 
   useEffect(() => {
     let responseListener: (() => void) | undefined;

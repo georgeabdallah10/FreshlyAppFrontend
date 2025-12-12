@@ -1,6 +1,12 @@
-import React, { useCallback, useEffect, useState } from "react";
+import ToastBanner from "@/components/generalMessage";
+import { useGroceryList } from "@/context/groceryListContext";
+import { useUser } from "@/context/usercontext";
+import type { GroceryListOut } from "@/src/services/grocery.service";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -9,11 +15,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
-import { useGroceryList } from "@/context/groceryListContext";
-import { useUser } from "@/context/usercontext";
-import ToastBanner from "@/components/generalMessage";
-import type { GroceryListOut } from "@/src/services/grocery.service";
 import { AllGroceryContent } from "./allGrocery";
 
 type GroceryMode = "lists" | "upload";
@@ -40,10 +41,23 @@ const COLORS = {
 
 const GroceryListsScreen: React.FC = () => {
   const router = useRouter();
-  const { myLists, familyLists, loading, refreshAllLists, setSelectedListId } = useGroceryList();
-  const { isInFamily } = useUser();
+  const groceryContext = useGroceryList();
+  const userContext = useUser();
+  
+  const myLists = groceryContext?.myLists ?? [];
+  const familyLists = groceryContext?.familyLists ?? [];
+  const loading = groceryContext?.loading ?? false;
+  const refreshAllLists = groceryContext?.refreshAllLists;
+  const setSelectedListId = groceryContext?.setSelectedListId;
+  const isInFamily = userContext?.isInFamily ?? false;
+  
   const [refreshing, setRefreshing] = useState(false);
   const [mode, setMode] = useState<GroceryMode>("lists");
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -63,13 +77,41 @@ const GroceryListsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    refreshAllLists().catch((err) => {
-      console.error("[GroceryListsScreen] Error loading lists:", err);
-      showToast("error", "Failed to load grocery lists");
-    });
+    if (refreshAllLists) {
+      refreshAllLists().catch((err: any) => {
+        console.log("[GroceryListsScreen] Error loading lists:", err);
+        showToast("error", "Failed to load grocery lists");
+      });
+    }
+  }, [refreshAllLists]);
+
+  // Entrance animations - super fast and snappy
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(headerFadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        delay: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        delay: 100,
+        friction: 8,
+        tension: 120,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
   const handleRefresh = useCallback(async () => {
+    if (!refreshAllLists) return;
+    
     setRefreshing(true);
     try {
       await refreshAllLists();
@@ -81,14 +123,16 @@ const GroceryListsScreen: React.FC = () => {
   }, [refreshAllLists]);
 
   const handleListPress = (list: GroceryListOut) => {
-    setSelectedListId(list.id);
+    if (setSelectedListId) {
+      setSelectedListId(list.id);
+    }
     router.push("/(main)/(home)/groceryListDetail");
   };
 
   const renderListItem = ({ item }: { item: GroceryListOut }) => {
     const isFamily = item.scope === "family";
     const totalItems = item.items.length;
-    const checkedItems = item.items.filter((i) => i.checked).length;
+    const checkedItems = item.items.filter((i: any) => i.checked).length;
     const progress = totalItems > 0 ? (checkedItems / totalItems) * 100 : 0;
 
     return (
@@ -172,13 +216,13 @@ const GroceryListsScreen: React.FC = () => {
   const sections = [];
   if (myLists.length > 0) {
     sections.push({ type: "header", key: "personal-header", title: "My Lists", count: myLists.length });
-    myLists.forEach((list) => {
+    myLists.forEach((list: any) => {
       sections.push({ type: "list", key: `list-${list.id}`, data: list });
     });
   }
   if (isInFamily && familyLists.length > 0) {
     sections.push({ type: "header", key: "family-header", title: "Family Lists", count: familyLists.length });
-    familyLists.forEach((list) => {
+    familyLists.forEach((list: any) => {
       sections.push({ type: "list", key: `list-${list.id}`, data: list });
     });
   }
@@ -202,7 +246,14 @@ const GroceryListsScreen: React.FC = () => {
       />
 
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View 
+        style={[
+          styles.header,
+          {
+            opacity: headerFadeAnim,
+          }
+        ]}
+      >
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
@@ -212,10 +263,18 @@ const GroceryListsScreen: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Grocery Lists</Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </Animated.View>
 
       {/* Mode Segmented Control */}
-      <View style={styles.segmentedControl}>
+      <Animated.View 
+        style={[
+          styles.segmentedControl,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
         <TouchableOpacity
           style={[
             styles.segmentButton,
@@ -251,13 +310,22 @@ const GroceryListsScreen: React.FC = () => {
             Upload Groceries
           </Text>
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       {/* Content */}
-      {mode === "lists" ? (
-        <>
-          {loading && sections.length === 0 ? (
-            <View style={styles.loadingContainer}>
+      <Animated.View 
+        style={[
+          { flex: 1 },
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }]
+          }
+        ]}
+      >
+        {mode === "lists" ? (
+          <>
+            {loading && sections.length === 0 ? (
+              <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={COLORS.primary} />
               <Text style={styles.loadingText}>Loading grocery lists...</Text>
             </View>
@@ -286,6 +354,7 @@ const GroceryListsScreen: React.FC = () => {
       ) : (
         <AllGroceryContent />
       )}
+      </Animated.View>
     </SafeAreaView>
   );
 };
@@ -310,14 +379,14 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
+    borderRadius: 12,
+    backgroundColor: COLORS.primaryLight,
   },
   backButtonText: {
-    fontSize: 32,
-    fontWeight: "300",
-    color: COLORS.text,
-    marginTop: -4,
+    fontSize: 28,
+    fontWeight: "600",
+    color: COLORS.primary,
+    marginTop: -2,
   },
   headerTitle: {
     fontSize: 20,
@@ -364,6 +433,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.primary,
   },
   listCardHeader: {
     marginBottom: 16,

@@ -11,7 +11,7 @@
 
 import { ApiError } from '@/src/client/apiClient';
 import { invalidateQueries, queryKeys } from '@/src/config/queryClient';
-import { useMutation, useQuery, useQueryClient, type UseQueryOptions, type UseMutationOptions } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseMutationOptions, type UseQueryOptions } from '@tanstack/react-query';
 
 // ============================================
 // TYPES
@@ -98,7 +98,10 @@ async function fetchMealPlanById(id: number): Promise<MealPlan> {
 
   const plans = await fetchMealPlans();
   const plan = plans.find(p => p.id === id);
-  if (!plan) throw new Error('Meal plan not found');
+  if (!plan) {
+    console.log('Meal plan not found');
+    throw new Error('Meal plan not found');
+  }
   return plan;
 }
 

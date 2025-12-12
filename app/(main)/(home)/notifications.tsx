@@ -1,30 +1,30 @@
 import ToastBanner from '@/components/generalMessage';
 import {
-  useDeleteAllRead,
-  useDeleteNotification,
-  useHandleNotificationClick,
-  useMarkAllAsRead,
-  useMarkAsRead,
-  useNotifications,
-  useUnreadNotifications,
+    useDeleteAllRead,
+    useDeleteNotification,
+    useHandleNotificationClick,
+    useMarkAllAsRead,
+    useMarkAsRead,
+    useNotifications,
+    useUnreadNotifications,
 } from '@/hooks/useNotifications';
-import { type Notification, type NotificationType } from '@/src/services/notification.service';
+import { type NotificationOut as Notification, type NotificationType } from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  LayoutAnimation,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  UIManager,
-  View,
+    ActivityIndicator,
+    Alert,
+    LayoutAnimation,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    UIManager,
+    View,
 } from 'react-native';
 
 type CategoryFilter = 'all' | 'meal_requests' | 'updates' | 'messages';
@@ -53,8 +53,17 @@ const NotificationsScreen = () => {
   };
 
   // Queries
-  const { data: allNotifications = [], isLoading, refetch, isRefetching } = useNotifications();
+  const {
+    data: allNotifications = [],
+    isLoading,
+    refetch,
+    isRefetching,
+  } = useNotifications();
   const { data: unreadNotifications = [] } = useUnreadNotifications();
+
+  // Guard against unexpected shapes so array methods are safe
+  const safeAllNotifications = Array.isArray(allNotifications) ? allNotifications : [];
+  const safeUnreadNotifications = Array.isArray(unreadNotifications) ? unreadNotifications : [];
 
   // Mutations
   const markAsRead = useMarkAsRead();
@@ -64,7 +73,9 @@ const NotificationsScreen = () => {
   const handleNotificationClick = useHandleNotificationClick();
   
   // Filter by read/unread first
-  const baseNotifications = filter === 'unread' ? unreadNotifications : allNotifications;
+  const baseNotifications = filter === 'unread'
+    ? safeUnreadNotifications
+    : safeAllNotifications;
   
   // Then filter by category
   const getFilteredNotifications = () => {
@@ -78,7 +89,7 @@ const NotificationsScreen = () => {
       case 'updates':
         return baseNotifications.filter(n => n.type === 'system');
       case 'messages':
-        return baseNotifications.filter(n => n.type === 'family');
+        return baseNotifications.filter(n => n.type === 'family_member_joined' || n.type === 'family_invite');
       case 'all':
       default:
         return baseNotifications;
@@ -89,13 +100,13 @@ const NotificationsScreen = () => {
   const unreadCount = unreadNotifications.length;
   
   // Count by category
-  const mealRequestsCount = allNotifications.filter(n => 
+  const mealRequestsCount = safeAllNotifications.filter(n => 
     n.type === 'meal_share_request' || 
     n.type === 'meal_share_accepted' || 
     n.type === 'meal_share_declined'
   ).length;
-  const updatesCount = allNotifications.filter(n => n.type === 'system').length;
-  const messagesCount = allNotifications.filter(n => n.type === 'family').length;
+  const updatesCount = safeAllNotifications.filter(n => n.type === 'system').length;
+  const messagesCount = safeAllNotifications.filter(n => n.type === 'family_member_joined' || n.type === 'family_invite').length;
 
   const handleMarkAsRead = async (id: number) => {
     try {
@@ -192,7 +203,7 @@ const NotificationsScreen = () => {
     }
   };
 
-  const getIcon = (type: NotificationType) => {
+  const getIcon = (type: NotificationType): { name: any; color: string } => {
     switch (type) {
       case 'meal_share_request':
         return { name: 'restaurant-outline' as const, color: '#00A86B' };
@@ -200,10 +211,13 @@ const NotificationsScreen = () => {
         return { name: 'checkmark-circle-outline' as const, color: '#10B981' };
       case 'meal_share_declined':
         return { name: 'close-circle-outline' as const, color: '#EF4444' };
-      case 'family':
+      case 'family_member_joined':
+      case 'family_invite':
         return { name: 'people-outline' as const, color: '#6B7280' };
       case 'system':
         return { name: 'information-circle-outline' as const, color: '#3B82F6' };
+      default:
+        return { name: 'notifications-outline' as const, color: '#6B7280' };
     }
   };
 
@@ -424,7 +438,7 @@ const NotificationItem: React.FC<{
 
   return (
     <TouchableOpacity
-      style={[styles.notificationItem, !notification.is_read && styles.notificationItemUnread]}
+      style={[styles.notificationItem, !notification.isRead && styles.notificationItemUnread]}
       onPress={handlePress}
       activeOpacity={0.7}
     >
@@ -435,12 +449,12 @@ const NotificationItem: React.FC<{
       <View style={styles.notificationContent}>
         <View style={styles.notificationHeader}>
           <Text style={styles.notificationTitle}>{notification.title}</Text>
-          {!notification.is_read && <View style={styles.unreadDot} />}
+          {!notification.isRead && <View style={styles.unreadDot} />}
         </View>
         <Text style={styles.notificationMessage} numberOfLines={2}>
           {notification.message}
         </Text>
-        <Text style={styles.notificationTime}>{formatTime(notification.created_at)}</Text>
+        <Text style={styles.notificationTime}>{formatTime(notification.createdAt)}</Text>
       </View>
 
       <TouchableOpacity

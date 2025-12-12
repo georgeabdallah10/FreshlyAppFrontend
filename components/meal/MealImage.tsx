@@ -2,13 +2,13 @@
 import { getMealImage, getMealInitials } from "@/src/services/mealImageService";
 import React, { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    StyleProp,
-    StyleSheet,
-    Text,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  Image,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
 } from "react-native";
 
 interface MealImageProps {
@@ -95,7 +95,7 @@ export const MealImage: React.FC<MealImageProps> = ({
           setIsLoading(false);
         }
       } catch (error: any) {
-        console.error("[MealImage] Error fetching image:", error);
+        console.log("[MealImage] Error fetching image:", error);
         if (mounted) {
           setHasError(true);
           setIsLoading(false);

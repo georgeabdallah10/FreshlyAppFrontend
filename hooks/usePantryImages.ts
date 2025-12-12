@@ -16,7 +16,8 @@ export type PantryImageState = {
  * Fetches image from Supabase storage: {userID}/{pantryItemID}/name.jpg
  */
 export function usePantryImage(pantryItemId: number | string, itemName: string) {
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
   const [imageState, setImageState] = useState<PantryImageState>({
     url: null,
     loading: true,
@@ -64,7 +65,7 @@ export function usePantryImage(pantryItemId: number | string, itemName: string) 
         setImageState({ url: null, loading: false, error: 'Failed to get image URL' });
       }
     } catch (error) {
-      console.error('[Pantry Image] Error:', error);
+      console.log('[Pantry Image] Error:', error);
       setImageState({
         url: null,
         loading: false,
@@ -100,7 +101,8 @@ export function usePantryImage(pantryItemId: number | string, itemName: string) 
 export function usePantryImages(
   items: Array<{ id: number | string; name: string }>
 ) {
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
   const [imageStates, setImageStates] = useState<Map<string | number, PantryImageState>>(
     new Map()
   );

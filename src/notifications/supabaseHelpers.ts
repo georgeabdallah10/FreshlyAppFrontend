@@ -6,12 +6,11 @@
  */
 
 import { supabase } from '../supabase/client';
-import { Storage } from '../utils/storage';
 import type {
-  SupabaseNotification,
-  UserPushToken,
   NotificationCategory,
   NotificationPreferences,
+  SupabaseNotification,
+  UserPushToken,
 } from './types';
 
 // ============================================
@@ -44,14 +43,14 @@ export async function savePushToken(
       );
 
     if (error) {
-      console.error('[Supabase] Error saving push token:', error);
+      console.log('[Supabase] Error saving push token:', error);
       throw error;
     }
 
     console.log('[Supabase] Push token saved successfully');
   } catch (error) {
-    console.error('[Supabase] Failed to save push token:', error);
-    throw error;
+    console.log('[Supabase] Failed to save push token:', error);
+    console.log
   }
 }
 
@@ -72,13 +71,13 @@ export async function getUserPushToken(
 
     if (error && error.code !== 'PGRST116') {
       // PGRST116 is "no rows returned"
-      console.error('[Supabase] Error fetching push token:', error);
+      console.log('[Supabase] Error fetching push token:', error);
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('[Supabase] Failed to fetch push token:', error);
+    console.log('[Supabase] Failed to fetch push token:', error);
     return null;
   }
 }
@@ -98,13 +97,13 @@ export async function deletePushToken(
       .eq('platform', platform);
 
     if (error) {
-      console.error('[Supabase] Error deleting push token:', error);
+      console.log('[Supabase] Error deleting push token:', error);
       throw error;
     }
 
     console.log('[Supabase] Push token deleted successfully');
   } catch (error) {
-    console.error('[Supabase] Failed to delete push token:', error);
+    console.log('[Supabase] Failed to delete push token:', error);
     throw error;
   }
 }
@@ -131,14 +130,14 @@ export async function fetchNotifications(
       .range(offset, offset + limit - 1);
 
     if (error) {
-      console.error('[Supabase] Error fetching notifications:', error);
+      console.log('[Supabase] Error fetching notifications:', error);
       throw error;
     }
 
     return data || [];
   } catch (error) {
-    console.error('[Supabase] Failed to fetch notifications:', error);
-    throw error;
+    console.log('[Supabase] Failed to fetch notifications:', error);
+    return [];
   }
 }
 
@@ -153,11 +152,11 @@ export async function markNotificationRead(notificationId: number): Promise<void
       .eq('id', notificationId);
 
     if (error) {
-      console.error('[Supabase] Error marking notification as read:', error);
+      console.log('[Supabase] Error marking notification as read:', error);
       throw error;
     }
   } catch (error) {
-    console.error('[Supabase] Failed to mark notification as read:', error);
+    console.log('[Supabase] Failed to mark notification as read:', error);
     throw error;
   }
 }
@@ -190,13 +189,13 @@ export async function createNotification(
       .single();
 
     if (error) {
-      console.error('[Supabase] Error creating notification:', error);
+      console.log('[Supabase] Error creating notification:', error);
       throw error;
     }
 
     return notification;
   } catch (error) {
-    console.error('[Supabase] Failed to create notification:', error);
+    console.log('[Supabase] Failed to create notification:', error);
     throw error;
   }
 }
@@ -219,13 +218,13 @@ export async function getNotificationPreferences(
       .single();
 
     if (error && error.code !== 'PGRST116') {
-      console.error('[Supabase] Error fetching preferences:', error);
+      console.log('[Supabase] Error fetching preferences:', error);
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('[Supabase] Failed to fetch preferences:', error);
+    console.log('[Supabase] Failed to fetch preferences:', error);
     return null;
   }
 }
@@ -253,13 +252,13 @@ export async function updateNotificationPreferences(
       .single();
 
     if (error) {
-      console.error('[Supabase] Error updating preferences:', error);
+      console.log('[Supabase] Error updating preferences:', error);
       throw error;
     }
 
     return data;
   } catch (error) {
-    console.error('[Supabase] Failed to update preferences:', error);
+    console.log('[Supabase] Failed to update preferences:', error);
     throw error;
   }
 }
@@ -318,13 +317,13 @@ export async function getUnreadNotificationCount(userId: number): Promise<number
       .eq('is_read', false);
 
     if (error) {
-      console.error('[Supabase] Error fetching unread count:', error);
+      console.log('[Supabase] Error fetching unread count:', error);
       throw error;
     }
 
     return count || 0;
   } catch (error) {
-    console.error('[Supabase] Failed to fetch unread count:', error);
+    console.log('[Supabase] Failed to fetch unread count:', error);
     return 0;
   }
 }
@@ -349,7 +348,7 @@ export async function deleteOldReadNotifications(
       .select();
 
     if (error) {
-      console.error('[Supabase] Error deleting old notifications:', error);
+      console.log('[Supabase] Error deleting old notifications:', error);
       throw error;
     }
 
@@ -357,7 +356,7 @@ export async function deleteOldReadNotifications(
     console.log(`[Supabase] Deleted ${deletedCount} old notifications`);
     return deletedCount;
   } catch (error) {
-    console.error('[Supabase] Failed to delete old notifications:', error);
+    console.log('[Supabase] Failed to delete old notifications:', error);
     return 0;
   }
 }

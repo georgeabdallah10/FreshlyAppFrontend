@@ -65,7 +65,7 @@ export async function sendMessage({
 }): Promise<ChatResponse> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -94,7 +94,7 @@ export async function sendMessage({
     if (!resp.ok) {
       const errorText = await resp.text();
       console.log('ERROR [Chat] Error response:', errorText);
-      throw new Error(`HTTP ${resp.status}: ${errorText}`);
+      console.log(`HTTP ${resp.status}: ${errorText}`);
     }
     return await resp.json();
   } catch (error: any) {
@@ -102,7 +102,7 @@ export async function sendMessage({
     
     if (error.name === 'AbortError') {
       console.log('ERROR [Chat] Request timed out after 50 seconds');
-      throw new Error('TIMEOUT');
+      console.log('TIMEOUT');
     }
     
     console.log('ERROR [Chat] Fetch error:', error);
@@ -114,7 +114,7 @@ export async function sendMessage({
 export async function getConversations(): Promise<Conversation[]> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -122,7 +122,7 @@ export async function getConversations(): Promise<Conversation[]> {
     headers: { "Authorization": `Bearer ${token}` },
   });
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) console.log(`HTTP ${resp.status}: ${await resp.text()}`);
   return await resp.json();
 }
 
@@ -133,7 +133,7 @@ export async function getConversation(id: number): Promise<{
 }> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -141,7 +141,7 @@ export async function getConversation(id: number): Promise<{
     headers: { "Authorization": `Bearer ${token}` },
   });
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) console.log(`HTTP ${resp.status}: ${await resp.text()}`);
   return await resp.json();
 }
 
@@ -149,7 +149,7 @@ export async function getConversation(id: number): Promise<{
 export async function createConversation(title?: string): Promise<Conversation> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -162,7 +162,7 @@ export async function createConversation(title?: string): Promise<Conversation> 
     body: JSON.stringify({ title }),
   });
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) console.log(`HTTP ${resp.status}: ${await resp.text()}`);
   return await resp.json();
 }
 
@@ -170,7 +170,7 @@ export async function createConversation(title?: string): Promise<Conversation> 
 export async function updateConversationTitle(id: number, title: string): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -181,14 +181,14 @@ export async function updateConversationTitle(id: number, title: string): Promis
     },
   });
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) console.log(`HTTP ${resp.status}: ${await resp.text()}`);
 }
 
 // Delete conversation
 export async function deleteConversation(id: number): Promise<void> {
   const token = await getAuthToken();
   if (!token) {
-    throw new Error('Authentication required - please log in');
+    console.log('Authentication required - please log in');
   }
 
   const baseUrl = getBaseUrl();
@@ -197,5 +197,5 @@ export async function deleteConversation(id: number): Promise<void> {
     headers: { "Authorization": `Bearer ${token}` },
   });
   
-  if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${await resp.text()}`);
+  if (!resp.ok) console.log(`HTTP ${resp.status}: ${await resp.text()}`);
 }

@@ -502,51 +502,57 @@ export default function CreateAccountScreen(): React.JSX.Element {
       });
 
       if (error) {
-        console.error("[Signup] Supabase OAuth error:", error);
-        throw new Error(error.message || "Unable to start authentication.");
+        console.log("[Signup] Supabase OAuth error:", error);
+        console.log(error.message || "Unable to start authentication.");
       }
 
       if (!data?.url) {
-        throw new Error("Unable to open provider login page.");
+        console.log("Unable to open provider login page.");
       }
 
       console.log("[Signup] Opening OAuth URL in browser...");
+      if (!data.url) return;
       const authResult = await WebBrowser.openAuthSessionAsync(
         data.url,
         redirectTo
       );
 
       if (authResult.type !== "success") {
-        throw new Error(
+        console.log(
           authResult.type === "cancel"
             ? "Authentication cancelled."
             : "Authentication failed. Please try again."
         );
+        return;
+      }
+
+      if (!authResult.url) {
+        console.log("[Signup] No redirect URL returned after OAuth.");
+        return;
       }
 
       console.log("[Signup] OAuth browser session completed");
 
       // Extract and process the redirect URL to establish Supabase session
-      if (authResult.url) {
-        console.log("[Signup] Processing redirect URL...");
-        const url = new URL(authResult.url);
-        const params = url.searchParams;
+      console.log("[Signup] Processing redirect URL...");
+      const url = new URL(authResult.url);
+      const params = url.searchParams;
 
-        // Check if we have the necessary tokens in the URL
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+      // Check if we have the necessary tokens in the URL
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
 
-        if (accessToken && refreshToken) {
-          console.log("[Signup] Setting Supabase session from redirect tokens...");
-          const { error: setSessionError } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken,
-          });
+      if (accessToken && refreshToken) {
+        console.log("[Signup] Setting Supabase session from redirect tokens...");
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
 
-          if (setSessionError) {
-            console.error("[Signup] Error setting session:", setSessionError);
-            throw new Error("Failed to establish session. Please try again.");
-          }
+        if (setSessionError) {
+          console.log("[Signup] Error setting session:", setSessionError);
+          showToast("error", "Failed to establish session. Please try again.");
+          return;
         }
       }
 
@@ -557,18 +563,20 @@ export default function CreateAccountScreen(): React.JSX.Element {
         await supabase.auth.getSession();
 
       if (sessionError) {
-        console.error(
+        console.log(
           "[Signup] Failed to fetch Supabase session:",
           sessionError
         );
-        throw new Error("Authentication failed. Please try again.");
+        showToast("error", "Authentication failed. Please try again.");
+        return;
       }
 
       const supabaseToken = sessionData.session?.access_token;
 
       if (!supabaseToken) {
-        console.error("[Signup] No access token in session:", sessionData);
-        throw new Error("Missing authentication token. Please try again.");
+        console.log("[Signup] No access token in session:", sessionData);
+        showToast("error", "Missing authentication token. Please try again.");
+        return;
       }
 
       console.log(
@@ -604,7 +612,7 @@ export default function CreateAccountScreen(): React.JSX.Element {
       showToast("success", "Welcome to SAVR!");
       router.replace("/(main)/(user)/setPfp");
     } catch (error: any) {
-      console.error("[Signup] OAuth signup error:", error);
+      console.log("[Signup] OAuth signup error:", error);
       // Provide user-friendly messages for common OAuth errors
       let errorMessage = "Unable to complete signup. Please try again.";
       if (error?.message) {

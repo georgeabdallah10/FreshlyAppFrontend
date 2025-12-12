@@ -1,4 +1,5 @@
 import ToastBanner from "@/components/generalMessage";
+import IconButton from "@/components/iconComponent";
 import { useUser } from "@/context/usercontext";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import {
@@ -11,14 +12,13 @@ import { scanImageViaProxy } from "@/src/utils/groceryScanProxy";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,10 +27,9 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import IconButton from "@/components/iconComponent";
 
 type ScanType = "groceries" | "receipt" | "barcode";
 
@@ -94,7 +93,10 @@ const UNITS = [
 
 const AllGroceryScanner = () => {
   const router = useRouter();
-  const { loadPantryItems, activeFamilyId } = useUser();
+  const userContext = useUser();
+  
+  const loadPantryItems = userContext?.loadPantryItems;
+  const activeFamilyId = userContext?.activeFamilyId;
 
   // Main state
   const [currentStep, setCurrentStep] = useState<ScanStep>("selection");
@@ -236,12 +238,13 @@ const AllGroceryScanner = () => {
   const processImage = async (imageData: string, scanType: ScanType) => {
     try {
       if (scanType === "barcode") {
-        throw new Error("Barcode scanning should not call processImage");
+        console.log("Barcode scanning should not call processImage");
+        return;
       }
 
       const response = await scanImageViaProxy({
         uri: imageData,
-        scanType: scanType,
+        scanType: scanType as "groceries" | "receipt",
       });
 
       const items: ScannedItem[] = response.items.map((item) => ({
@@ -360,12 +363,14 @@ const AllGroceryScanner = () => {
         snapshot = result.snapshot;
       }
 
-      await loadPantryItems();
+      if (loadPantryItems) {
+        await loadPantryItems();
+      }
       setCurrentStep("success");
       showToast("success", `${scannedItems.length} items added to pantry!`);
     } catch (error: any) {
       startCooldown(30);
-      console.error("Failed to add items to pantry:", error);
+      console.log("Failed to add items to pantry:", error);
 
       let errorMessage = "Unable to add items to pantry. ";
       const errorStr = error.message?.toLowerCase() || "";

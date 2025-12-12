@@ -5,26 +5,26 @@ import { useGroceryList } from "@/context/groceryListContext";
 import { useUser } from "@/context/usercontext";
 import type { GroceryListItemSummary } from "@/src/services/grocery.service";
 import {
-    formatQuantityDisplay,
-    getItemCategory,
-    groupItemsByCategory,
-    SORT_OPTIONS,
-    sortItems,
-    type SortOption
+  formatQuantityDisplay,
+  getItemCategory,
+  groupItemsByCategory,
+  SORT_OPTIONS,
+  sortItems,
+  type SortOption
 } from "@/src/utils/groceryListUtils";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    Modal,
-    Pressable,
-    RefreshControl,
-    SectionList,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Alert,
+  Modal,
+  Pressable,
+  RefreshControl,
+  SectionList,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -152,7 +152,21 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({
 
 const GroceryListDetailScreen: React.FC = () => {
   const router = useRouter();
-  const { user } = useUser();
+  const userContext = useUser();
+  const groceryContext = useGroceryList();
+
+  if (!userContext || !groceryContext) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const { user } = userContext;
   const {
     selectedList,
     refreshSelectedList,
@@ -170,7 +184,7 @@ const GroceryListDetailScreen: React.FC = () => {
     markItemPurchased,
     rebuildFromMealPlan,
     isRebuilding,
-  } = useGroceryList();
+  } = groceryContext;
 
   const [refreshing, setRefreshing] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -205,8 +219,8 @@ const GroceryListDetailScreen: React.FC = () => {
       router.back();
       return;
     }
-    refreshSelectedList().catch((err) => {
-      console.error("[GroceryListDetail] Error loading list:", err);
+    refreshSelectedList().catch((err: any) => {
+      console.log("[GroceryListDetail] Error loading list:", err);
     });
   }, []);
 
@@ -214,7 +228,7 @@ const GroceryListDetailScreen: React.FC = () => {
   useEffect(() => {
     if (selectedList && expandedCategories.size === 0) {
       const categories = new Set<string>();
-      selectedList.items.forEach((item) => {
+      selectedList.items.forEach((item: GroceryListItemSummary) => {
         categories.add(getItemCategory(item));
       });
       setExpandedCategories(categories);
@@ -304,7 +318,7 @@ const GroceryListDetailScreen: React.FC = () => {
   const handleClearChecked = () => {
     if (!selectedList) return;
 
-    const checkedCount = selectedList.items.filter((i) => i.checked).length;
+    const checkedCount = selectedList.items.filter((i: GroceryListItemSummary) => i.checked).length;
     if (checkedCount === 0) {
       showToast("info", "No checked items to clear");
       return;
@@ -541,7 +555,7 @@ const GroceryListDetailScreen: React.FC = () => {
 
   const isFamily = selectedList.scope === "family";
   const totalItems = selectedList.items.length;
-  const checkedItems = selectedList.items.filter((i) => i.checked).length;
+  const checkedItems = selectedList.items.filter((i: GroceryListItemSummary) => i.checked).length;
   const remainingItems = totalItems - checkedItems;
 
   return (

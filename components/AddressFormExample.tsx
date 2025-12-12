@@ -2,12 +2,12 @@
 import type { ParsedAddress } from '@/hooks/useGooglePlaces';
 import React, { useState } from 'react';
 import {
-    Alert,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { GooglePlacesAutocomplete } from './GooglePlacesAutocomplete';
 
@@ -52,7 +52,7 @@ export const AddressFormExample: React.FC = () => {
 
       Alert.alert('Success', 'Address saved successfully!');
     } catch (error) {
-      console.error('Error submitting address:', error);
+      console.log('Error submitting address:', error);
       Alert.alert('Error', 'Failed to save address');
     } finally {
       setIsSubmitting(false);

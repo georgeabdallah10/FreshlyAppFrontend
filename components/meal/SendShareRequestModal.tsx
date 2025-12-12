@@ -67,7 +67,8 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const { user } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
   const [selectedUser, setSelectedUser] = useState<UserSearchResult | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [familyMembers, setFamilyMembers] = useState<UserSearchResult[]>([]);
@@ -119,7 +120,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         .filter((member: any): member is UserSearchResult => Boolean(member && member.id !== user?.id));
       setFamilyMembers(normalized);
     } catch (error: any) {
-      console.error('[SendShareRequestModal] Error loading family members:', error);
+      console.log('[SendShareRequestModal] Error loading family members:', error);
       setFamilyError(error?.message || 'Failed to load family members');
     } finally {
       setFamilyLoading(false);
@@ -226,7 +227,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
         onSuccess?.();
       }, 1500);
     } catch (error: any) {
-      console.error('[SendShareRequestModal] Error sending request:', error);
+      console.log('[SendShareRequestModal] Error sending request:', error);
       const errorMessage = error?.message || 'Failed to send request';
       
       setToast({

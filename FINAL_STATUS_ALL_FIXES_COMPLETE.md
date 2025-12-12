@@ -90,7 +90,7 @@ try {
     console.warn('[QuickMeals] User has no families - meal will be saved but not shareable');
   }
 } catch (error: any) {
-  console.error('[QuickMeals] Error loading family for meal sharing:', error);
+  console.log('[QuickMeals] Error loading family for meal sharing:', error);
   // Continue without family - meal will still be saved
 }
 

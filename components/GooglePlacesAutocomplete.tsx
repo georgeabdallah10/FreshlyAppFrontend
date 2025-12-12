@@ -2,15 +2,15 @@
 import { ParsedAddress, useGooglePlaces } from '@/hooks/useGooglePlaces';
 import React, { useCallback, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TextStyle,
-    TouchableOpacity,
-    View,
-    ViewStyle,
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
 } from 'react-native';
 
 interface GooglePlacesAutocompleteProps {
@@ -83,7 +83,7 @@ export const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> =
         console.warn('Failed to get place details, using description');
       }
     } catch (err) {
-      console.error('Error selecting place:', err);
+      console.log('Error selecting place:', err);
     } finally {
       setIsSelecting(false);
       clearPredictions();

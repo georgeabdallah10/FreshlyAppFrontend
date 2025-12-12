@@ -27,7 +27,7 @@ export default function AuthCallbackScreen() {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
 
       if (sessionError) {
-        console.error("[Callback] Session error:", sessionError);
+        console.log("[Callback] Session error:", sessionError);
         setError("Authentication failed. Please try again.");
         setTimeout(() => router.replace("/(auth)/Login"), 3000);
         return;
@@ -37,14 +37,14 @@ export default function AuthCallbackScreen() {
       const provider = sessionData.session?.user?.app_metadata?.provider as OAuthProvider;
 
       if (!supabaseToken) {
-        console.error("[Callback] No access token in session");
+        console.log("[Callback] No access token in session");
         setError("Missing authentication token. Please try again.");
         setTimeout(() => router.replace("/(auth)/Login"), 3000);
         return;
       }
 
       if (!provider) {
-        console.error("[Callback] No provider information");
+        console.log("[Callback] No provider information");
         setError("Missing provider information. Please try again.");
         setTimeout(() => router.replace("/(auth)/Login"), 3000);
         return;
@@ -56,7 +56,7 @@ export default function AuthCallbackScreen() {
       const backend = await authenticateWithOAuth(supabaseToken, provider);
 
       if (!backend.ok) {
-        console.error("[Callback] Backend authentication failed:", backend.message);
+        console.log("[Callback] Backend authentication failed:", backend.message);
         let errorMessage = "Unable to complete authentication. ";
         
         if (backend.status === 400) {
@@ -83,7 +83,7 @@ export default function AuthCallbackScreen() {
       // Redirect to main app
       router.replace("/(main)/(home)/main");
     } catch (err: any) {
-      console.error("[Callback] Unexpected error:", err);
+      console.log("[Callback] Unexpected error:", err);
       setError("An unexpected error occurred. Please try again.");
       setTimeout(() => router.replace("/(auth)/Login"), 3000);
     }

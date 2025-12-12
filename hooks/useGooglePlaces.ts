@@ -1,10 +1,10 @@
 
 import {
-    GOOGLE_PLACES_API_KEY,
-    GOOGLE_PLACES_AUTOCOMPLETE_URL,
-    GOOGLE_PLACE_DETAILS_URL,
-    PLACES_CONFIG,
-    validateApiKey,
+  GOOGLE_PLACES_API_KEY,
+  GOOGLE_PLACES_AUTOCOMPLETE_URL,
+  GOOGLE_PLACE_DETAILS_URL,
+  PLACES_CONFIG,
+  validateApiKey,
 } from '@/src/config/googlePlaces';
 import * as Location from 'expo-location';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -168,12 +168,12 @@ export const useGooglePlaces = () => {
       } else if (data.status === 'ZERO_RESULTS') {
         setPredictions([]);
       } else {
-        throw new Error(data.error_message || `API error: ${data.status}`);
+        console.log(data.error_message || `API error: ${data.status}`);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch predictions';
       setError(errorMessage);
-      console.error('Google Places Autocomplete error:', err);
+      console.log('Google Places Autocomplete error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -271,12 +271,13 @@ export const useGooglePlaces = () => {
           formattedAddress: result.formatted_address || '',
         };
       } else {
-        throw new Error(data.error_message || `API error: ${data.status}`);
+        console.log(data.error_message || `API error: ${data.status}`);
+        return null;
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to fetch place details';
       setError(errorMessage);
-      console.error('Google Place Details error:', err);
+      console.log('Google Place Details error:', err);
       return null;
     } finally {
       setIsLoading(false);

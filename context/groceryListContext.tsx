@@ -100,7 +100,10 @@ const GroceryListContext = createContext<GroceryListContextType | undefined>(und
 // ============================================
 
 export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { activeFamilyId, isInFamily, user } = useUser();
+  const userContext = useUser();
+  const activeFamilyId = userContext?.activeFamilyId;
+  const isInFamily = userContext?.isInFamily;
+  const user = userContext?.user;
   const queryClient = useQueryClient();
 
   // Selected list state
@@ -148,7 +151,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isLoading: familyListsLoading,
     error: familyListsError,
     refetch: refetchFamilyLists,
-  } = useFamilyGroceryLists(isInFamily ? activeFamilyId : null);
+  } = useFamilyGroceryLists(isInFamily ? (activeFamilyId ?? null) : null);
 
   // DEBUG: Log family lists when they change
   React.useEffect(() => {
@@ -422,7 +425,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
       }
 
     } catch (debugErr) {
-      console.error("[GroceryListContext] Error fetching pantry for debug:", debugErr);
+      console.log("[GroceryListContext] Error fetching pantry for debug:", debugErr);
     }
 
     console.log("\n[GroceryListContext] ========== CALLING SYNC API ==========");
@@ -474,7 +477,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
       return response;
     } catch (err: any) {
-      console.error("[GroceryListContext] Sync error:", err);
+      console.log("[GroceryListContext] Sync error:", err);
       console.log("HELLLO")
       console.log(err)
       // Re-throw with status for proper error handling in UI
@@ -646,6 +649,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
 export const useGroceryList = () => {
   const ctx = useContext(GroceryListContext);
-  if (!ctx) throw new Error("useGroceryList must be used within GroceryListProvider");
+  if (!ctx) console.log("useGroceryList must be used within GroceryListProvider");
   return ctx;
 };

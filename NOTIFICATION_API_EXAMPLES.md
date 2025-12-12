@@ -154,7 +154,7 @@ async function loadNotifications() {
 
     return all;
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    console.log('Error fetching notifications:', error);
     throw error;
   }
 }
@@ -336,12 +336,12 @@ async function sendExpoPush(expoToken, title, body, data = {}, category = null) 
     const result = response.data;
 
     if (result.data?.status === 'error') {
-      throw new Error(`Push failed: ${result.data.message}`);
+      console.log(`Push failed: ${result.data.message}`);
     }
 
     return result;
   } catch (error) {
-    console.error('Error sending push notification:', error);
+    console.log('Error sending push notification:', error);
     throw error;
   }
 }

@@ -4,10 +4,10 @@ import OwnerView from "@/components/familyMangment/OwnerView";
 import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import {
-    leaveFamily,
-    listFamilyMembers,
-    regenerateInviteCode,
-    removeFamilyMember,
+  leaveFamily,
+  listFamilyMembers,
+  regenerateInviteCode,
+  removeFamilyMember,
 } from "@/src/user/family";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
@@ -38,14 +38,15 @@ export interface FamilyData {
 
 const FamilyManagementScreen = () => {
   const router = useRouter();
-  const {user} = useUser();
-  const {
-    families,
-    loading: familiesLoading,
-    selectedFamily,
-    setSelectedFamilyId,
-    refreshFamilies,
-  } = useFamilyContext();
+  const userContext = useUser();
+  const familyContext = useFamilyContext();
+  
+  const user = userContext?.user;
+  const families = familyContext?.families ?? [];
+  const familiesLoading = familyContext?.loading ?? false;
+  const selectedFamily = familyContext?.selectedFamily;
+  const setSelectedFamilyId = familyContext?.setSelectedFamilyId;
+  const refreshFamilies = familyContext?.refreshFamilies;
   
   const [isLoading, setIsLoading] = useState(true);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole>("user");
@@ -125,7 +126,7 @@ const FamilyManagementScreen = () => {
           setCurrentUserRole("member");
         }
       } catch (error) {
-        console.error("Error fetching family data:", error);
+        console.log("Error fetching family data:", error);
       } finally {
         setIsLoading(false);
       }
@@ -156,10 +157,12 @@ const FamilyManagementScreen = () => {
     try {
       const updated = await regenerateInviteCode(Number(familyData.id));
       const newCode = updated?.invite_code ?? updated?.inviteCode ?? "";
-      await refreshFamilies();
+      if (refreshFamilies) {
+        await refreshFamilies();
+      }
       return newCode;
     } catch (error) {
-      console.error("Error regenerating code:", error);
+      console.log("Error regenerating code:", error);
       throw error;
     }
   };
@@ -198,9 +201,11 @@ const FamilyManagementScreen = () => {
         };
       });
       setMembers(normalizedMembers);
-      await refreshFamilies();
+      if (refreshFamilies) {
+        await refreshFamilies();
+      }
     } catch (error) {
-      console.error("Error kicking member:", error);
+      console.log("Error kicking member:", error);
       throw error;
     }
   };
@@ -211,11 +216,15 @@ const FamilyManagementScreen = () => {
       await leaveFamily(Number(familyData.id), Number(user?.id));
       setMembers([]);
       setCurrentUserRole("user");
-      setSelectedFamilyId(null);
-      await refreshFamilies();
+      if (setSelectedFamilyId) {
+        setSelectedFamilyId(null);
+      }
+      if (refreshFamilies) {
+        await refreshFamilies();
+      }
       router.replace("/(auth)/familyAuth");
     } catch (error) {
-      console.error("Error leaving family:", error);
+      console.log("Error leaving family:", error);
       throw error;
     }
   };
@@ -264,7 +273,9 @@ const FamilyManagementScreen = () => {
           onBack={() => router.back()}
           onComplete={async () => {
             // Refresh family data after creating/joining
-            await refreshFamilies();
+            if (refreshFamilies) {
+              await refreshFamilies();
+            }
           }}
         />
       )}

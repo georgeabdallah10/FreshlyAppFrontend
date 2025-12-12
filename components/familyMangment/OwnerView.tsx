@@ -54,8 +54,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   onKickMember,
 }) => {
   const router = useRouter();
-  const {user} = useUser(); // Get user context first
-  const { selectedFamily } = useFamilyContext();
+  const userContext = useUser();
+  const user = userContext?.user;
+  const familyContext = useFamilyContext();
+  const selectedFamily = familyContext?.selectedFamily;
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const resolvedFamilyData = useMemo(() => {
@@ -205,7 +207,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       // Normalize backend shape -> UI shape
       setLocalMembers(sortMembers(normalizeMembers(fetched)));
     } catch (e) {
-      console.error("Failed to load members:", e);
+      console.log("Failed to load members:", e);
       showToast("error", "Couldn't load members");
     } finally {
       setLoadingMembers(false);
@@ -500,7 +502,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       setLocalInviteCode(newCode);
       showToast("success", "New invite code generated successfully!");
     } catch (error) {
-      console.error("Regenerate code error:", error);
+      console.log("Regenerate code error:", error);
       showToast("error", "Failed to regenerate code. Please try again.");
     } finally {
       setIsRegenerating(false);
@@ -513,7 +515,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         message: `Join our family on SAVR!\n\nFamily: ${resolvedFamilyData?.name ?? "My Family"}\nInvite Code: ${localInviteCode}\n\nDownload the app and enter this code to join.`,
       });
     } catch (error) {
-      console.error("Error sharing:", error);
+      console.log("Error sharing:", error);
     }
   };
 

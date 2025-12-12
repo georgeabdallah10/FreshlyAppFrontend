@@ -58,13 +58,13 @@ export async function uploadImageUri({
   console.log('[uploadImageUri] Available buckets:', buckets?.map(b => b.name));
   
   if (bucketError) {
-    console.error('[uploadImageUri] Failed to list buckets:', bucketError);
+    console.log('[uploadImageUri] Failed to list buckets:', bucketError);
     return { path, publicUrl: undefined };
   }
 
   const bucketExists = buckets?.some(b => b.name === bucket);
   if (!bucketExists) {
-    console.error(`[uploadImageUri] Bucket "${bucket}" does not exist. Available: ${buckets?.map(b => b.name).join(', ')}`);
+    console.log(`[uploadImageUri] Bucket "${bucket}" does not exist. Available: ${buckets?.map(b => b.name).join(', ')}`);
     return { path, publicUrl: undefined };
   }
 
@@ -135,7 +135,10 @@ export async function pickAndUploadAvatar(options: PickAndUploadAvatarOptions = 
     }
     userId = auth?.user?.id ?? undefined;
   }
-  if (!userId) throw new Error("Not signed in or userId not provided.");
+  if (!userId) {
+    console.log("Not signed in or userId not provided.");
+    return null;
+  }
 
   // 1) Pick
   const res = await ImagePicker.launchImageLibraryAsync({
@@ -199,8 +202,8 @@ export async function uploadAvatarFromUri(
     cacheSeconds = 3600,
   } = options ?? {};
 
-  if (!userId) throw new Error("uploadAvatarFromUri: userId is required");
-  if (!uri) throw new Error("uploadAvatarFromUri: image uri is required");
+  if (!userId) console.log("uploadAvatarFromUri: userId is required");
+  if (!uri) console.log("uploadAvatarFromUri: image uri is required");
 
   // Re-encode to JPEG to normalize formats (e.g., HEIC) and compress if needed
   const manipulated = await ImageManipulator.manipulateAsync(

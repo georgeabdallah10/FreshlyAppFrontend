@@ -44,8 +44,10 @@ const MemberView: React.FC<MemberViewProps> = ({
   onLeaveFamily,
 }) => {
   const router = useRouter();
-  const {user} = useUser(); // Get user context first
-  const { selectedFamily } = useFamilyContext();
+  const userContext = useUser();
+  const user = userContext?.user;
+  const familyContext = useFamilyContext();
+  const selectedFamily = familyContext?.selectedFamily;
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const resolvedFamilyData = useMemo(() => {
     if (familyData) return familyData;

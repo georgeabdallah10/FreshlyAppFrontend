@@ -4,18 +4,18 @@
  */
 
 import {
-    deleteAllNotifications,
-    deleteAllReadNotifications,
-    deleteNotification,
-    getNotification,
-    getNotifications,
-    getNotificationStats,
-    getUnreadCount,
-    markAllNotificationsAsRead,
-    markNotificationAsRead,
-    markNotificationAsUnread,
-    type Notification,
-    type NotificationsQuery
+  deleteAllNotifications,
+  deleteAllReadNotifications,
+  deleteNotification,
+  getNotification,
+  getNotifications,
+  getNotificationStats,
+  getUnreadCount,
+  markAllNotificationsAsRead,
+  markNotificationAsRead,
+  markNotificationAsUnread,
+  type NotificationOut as Notification,
+  type NotificationsQuery
 } from '@/src/services/notification.service';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -145,7 +145,7 @@ export function useDeleteAll() {
 
 // Get only unread notifications
 export function useUnreadNotifications() {
-  return useNotifications({ is_read: false });
+  return useNotifications({ unreadOnly: true });
 }
 
 // Get meal share notifications (requests + responses)
@@ -171,10 +171,10 @@ export function useHandleNotificationClick() {
 
   return {
     mutateAsync: async (notification: Notification): Promise<number | null> => {
-      if (!notification.is_read) {
+      if (!notification.isRead) {
         await markAsRead.mutateAsync(notification.id);
       }
-      return notification.related_id || null;
+      return notification.relatedMealId || notification.relatedUserId || notification.relatedFamilyId || notification.relatedShareRequestId || null;
     },
   };
 }
@@ -185,16 +185,16 @@ export function useHandleNotificationClick() {
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-    setupNotificationReceivedListener,
-    setupNotificationResponseListener,
+  setupNotificationReceivedListener,
+  setupNotificationResponseListener,
 } from '../src/notifications/handleIncomingNotifications';
 import {
-    isPushNotificationEnabled,
-    registerForPushNotifications,
-    setBadgeCount,
+  isPushNotificationEnabled,
+  registerForPushNotifications,
+  setBadgeCount,
 } from '../src/notifications/registerForPush';
 import {
-    schedulePantryExpirationNotifications,
+  schedulePantryExpirationNotifications,
 } from '../src/notifications/schedulePantryNotifications';
 
 /**
@@ -221,7 +221,7 @@ export function useNotificationSystem(userId?: number) {
       }
     },
     onError: (error) => {
-      console.error('[useNotificationSystem] Error registering for push:', error);
+      console.log('[useNotificationSystem] Error registering for push:', error);
       setPermissionsGranted(false);
     },
   });
@@ -247,7 +247,7 @@ export function useNotificationSystem(userId?: number) {
         setIsInitialized(true);
         console.log('[useNotificationSystem] Initialized successfully');
       } catch (error) {
-        console.error('[useNotificationSystem] Initialization error:', error);
+        console.log('[useNotificationSystem] Initialization error:', error);
         setIsInitialized(true); // Set to true anyway to prevent infinite loading
       }
     }
@@ -323,7 +323,7 @@ export function useNotificationPermissions(userId?: number) {
         const hasPermission = await isPushNotificationEnabled();
         setPermissionsGranted(hasPermission);
       } catch (error) {
-        console.error('[useNotificationPermissions] Error checking permissions:', error);
+        console.log('[useNotificationPermissions] Error checking permissions:', error);
       } finally {
         setIsChecking(false);
       }
@@ -342,7 +342,7 @@ export function useNotificationPermissions(userId?: number) {
       setPermissionsGranted(!!token);
       return !!token;
     } catch (error) {
-      console.error('[useNotificationPermissions] Error requesting permissions:', error);
+      console.log('[useNotificationPermissions] Error requesting permissions:', error);
       setPermissionsGranted(false);
       return false;
     }

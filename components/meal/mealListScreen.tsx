@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -70,6 +71,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const router = useRouter();
   const scrollViewRef = useRef<ScrollView>(null);
 
+  // Animation values
+  const headerFadeAnim = useRef(new Animated.Value(0)).current;
+  const searchFadeAnim = useRef(new Animated.Value(0)).current;
+  const categoriesFadeAnim = useRef(new Animated.Value(0)).current;
+  const contentFadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
   const mapMealType = (mt?: string): Category | "All" => {
     const s = String(mt || "").toLowerCase();
     if (s === "breakfast") return "Breakfast";
@@ -128,6 +136,40 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     }
   };
 
+  // Entrance animation
+  useEffect(() => {
+    Animated.stagger(80, [
+      Animated.parallel([
+        Animated.timing(headerFadeAnim, {
+          toValue: 1,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.spring(slideAnim, {
+          toValue: 0,
+          friction: 8,
+          tension: 120,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(searchFadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(categoriesFadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contentFadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   useEffect(() => {
     reloadMeals();
   }, []);
@@ -174,7 +216,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       setShowAddMealModal(false);
       alert("Meal added successfully!");
     } catch (error) {
-      console.error("Error creating meal:", error);
+      console.log("Error creating meal:", error);
       alert("Failed to add meal. Please try again.");
     } finally {
       setIsSubmitting(false);
@@ -216,7 +258,12 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       )}
       
       {/* Header */}
-      <View style={styles.header}>
+      <Animated.View 
+        style={[
+          styles.header,
+          { opacity: headerFadeAnim, transform: [{ translateY: slideAnim }] }
+        ]}
+      >
         <TouchableOpacity
           style={styles.backButton}
           activeOpacity={0.8}
@@ -228,10 +275,15 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Meal Plans</Text>
-      </View>
+      </Animated.View>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <Animated.View 
+        style={[
+          styles.searchContainer,
+          { opacity: searchFadeAnim }
+        ]}
+      >
         <TextInput
           style={styles.searchInput}
           placeholder="Search meals..."
@@ -240,10 +292,15 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           onChangeText={setSearchQuery}
           returnKeyType="search"
         />
-      </View>
+      </Animated.View>
 
       {/* Categories */}
-      <View style={styles.categoriesWrapper}>
+      <Animated.View 
+        style={[
+          styles.categoriesWrapper,
+          { opacity: categoriesFadeAnim }
+        ]}
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -284,18 +341,18 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             );
           })}
         </ScrollView>
-      </View>
+      </Animated.View>
 
       {/* Loading State */}
       {parentLoading ? (
-        <View style={styles.emptyStateContainer}>
+        <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.emptyStateTitle}>Loading your meals...</Text>
           <Text style={styles.emptyStateSubtitle}>Just a moment</Text>
-        </View>
+        </Animated.View>
       ) : parentError ? (
         /* Error State */
-        <View style={styles.emptyStateContainer}>
+        <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
           <Text style={styles.emptyStateEmoji}>😕</Text>
           <Text style={styles.emptyStateTitle}>Couldn't Load Meals</Text>
           <Text style={styles.emptyStateSubtitle}>
@@ -315,10 +372,10 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
               <Text style={styles.retryButtonText}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       ) : filteredMeals.length === 0 ? (
         /* Empty State */
-        <View style={styles.emptyStateContainer}>
+        <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
           <Text style={styles.emptyStateEmoji}>🍽️</Text>
           <Text style={styles.emptyStateTitle}>No Meals Yet</Text>
           <Text style={styles.emptyStateSubtitle}>
@@ -338,12 +395,12 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
               <Text style={styles.addFirstMealButtonText}>+ Add Your First Meal</Text>
             </LinearGradient>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       ) : (
         /* Meal cards */
-        <ScrollView
+        <Animated.ScrollView
           ref={scrollViewRef}
-          style={styles.mealsContainer}
+          style={[styles.mealsContainer, { opacity: contentFadeAnim }]}
           contentContainerStyle={styles.mealsContent}
           showsVerticalScrollIndicator={false}
           bounces={true}
@@ -443,7 +500,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             );
           })}
           <View style={{ height: 100 }} />
-        </ScrollView>
+        </Animated.ScrollView>
       )}
 
       {/* Add Meal Floating Button */}

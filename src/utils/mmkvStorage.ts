@@ -47,7 +47,7 @@ function createMockMMKV(id: string): MMKV {
 
   return {
     set(key: string, value: string | number | boolean): void {
-      AsyncStorage.setItem(prefix + key, String(value)).catch(console.error);
+      AsyncStorage.setItem(prefix + key, String(value)).catch(console.log);
     },
 
     getString(key: string): string | undefined {
@@ -55,7 +55,7 @@ function createMockMMKV(id: string): MMKV {
       let result: string | undefined;
       AsyncStorage.getItem(prefix + key)
         .then(value => { if (value) result = value; })
-        .catch(console.error);
+        .catch(console.log);
       return result;
     },
 
@@ -73,12 +73,12 @@ function createMockMMKV(id: string): MMKV {
       let result = false;
       AsyncStorage.getItem(prefix + key)
         .then(value => { result = value !== null; })
-        .catch(console.error);
+        .catch(console.log);
       return result;
     },
 
     remove(key: string): void {
-      AsyncStorage.removeItem(prefix + key).catch(console.error);
+      AsyncStorage.removeItem(prefix + key).catch(console.log);
     },
 
     clearAll(): void {
@@ -87,7 +87,7 @@ function createMockMMKV(id: string): MMKV {
           const prefixedKeys = keys.filter(k => k.startsWith(prefix));
           return AsyncStorage.multiRemove(prefixedKeys);
         })
-        .catch(console.error);
+        .catch(console.log);
     },
 
     getAllKeys(): string[] {
@@ -96,7 +96,7 @@ function createMockMMKV(id: string): MMKV {
         .then(keys => {
           result = keys.filter(k => k.startsWith(prefix)).map(k => k.replace(prefix, ''));
         })
-        .catch(console.error);
+        .catch(console.log);
       return result;
     },
   };
@@ -136,14 +136,14 @@ if (IS_EXPO_GO) {
       encryptionKey: 'freshly-user-encryption-key-2024',
     });
   } catch (error) {
-    console.error('[MMKV] Failed to initialize MMKV, falling back to AsyncStorage:', error);
+    console.log('[MMKV] Failed to initialize MMKV, falling back to AsyncStorage:', error);
     storage = createMockMMKV('app-storage');
     cacheStorage = createMockMMKV('query-cache');
     userStorage = createMockMMKV('user-storage');
   }
 }
 
-export { storage, cacheStorage, userStorage };
+export { cacheStorage, storage, userStorage };
 
 // ============================================
 // TYPED STORAGE HELPERS
@@ -172,7 +172,7 @@ export class MMKVStorage<T = any> {
     try {
       return JSON.parse(value) as T;
     } catch (error) {
-      console.error(`[MMKVStorage] Failed to parse ${key}:`, error);
+      console.log(`[MMKVStorage] Failed to parse ${key}:`, error);
       return null;
     }
   }
@@ -266,7 +266,7 @@ export const mmkvQueryPersister = {
     try {
       return JSON.parse(cached);
     } catch (error) {
-      console.error('[MMKV Persister] Failed to restore cache:', error);
+      console.log('[MMKV Persister] Failed to restore cache:', error);
       return undefined;
     }
   },

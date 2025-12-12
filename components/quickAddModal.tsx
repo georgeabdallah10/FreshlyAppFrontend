@@ -41,7 +41,8 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
   visible,
   onClose,
 }) => {
-  const { activeFamilyId } = useUser();
+  const userContext = useUser();
+  const activeFamilyId = userContext?.activeFamilyId;
   const [modalType, setModalType] = useState<"choice" | "single" | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [productName, setProductName] = useState("");
@@ -162,7 +163,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         errorMessage += "Please try again.";
       }
       
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
   };
 

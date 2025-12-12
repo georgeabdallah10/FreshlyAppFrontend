@@ -38,7 +38,7 @@ export async function setHasSeenTutorial(value: boolean = true): Promise<void> {
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_SEEN_TUTORIAL, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasSeenTutorial:', error);
+    console.log('[UIFlags] Failed to set hasSeenTutorial:', error);
   }
 }
 
@@ -50,7 +50,7 @@ export async function getHasSeenTutorial(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_SEEN_TUTORIAL);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasSeenTutorial:', error);
+    console.log('[UIFlags] Failed to get hasSeenTutorial:', error);
     return false;
   }
 }
@@ -62,7 +62,7 @@ export async function setHasCompletedOnboarding(value: boolean = true): Promise<
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_COMPLETED_ONBOARDING, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasCompletedOnboarding:', error);
+    console.log('[UIFlags] Failed to set hasCompletedOnboarding:', error);
   }
 }
 
@@ -74,7 +74,7 @@ export async function getHasCompletedOnboarding(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_COMPLETED_ONBOARDING);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasCompletedOnboarding:', error);
+    console.log('[UIFlags] Failed to get hasCompletedOnboarding:', error);
     return false;
   }
 }
@@ -90,7 +90,7 @@ export async function setHasSeenPantryGuide(value: boolean = true): Promise<void
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_SEEN_PANTRY_GUIDE, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasSeenPantryGuide:', error);
+    console.log('[UIFlags] Failed to set hasSeenPantryGuide:', error);
   }
 }
 
@@ -102,7 +102,7 @@ export async function getHasSeenPantryGuide(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_SEEN_PANTRY_GUIDE);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasSeenPantryGuide:', error);
+    console.log('[UIFlags] Failed to get hasSeenPantryGuide:', error);
     return false;
   }
 }
@@ -114,7 +114,7 @@ export async function setHasSeenMealPlanGuide(value: boolean = true): Promise<vo
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_SEEN_MEAL_PLAN_GUIDE, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasSeenMealPlanGuide:', error);
+    console.log('[UIFlags] Failed to set hasSeenMealPlanGuide:', error);
   }
 }
 
@@ -126,7 +126,7 @@ export async function getHasSeenMealPlanGuide(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_SEEN_MEAL_PLAN_GUIDE);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasSeenMealPlanGuide:', error);
+    console.log('[UIFlags] Failed to get hasSeenMealPlanGuide:', error);
     return false;
   }
 }
@@ -142,7 +142,7 @@ export async function setHasSeenNotificationPrompt(value: boolean = true): Promi
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_SEEN_NOTIFICATION_PROMPT, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasSeenNotificationPrompt:', error);
+    console.log('[UIFlags] Failed to set hasSeenNotificationPrompt:', error);
   }
 }
 
@@ -154,7 +154,7 @@ export async function getHasSeenNotificationPrompt(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_SEEN_NOTIFICATION_PROMPT);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasSeenNotificationPrompt:', error);
+    console.log('[UIFlags] Failed to get hasSeenNotificationPrompt:', error);
     return false;
   }
 }
@@ -166,7 +166,7 @@ export async function setHasEnabledPushNotifications(value: boolean): Promise<vo
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.HAS_ENABLED_PUSH_NOTIFICATIONS, JSON.stringify(value));
   } catch (error) {
-    console.error('[UIFlags] Failed to set hasEnabledPushNotifications:', error);
+    console.log('[UIFlags] Failed to set hasEnabledPushNotifications:', error);
   }
 }
 
@@ -178,7 +178,7 @@ export async function getHasEnabledPushNotifications(): Promise<boolean> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.HAS_ENABLED_PUSH_NOTIFICATIONS);
     return value === 'true';
   } catch (error) {
-    console.error('[UIFlags] Failed to get hasEnabledPushNotifications:', error);
+    console.log('[UIFlags] Failed to get hasEnabledPushNotifications:', error);
     return false;
   }
 }
@@ -196,7 +196,7 @@ export async function setPreferredTheme(theme: ThemePreference): Promise<void> {
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.PREFERRED_THEME, theme);
   } catch (error) {
-    console.error('[UIFlags] Failed to set preferredTheme:', error);
+    console.log('[UIFlags] Failed to set preferredTheme:', error);
   }
 }
 
@@ -208,7 +208,7 @@ export async function getPreferredTheme(): Promise<ThemePreference> {
     const value = await AsyncStorage.getItem(UI_FLAG_KEYS.PREFERRED_THEME) as ThemePreference;
     return value || 'system';
   } catch (error) {
-    console.error('[UIFlags] Failed to get preferredTheme:', error);
+    console.log('[UIFlags] Failed to get preferredTheme:', error);
     return 'system';
   }
 }
@@ -224,7 +224,7 @@ export async function setLastAppVersion(version: string): Promise<void> {
   try {
     await AsyncStorage.setItem(UI_FLAG_KEYS.LAST_APP_VERSION, version);
   } catch (error) {
-    console.error('[UIFlags] Failed to set lastAppVersion:', error);
+    console.log('[UIFlags] Failed to set lastAppVersion:', error);
   }
 }
 
@@ -235,7 +235,7 @@ export async function getLastAppVersion(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(UI_FLAG_KEYS.LAST_APP_VERSION);
   } catch (error) {
-    console.error('[UIFlags] Failed to get lastAppVersion:', error);
+    console.log('[UIFlags] Failed to get lastAppVersion:', error);
     return null;
   }
 }
@@ -252,7 +252,7 @@ export async function resetAllUIFlags(): Promise<void> {
     const keys = Object.values(UI_FLAG_KEYS);
     await AsyncStorage.multiRemove(keys);
   } catch (error) {
-    console.error('[UIFlags] Failed to reset all UI flags:', error);
+    console.log('[UIFlags] Failed to reset all UI flags:', error);
   }
 }
 

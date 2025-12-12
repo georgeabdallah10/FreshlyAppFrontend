@@ -1,3 +1,5 @@
+import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
+import { useRouter } from "expo-router";
 import React, {
   createContext,
   useCallback,
@@ -6,8 +8,6 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
-import { useRouter } from "expo-router";
 import { useUser } from "./usercontext";
 
 export type FamilySummary = {
@@ -46,7 +46,8 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const router = useRouter();
-  const { logout } = useUser();
+  const userContext = useUser();
+  const logout = userContext?.logout;
   const [families, setFamilies] = useState<FamilySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +57,9 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({
   const handleUnauthorized = useCallback(async (message?: string) => {
     if (authRedirected) return true;
     setAuthRedirected(true);
-    await logout();
+    if (logout) {
+      await logout();
+    }
     router.replace("/(auth)/Login");
     setError(message ?? "Session expired. Please log in again.");
     return true;
@@ -126,7 +129,7 @@ export const FamilyProvider: React.FC<{ children: React.ReactNode }> = ({
 export const useFamilyContext = () => {
   const ctx = useContext(FamilyContext);
   if (!ctx) {
-    throw new Error("useFamilyContext must be used within a FamilyProvider");
+    console.log("useFamilyContext must be used within a FamilyProvider");
   }
   return ctx;
 };

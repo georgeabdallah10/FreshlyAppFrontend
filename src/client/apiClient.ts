@@ -159,7 +159,7 @@ class ApiClient {
             const refreshToken = await getRefreshToken();
 
             if (!refreshToken) {
-              throw new Error('No refresh token available');
+              console.log('No refresh token available');
             }
 
             // Call backend refresh endpoint

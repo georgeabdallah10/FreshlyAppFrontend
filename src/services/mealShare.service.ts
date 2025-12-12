@@ -190,14 +190,14 @@ export async function sendMealShareRequest(
         errorMessage = "Server error. Please try again later.";
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const result = await res.json();
     return transformRequest(result);
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -242,14 +242,14 @@ export async function getReceivedRequests(
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
     return Array.isArray(data) ? data.map(transformRequest) : [];
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -294,14 +294,14 @@ export async function getSentRequests(
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
     return Array.isArray(data) ? data.map(transformRequest) : [];
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -337,14 +337,14 @@ export async function getPendingRequests(): Promise<MealShareRequest[]> {
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
     return Array.isArray(data) ? data.map(transformRequest) : [];
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -387,14 +387,14 @@ async function respondToShareRequest(
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
     return transformRequest(data);
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -443,11 +443,11 @@ export async function cancelShareRequest(requestId: number): Promise<void> {
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -481,7 +481,7 @@ export async function getAcceptedMeals(): Promise<MealShareMealDetail[]> {
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
@@ -493,7 +493,7 @@ export async function getAcceptedMeals(): Promise<MealShareMealDetail[]> {
     return normalized;
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -533,14 +533,14 @@ export async function getShareRequest(requestId: number): Promise<MealShareReque
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     const data = await res.json();
     return transformRequest(data);
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }

@@ -217,32 +217,6 @@ const HomeDashboard = () => {
   const familyButtonRef = useRef<View>(null);
   const settingsButtonRef = useRef<View>(null);
 
-  // Check if tutorial should be shown
-  useEffect(() => {
-    const checkAndShowTutorial = async () => {
-      // If dev mode is on, always show tutorial
-      if (TUTORIAL_DEV_MODE) {
-        setTimeout(() => {
-          measureAllTargets();
-          setShowTutorial(true);
-        }, 500);
-        return;
-      }
-
-      // Otherwise, check if user has completed it
-      const hasCompleted = await checkTutorialCompleted();
-      if (!hasCompleted) {
-        // Give time for layout to settle
-        setTimeout(() => {
-          measureAllTargets();
-          setShowTutorial(true);
-        }, 500);
-      }
-    };
-
-    checkAndShowTutorial();
-  }, []);
-
   // Entrance animations - super fast and snappy
   useEffect(() => {
     Animated.sequence([
@@ -278,13 +252,47 @@ const HomeDashboard = () => {
     ]).start();
   }, []);
 
+  // Check if tutorial should be shown - AFTER animations complete
+  useEffect(() => {
+    const checkAndShowTutorial = async () => {
+      // If dev mode is on, always show tutorial
+      if (TUTORIAL_DEV_MODE) {
+        // Wait for animations to complete (max 320ms) + extra buffer for layout to settle
+        setTimeout(() => {
+          measureAllTargets();
+          // Add small delay between measurement and showing to ensure measurements are complete
+          setTimeout(() => setShowTutorial(true), 100);
+        }, 800);
+        return;
+      }
+
+      // Otherwise, check if user has completed it
+      const hasCompleted = await checkTutorialCompleted();
+      if (!hasCompleted) {
+        // Wait for animations to complete (max 320ms) + extra buffer for layout to settle
+        setTimeout(() => {
+          measureAllTargets();
+          // Add small delay between measurement and showing to ensure measurements are complete
+          setTimeout(() => setShowTutorial(true), 100);
+        }, 800);
+      }
+    };
+
+    checkAndShowTutorial();
+  }, []);
+
   // Measure all target positions
   const measureAllTargets = () => {
     const measureElement = (ref: React.RefObject<View | null>, key: string) => {
       if (ref.current) {
-        ref.current.measureInWindow((x, y, width, height) => {
-          console.log(`[Tutorial] Measured ${key}:`, { x, y, width, height });
-          setTargetMeasurements(prev => ({ ...prev, [key]: { x, y, width, height } }));
+        // Use requestAnimationFrame to ensure layout is complete
+        requestAnimationFrame(() => {
+          if (ref.current) {
+            ref.current.measureInWindow((x, y, width, height) => {
+              console.log(`[Tutorial] Measured ${key}:`, { x, y, width, height });
+              setTargetMeasurements(prev => ({ ...prev, [key]: { x, y, width, height } }));
+            });
+          }
         });
       } else {
         console.warn(`[Tutorial] Failed to measure ${key}: ref.current is null`);

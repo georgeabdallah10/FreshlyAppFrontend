@@ -59,13 +59,13 @@ export async function createFamily(display_name: string) {
         }
       }
       
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
     
     return await res.json(); // Returns { id, display_name, invite_code }
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -161,13 +161,13 @@ export async function joinFamilyByCode(invite_code: string) {
         }
       }
       
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
     
     return await res.json(); // Returns membership info
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -209,13 +209,13 @@ export async function removeFamilyMember(familyId: number, userId: number) {
         }
       }
       
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
     
     return true;
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -270,13 +270,13 @@ export async function updateFamilyMemberRole(
         }
       }
 
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
 
     return await res.json();
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -315,13 +315,13 @@ export async function regenerateInviteCode(familyId: number) {
         }
       }
       
-      throw new Error(errorMessage);
+      console.log(errorMessage);
     }
     
     return await res.json(); // Returns updated FamilyOut with new invite_code
   } catch (error: any) {
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }
@@ -364,17 +364,17 @@ export async function listFamilyMembers(familyId: number) {
         }
       }
       
-      console.error('[family.ts] Error response:', { status: res.status, errorMessage });
-      throw new Error(errorMessage);
+      console.log('[family.ts] Error response:', { status: res.status, errorMessage });
+      console.log(errorMessage);
     }
     
     const data = await res.json();
     console.log('[family.ts] Members fetched successfully:', JSON.stringify(data, null, 2));
     return data; // Returns list of MembershipOut
   } catch (error: any) {
-    console.error('[family.ts] Exception:', error);
+    console.log('[family.ts] Exception:', error);
     if (error.message?.toLowerCase().includes("fetch")) {
-      throw new Error("Network error. Please check your internet connection.");
+      console.log("Network error. Please check your internet connection.");
     }
     throw error;
   }

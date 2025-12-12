@@ -56,8 +56,8 @@ export const PLACES_CONFIG = {
 
 export const validateApiKey = (): boolean => {
   if (!GOOGLE_PLACES_API_KEY || GOOGLE_PLACES_API_KEY === '') {
-    console.error('⚠️ Google Places API key is not configured!');
-    console.error('Please add your API key to app.json under expo.extra.googlePlacesApiKey');
+    console.log('⚠️ Google Places API key is not configured!');
+    console.log('Please add your API key to app.json under expo.extra.googlePlacesApiKey');
     return false;
   }
   return true;

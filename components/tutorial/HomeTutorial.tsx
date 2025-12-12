@@ -1,13 +1,13 @@
 import { Storage } from '@/src/utils/storage';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-    Animated,
-    Dimensions,
-    Platform,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  Animated,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -102,13 +102,17 @@ interface HomeTutorialProps {
 
 // Check if tutorial has been completed
 export const checkTutorialCompleted = async (): Promise<boolean> => {
-  try {
-    const value = await Storage.getItem(TUTORIAL_KEY);
-    return value === 'true';
-  } catch (error) {
-    console.error('Error checking tutorial status:', error);
-    return false;
-  }
+  // TEMPORARY: Always return false for testing - tutorial will show on every reload
+  return false;
+  
+  // TODO: Uncomment below for production
+  // try {
+  //   const value = await Storage.getItem(TUTORIAL_KEY);
+  //   return value === 'true';
+  // } catch (error) {
+  //   console.log('Error checking tutorial status:', error);
+  //   return false;
+  // }
 };
 
 // Mark tutorial as completed
@@ -116,7 +120,7 @@ export const markTutorialCompleted = async (): Promise<void> => {
   try {
     await Storage.setItem(TUTORIAL_KEY, 'true');
   } catch (error) {
-    console.error('Error marking tutorial as complete:', error);
+    console.log('Error marking tutorial as complete:', error);
   }
 };
 
@@ -150,6 +154,12 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
 
   // Check if current step is the congratulations step
   const isCongratulationsStep = currentStepIndex === TUTORIAL_STEPS.length - 1;
+
+  // Check if card will be positioned in lower half of screen (and thus might overlap skip button)
+  const isCardInLowerHalf = targetMeasurement ? (targetMeasurement.y + targetMeasurement.height) > (SCREEN_HEIGHT / 2) : false;
+  
+  // Move skip button up if card is in lower half or it's a bottom nav step
+  const shouldMoveSkipButtonUp = isBottomNavStep || isCardInLowerHalf;
 
   // Initialize spotlight position when tutorial becomes visible
   useEffect(() => {
@@ -235,13 +245,13 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
   useEffect(() => {
     if (visible) {
       Animated.spring(skipButtonPosition, {
-        toValue: isBottomNavStep ? 1 : 0,
+        toValue: shouldMoveSkipButtonUp ? 1 : 0,
         friction: 7,
         tension: 50,
         useNativeDriver: false,
       }).start();
     }
-  }, [isBottomNavStep, visible]);
+  }, [shouldMoveSkipButtonUp, visible]);
 
   const animateCardIn = () => {
     cardSlideAnim.setValue(100);
@@ -346,7 +356,7 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
               style={[
                 styles.overlaySection,
                 {
-                  height: Animated.add(animatedSpotlightY, -8),
+                  height: Animated.add(animatedSpotlightY, -10),
                 },
               ]}
             />
@@ -355,7 +365,7 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
             <Animated.View
               style={{
                 flexDirection: 'row',
-                height: Animated.add(animatedSpotlightHeight, 16),
+                height: Animated.add(animatedSpotlightHeight, 20),
               }}
             >
               {/* Left Dark Area */}
@@ -363,7 +373,7 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
                 style={[
                   styles.overlaySection,
                   {
-                    width: Animated.add(animatedSpotlightX, -8),
+                    width: Animated.add(animatedSpotlightX, -10),
                   },
                 ]}
               />
@@ -371,7 +381,7 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
               {/* Cutout (transparent - shows content) */}
               <Animated.View
                 style={{
-                  width: Animated.add(animatedSpotlightWidth, 16),
+                  width: Animated.add(animatedSpotlightWidth, 20),
                 }}
               />
 
@@ -402,10 +412,10 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
             style={[
               styles.spotlight,
               {
-                left: Animated.add(animatedSpotlightX, -8),
-                top: Animated.add(animatedSpotlightY, -8),
-                width: Animated.add(animatedSpotlightWidth, 16),
-                height: Animated.add(animatedSpotlightHeight, 16),
+                left: Animated.add(animatedSpotlightX, -10),
+                top: Animated.add(animatedSpotlightY, -10),
+                width: Animated.add(animatedSpotlightWidth, 20),
+                height: Animated.add(animatedSpotlightHeight, 20),
               },
             ]}
             pointerEvents="none"
@@ -427,9 +437,10 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
             ],
           },
         ]}
+        pointerEvents="box-none"
       >
         {/* Progress Indicators */}
-        <View style={styles.progressContainer}>
+        <View style={styles.progressContainer} pointerEvents="none">
           {TUTORIAL_STEPS.map((_, index) => (
             <View
               key={index}
@@ -442,7 +453,7 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
         </View>
 
         {/* Content */}
-        <View style={styles.cardContent}>
+        <View style={styles.cardContent} pointerEvents="none">
           <Text style={styles.stepTitle}>{currentStep.title}</Text>
           <Text style={styles.stepDescription}>{currentStep.description}</Text>
         </View>

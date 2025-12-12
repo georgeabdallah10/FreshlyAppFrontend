@@ -1,18 +1,18 @@
-import React, { useEffect, useState, useCallback, ReactNode } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { copilot, CopilotProps, CopilotStep as CopilotStepType, walkthroughable } from '@okgrow/react-native-copilot';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
+import React, { ReactNode, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Animated,
+  Dimensions,
   Easing,
   Platform,
-  Dimensions,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { copilot, walkthroughable, CopilotStep as CopilotStepType, CopilotProps } from '@okgrow/react-native-copilot';
-import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 
 const TUTORIAL_KEY = 'hasSeenMainTutorial';
 const DEV_MODE = true;
@@ -242,7 +242,7 @@ export const hasSeenTutorial = async (): Promise<boolean> => {
     const value = await AsyncStorage.getItem(TUTORIAL_KEY);
     return value === 'true';
   } catch (error) {
-    console.error('Error checking tutorial status:', error);
+    console.log('Error checking tutorial status:', error);
     return false;
   }
 };
@@ -252,7 +252,7 @@ export const markTutorialComplete = async (): Promise<void> => {
     await AsyncStorage.setItem(TUTORIAL_KEY, 'true');
     console.log('✅ Tutorial marked as complete');
   } catch (error) {
-    console.error('Error saving tutorial status:', error);
+    console.log('Error saving tutorial status:', error);
   }
 };
 
@@ -261,7 +261,7 @@ export const resetTutorial = async (): Promise<void> => {
     await AsyncStorage.removeItem(TUTORIAL_KEY);
     console.log('🔄 Tutorial reset - will show on next app launch');
   } catch (error) {
-    console.error('Error resetting tutorial:', error);
+    console.log('Error resetting tutorial:', error);
   }
 };
 
@@ -291,7 +291,7 @@ const MainScreenTutorialBase: React.FC<MainScreenTutorialProps & CopilotProps> =
           console.log('✅ User has seen tutorial - skipping');
         }
       } catch (error) {
-        console.error('Error checking tutorial status:', error);
+        console.log('Error checking tutorial status:', error);
       }
     };
 

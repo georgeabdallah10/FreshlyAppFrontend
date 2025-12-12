@@ -6,30 +6,29 @@
  * Features: Pull-to-refresh, filtering, mark as read, empty state
  */
 
-import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  TouchableOpacity,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { MotiView } from 'moti';
 import NotificationCard from '@/components/NotificationCard';
 import {
+  useDeleteNotification,
+  useMarkAllAsRead,
+  useNotificationPermissions,
   useNotifications,
   useUnreadCount,
-  useMarkAllAsRead,
-  useDeleteNotification,
-  useNotificationPermissions,
 } from '@/hooks/useNotifications';
-import type { Notification } from '@/src/services/notification.service';
+import type { NotificationOut as Notification } from '@/src/services/notification.service';
+import { Ionicons } from '@expo/vector-icons';
+import { MotiView } from 'moti';
+import React, { useCallback, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 // ============================================
 // FILTER TABS
@@ -84,7 +83,7 @@ export default function NotificationsScreen() {
     try {
       await refetch();
     } catch (error) {
-      console.error('[NotificationsScreen] Error refreshing:', error);
+      console.log('[NotificationsScreen] Error refreshing:', error);
     } finally {
       setIsRefreshing(false);
     }
@@ -346,7 +345,7 @@ function filterNotifications(
 ): Notification[] {
   switch (filter) {
     case 'unread':
-      return notifications.filter((n) => !n.is_read);
+      return notifications.filter((n) => !n.isRead);
 
     case 'meal_requests':
       return notifications.filter((n) =>

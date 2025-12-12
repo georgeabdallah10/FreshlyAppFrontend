@@ -1,8 +1,8 @@
 import { BASE_URL } from "@/src/env/baseUrl";
 import { Storage } from "@/src/utils/storage";
-import { supabase } from "../supabase/client";
-import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { supabase } from "../supabase/client";
 
 /**
  * Meal Image Service
@@ -49,9 +49,9 @@ async function ensureBucketExists(): Promise<boolean> {
       .list('', { limit: 1 });
 
     if (listError) {
-      console.error(`[MealImageService] ❌ Bucket "${BUCKET_NAME}" error:`, listError.message);
-      console.error(`[MealImageService] 📋 Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
-      console.error(`[MealImageService] 🔧 Fix: Ensure bucket RLS policies allow anon/public INSERT (like pantryItems bucket)`);
+      console.log(`[MealImageService] ❌ Bucket "${BUCKET_NAME}" error:`, listError.message);
+      console.log(`[MealImageService] 📋 Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
+      console.log(`[MealImageService] 🔧 Fix: Ensure bucket RLS policies allow anon/public INSERT (like pantryItems bucket)`);
       return false;
     }
 
@@ -59,7 +59,7 @@ async function ensureBucketExists(): Promise<boolean> {
     console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" is accessible`);
     return true;
   } catch (error) {
-    console.error(`[MealImageService] ❌ Error checking bucket:`, error);
+    console.log(`[MealImageService] ❌ Error checking bucket:`, error);
     return false;
   }
 }
@@ -93,7 +93,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
     // Step 1: Download to temp file (ImageManipulator needs file URI)
     const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
     if (!cacheDir) {
-      console.error('[MealImageService] No cache directory available');
+      console.log('[MealImageService] No cache directory available');
       return null;
     }
     const tempPath = `${cacheDir}temp-meal-${Date.now()}.png`;
@@ -102,13 +102,13 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
     const downloadResult = await FileSystem.downloadAsync(imageUrl, tempPath);
 
     if (downloadResult.status !== 200) {
-      console.error(`[MealImageService] Download failed with status ${downloadResult.status}`);
+      console.log(`[MealImageService] Download failed with status ${downloadResult.status}`);
       return null;
     }
 
     const originalInfo = await FileSystem.getInfoAsync(downloadResult.uri);
     if (!originalInfo.exists || !originalInfo.size) {
-      console.error('[MealImageService] Downloaded file is invalid');
+      console.log('[MealImageService] Downloaded file is invalid');
       return null;
     }
 
@@ -157,7 +157,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
 
     return bytes;
   } catch (error) {
-    console.error(`[MealImageService] ❌ Compression failed:`, error);
+    console.log(`[MealImageService] ❌ Compression failed:`, error);
     return null;
   }
 }
@@ -178,7 +178,7 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
       });
 
     if (error) {
-      console.error("[MealImageService] Error checking bucket:", error);
+      console.log("[MealImageService] Error checking bucket:", error);
       return null;
     }
 
@@ -210,7 +210,7 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
 
     return null;
   } catch (error) {
-    console.error("[MealImageService] Error in checkImageInBucket:", error);
+    console.log("[MealImageService] Error in checkImageInBucket:", error);
     return null;
   }
 }
@@ -246,7 +246,7 @@ async function generateMealImage(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("[MealImageService] Generate image failed:", errorText);
+      console.log("[MealImageService] Generate image failed:", errorText);
       return null;
     }
 
@@ -256,14 +256,14 @@ async function generateMealImage(
     const imageUrl = data.image_url;
 
     if (!imageUrl) {
-      console.error("[MealImageService] No image_url in response:", data);
+      console.log("[MealImageService] No image_url in response:", data);
       return null;
     }
 
     console.log(`[MealImageService] ✅ Image generated successfully`);
     return imageUrl;
   } catch (error) {
-    console.error("[MealImageService] Error generating image:", error);
+    console.log("[MealImageService] Error generating image:", error);
     return null;
   }
 }
@@ -299,7 +299,7 @@ async function uploadImageToBucket(
       const compressedBytes = await compressImage(imageUrl);
 
       if (!compressedBytes || compressedBytes.length === 0) {
-        console.error("[MealImageService] Compressed image is empty or null");
+        console.log("[MealImageService] Compressed image is empty or null");
         lastError = new Error("Compressed image is empty");
         continue; // Retry
       }
@@ -318,7 +318,7 @@ async function uploadImageToBucket(
         });
 
       if (error) {
-        console.error(`[MealImageService] ❌ Supabase upload error (attempt ${attempt}/${retries}):`, {
+        console.log(`[MealImageService] ❌ Supabase upload error (attempt ${attempt}/${retries}):`, {
           name: error.name,
           message: error.message,
           statusCode: (error as any).statusCode,
@@ -351,7 +351,7 @@ async function uploadImageToBucket(
       const publicUrl = urlData?.publicUrl;
 
       if (!publicUrl) {
-        console.error("[MealImageService] Failed to get public URL after upload");
+        console.log("[MealImageService] Failed to get public URL after upload");
         lastError = new Error("Failed to get public URL after upload");
         continue; // Retry
       }
@@ -360,14 +360,14 @@ async function uploadImageToBucket(
       console.log(`[MealImageService] 🔗 Public URL: ${publicUrl}`);
       return publicUrl;
     } catch (error) {
-      console.error(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);
+      console.log(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);
       lastError = error;
 
       // Don't retry on certain errors
       if (error instanceof Error) {
         const errorMsg = error.message.toLowerCase();
         if (errorMsg.includes('permission') || errorMsg.includes('unauthorized') || errorMsg.includes('forbidden')) {
-          console.error(`[MealImageService] ❌ Permission error - aborting retries`);
+          console.log(`[MealImageService] ❌ Permission error - aborting retries`);
           break;
         }
       }
@@ -375,7 +375,7 @@ async function uploadImageToBucket(
   }
 
   // All retries failed
-  console.error(`[MealImageService] ❌ Failed to upload after ${retries} attempts:`, lastError);
+  console.log(`[MealImageService] ❌ Failed to upload after ${retries} attempts:`, lastError);
   return null;
 }
 
@@ -457,7 +457,7 @@ export async function getMealImage(
       const generatedUrl = await generateMealImage(mealName);
       
       if (!generatedUrl) {
-        console.error(`[MealImageService] Failed to generate image for: ${mealName}`);
+        console.log(`[MealImageService] Failed to generate image for: ${mealName}`);
         imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
         return null;
       }
@@ -477,7 +477,7 @@ export async function getMealImage(
         return generatedUrl; // Return temp URL for immediate use only
       }
     } catch (error) {
-      console.error(`[MealImageService] Error in getMealImage:`, error);
+      console.log(`[MealImageService] Error in getMealImage:`, error);
       imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
       return null;
     } finally {
@@ -517,7 +517,7 @@ export async function getMealImagesBatch(
     if (result.status === "fulfilled") {
       imageMap.set(name, result.value);
     } else {
-      console.error(`[MealImageService] Failed to fetch image for ${name}:`, result.reason);
+      console.log(`[MealImageService] Failed to fetch image for ${name}:`, result.reason);
       imageMap.set(name, null);
     }
   });
@@ -536,7 +536,7 @@ export async function preloadMealImages(mealNames: string[]): Promise<void> {
   
   // Don't await - let it run in background
   getMealImagesBatch(mealNames).catch(error => {
-    console.error("[MealImageService] Error in preload:", error);
+    console.log("[MealImageService] Error in preload:", error);
   });
 }
 

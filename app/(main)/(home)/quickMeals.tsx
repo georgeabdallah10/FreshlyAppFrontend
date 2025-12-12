@@ -1,29 +1,29 @@
 import RecipeItem from "@/components/meal/mealPreview";
 import { useUser } from "@/context/usercontext";
 import { askAI } from "@/src/home/chat";
-import { createMealForSignleUser } from "@/src/user/meals";
 import { getMealImage } from "@/src/services/mealImageService";
+import { createMealForSignleUser } from "@/src/user/meals";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, {
-    useCallback,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 import {
-    Animated,
-    Easing,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    KeyboardAvoidingView,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type FormState = {
@@ -287,7 +287,12 @@ Phase4Block.displayName = "Phase4Block";
 
 const QuickMealsCreateScreen: React.FC = () => {
   const router = useRouter();
-  const { user, prefrences, pantryItems } = useUser();
+  const userContext = useUser();
+  
+  const user = userContext?.user;
+  const prefrences = userContext?.prefrences;
+  const pantryItems = userContext?.pantryItems ?? [];
+  
   const [currentMeal, setCurrentMeal] = useState<CurrentMeal>({
     name: "",
     mealType: "",
@@ -515,7 +520,7 @@ Rules:
         })) : [];
         setFamilies(familyList);
       } catch (error) {
-        console.error('[QuickMeals] Failed to load families:', error);
+        console.log('[QuickMeals] Failed to load families:', error);
       }
     };
     loadFamilies();
@@ -718,7 +723,7 @@ ${JSON_DIRECTIVE}`;
       startCooldown(10);
       triggeredCooldown = true;
     } catch (error: any) {
-      console.error('[QuickMeals] Generation error:', error);
+      console.log('[QuickMeals] Generation error:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       let errorMessage = 'Unable to generate meal. ';
@@ -763,7 +768,7 @@ ${JSON_DIRECTIVE}`;
 
   async function handleSaveMeal(mealInput: any) {
     if (isSubmitting || isButtonDisabled) {
-      throw new Error('Already saving or on cooldown');
+      console.log('Already saving or on cooldown');
     }
 
     const normalizeMealType = (mt?: string) => {
@@ -848,7 +853,7 @@ ${JSON_DIRECTIVE}`;
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: any) {
       startCooldown(30);
-      console.error('[QuickMeals] Failed to save meal:', error);
+      console.log('[QuickMeals] Failed to save meal:', error);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       
       let errorMessage = 'Unable to save meal. ';

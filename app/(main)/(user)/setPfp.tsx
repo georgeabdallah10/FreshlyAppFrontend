@@ -60,7 +60,10 @@ export const SetPfp = () => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [userID, setUserID] = useState("");
-  const { user, updateUserInfo, refreshUser } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
+  const updateUserInfo = userContext?.updateUserInfo;
+  const refreshUser = userContext?.refreshUser;
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -161,11 +164,15 @@ export const SetPfp = () => {
 
     // 2) Persist to backend (PATCH /users/me via your context method)
     // Make sure updateUserInfo returns a promise; if not, wrap it.
-    await Promise.resolve(updateUserInfo({ avatar_path: busted }));
+    if (updateUserInfo) {
+      await Promise.resolve(updateUserInfo({ avatar_path: busted }));
+    }
 
     // 3) Give the backend a tick to commit, then refresh local user data
     await new Promise((r) => setTimeout(r, 300));
-    await Promise.resolve(refreshUser());
+    if (refreshUser) {
+      await Promise.resolve(refreshUser());
+    }
     showToast("success", "Profile photo updated!");
   };
 
@@ -245,7 +252,7 @@ export const SetPfp = () => {
       setUploading(true);
 
       const assetUri = result.assets?.[0]?.uri;
-      if (!assetUri) throw new Error("No image URI from camera.");
+      if (!assetUri) console.log("No image URI from camera.");
       setSelectedImage(assetUri);
 
       // Upload via backend proxy
@@ -337,7 +344,7 @@ export const SetPfp = () => {
       setUploading(true);
 
       const assetUri = result.assets?.[0]?.uri;
-      if (!assetUri) throw new Error("No image URI from gallery.");
+      if (!assetUri) console.log("No image URI from gallery.");
       setSelectedImage(assetUri);
 
       // Upload via backend proxy

@@ -1,16 +1,16 @@
+import { useUser } from '@/context/usercontext';
+import { deleteUserAccount } from '@/src/services/user.service';
+import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  TouchableOpacity,
-  StyleSheet,
   ActivityIndicator,
   Alert,
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { deleteUserAccount } from '@/src/services/user.service';
-import { useUser } from '@/context/usercontext';
-import { useRouter } from 'expo-router';
 
 type Props = {
   visible: boolean;
@@ -19,7 +19,8 @@ type Props = {
 
 const DeleteAccountModal: React.FC<Props> = ({ visible, onClose }) => {
   const [isDeleting, setIsDeleting] = useState(false);
-  const { logout } = useUser();
+  const userContext = useUser();
+  const logout = userContext?.logout;
   const router = useRouter();
 
   const handleDeleteAccount = async () => {
@@ -37,14 +38,16 @@ const DeleteAccountModal: React.FC<Props> = ({ visible, onClose }) => {
             onPress: async () => {
               onClose();
               // Logout and redirect to auth screen
-              await logout();
+              if (logout) {
+                await logout();
+              }
               router.replace('/(auth)/Login');
             },
           },
         ]
       );
     } catch (error: any) {
-      console.error('Error deleting account:', error);
+      console.log('Error deleting account:', error);
       Alert.alert(
         'Error',
         error?.message || 'Failed to delete account. Please try again.'

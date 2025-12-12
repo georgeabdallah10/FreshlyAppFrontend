@@ -7,7 +7,7 @@
  */
 
 import { useMarkAsRead } from '@/hooks/useNotifications';
-import type { Notification } from '@/src/services/notification.service';
+import type { NotificationOut as Notification } from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { MotiView } from 'moti';
@@ -94,11 +94,11 @@ export function NotificationCard({
 
   const handlePress = async () => {
     // Mark as read if unread
-    if (!notification.is_read) {
+    if (!notification.isRead) {
       try {
         await markAsRead.mutateAsync(notification.id);
       } catch (error) {
-        console.error('[NotificationCard] Error marking as read:', error);
+        console.log('[NotificationCard] Error marking as read:', error);
       }
     }
 
@@ -119,7 +119,7 @@ export function NotificationCard({
   };
 
   // Format timestamp
-  const timeAgo = formatTimeAgo(new Date(notification.created_at));
+  const timeAgo = formatTimeAgo(new Date(notification.createdAt));
 
   return (
     <MotiView
@@ -148,7 +148,7 @@ export function NotificationCard({
         style={[
           styles.card,
           { backgroundColor: config.backgroundColor },
-          !notification.is_read && styles.unreadCard,
+          !notification.isRead && styles.unreadCard,
         ]}
       >
         {/* Left Color Indicator */}
@@ -165,13 +165,13 @@ export function NotificationCard({
             <Text
               style={[
                 styles.title,
-                !notification.is_read && styles.unreadTitle,
+                !notification.isRead && styles.unreadTitle,
               ]}
               numberOfLines={2}
             >
               {notification.title}
             </Text>
-            {!notification.is_read && <View style={styles.unreadDot} />}
+            {!notification.isRead && <View style={styles.unreadDot} />}
           </View>
 
           <Text style={styles.message} numberOfLines={3}>
@@ -205,15 +205,16 @@ function handleDefaultRouting(notification: Notification) {
     case 'meal_share_request':
     case 'meal_share_accepted':
     case 'meal_share_declined':
-      if (notification.related_id) {
+      if (notification.relatedMealId) {
         router.push({
           pathname: '/(home)/meal/[id]' as any,
-          params: { id: notification.related_id.toString() },
+          params: { id: notification.relatedMealId.toString() },
         });
       }
       break;
 
-    case 'family':
+    case 'family_member_joined':
+    case 'family_invite':
       router.push('/(home)/chat' as any);
       break;
 

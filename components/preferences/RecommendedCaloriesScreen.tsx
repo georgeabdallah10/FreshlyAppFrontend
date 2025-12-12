@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import {
-  Animated,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    Animated,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
 type RecommendedCaloriesScreenProps = {

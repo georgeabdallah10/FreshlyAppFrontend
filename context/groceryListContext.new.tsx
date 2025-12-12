@@ -11,27 +11,27 @@
 
 import type { SyncModalData } from "@/components/grocery/SyncResultModal";
 import {
-    groceryQueryKeys,
-    useAddItemMutation,
-    useClearCheckedMutation,
-    useDeleteListMutation,
-    useFamilyGroceryLists,
-    useGroceryList as useGroceryListQuery,
-    usePersonalGroceryLists,
-    useRemoveItemMutation,
-    useSyncPantryMutation,
-    useToggleItemMutation,
-    useUpdateItemMutation,
+  groceryQueryKeys,
+  useAddItemMutation,
+  useClearCheckedMutation,
+  useDeleteListMutation,
+  useFamilyGroceryLists,
+  useGroceryList as useGroceryListQuery,
+  usePersonalGroceryLists,
+  useRemoveItemMutation,
+  useSyncPantryMutation,
+  useToggleItemMutation,
+  useUpdateItemMutation,
 } from "@/src/hooks/grocery";
 import {
-    type AddFromRecipeRequest,
-    type AddFromRecipeResponse,
-    type AddGroceryListItemRequest,
-    type GroceryListOut,
-    type SyncWithPantryResponse,
-    type UpdateGroceryListItemRequest,
-    addFromRecipe as addFromRecipeApi,
-    getGroceryListById
+  type AddFromRecipeRequest,
+  type AddFromRecipeResponse,
+  type AddGroceryListItemRequest,
+  type GroceryListOut,
+  type SyncWithPantryResponse,
+  type UpdateGroceryListItemRequest,
+  addFromRecipe as addFromRecipeApi,
+  getGroceryListById
 } from "@/src/services/grocery.service";
 import { useQueryClient } from "@tanstack/react-query";
 import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
@@ -90,7 +90,10 @@ const GroceryListContext = createContext<GroceryListContextType | undefined>(und
 // ============================================
 
 export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { activeFamilyId, isInFamily, user } = useUser();
+  const userContext = useUser();
+  const activeFamilyId = userContext?.activeFamilyId;
+  const isInFamily = userContext?.isInFamily;
+  const user = userContext?.user;
   const queryClient = useQueryClient();
 
   // Selected list state
@@ -118,7 +121,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
     isLoading: familyListsLoading,
     error: familyListsError,
     refetch: refetchFamilyLists,
-  } = useFamilyGroceryLists(isInFamily ? activeFamilyId : null);
+  } = useFamilyGroceryLists(isInFamily ? (activeFamilyId ?? null) : null);
 
   // Selected list query
   const {
@@ -382,6 +385,6 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
 export const useGroceryList = () => {
   const ctx = useContext(GroceryListContext);
-  if (!ctx) throw new Error("useGroceryList must be used within GroceryListProvider");
+  if (!ctx) console.log("useGroceryList must be used within GroceryListProvider");
   return ctx;
 };

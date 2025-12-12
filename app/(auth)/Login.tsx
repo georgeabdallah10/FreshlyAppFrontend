@@ -336,41 +336,48 @@ export default function LoginScreen(): React.JSX.Element {
       });
 
       if (error) {
-        console.error("[Login] Supabase OAuth error:", error);
-        throw new Error(error.message || "Unable to start authentication.");
+        console.log("[Login] Supabase OAuth error:", error);
+        console.log(error.message || "Unable to start authentication.");
       }
 
       if (!data?.url) {
-        throw new Error("Unable to open provider login page.");
+        console.log("Unable to open provider login page.");
       }
 
       console.log("[Login] Opening OAuth URL in browser...");
+      if (!data.url) return;
       const authResult = await WebBrowser.openAuthSessionAsync(
         data.url,
         redirectTo
       );
 
       if (authResult.type !== "success") {
-        throw new Error(
+        console.log(
           authResult.type === "cancel"
             ? "Authentication cancelled."
             : "Authentication failed. Please try again."
         );
+        return;
+      }
+
+      if (!authResult.url) {
+        console.log("[Login] No redirect URL returned after OAuth.");
+        return;
       }
 
       console.log("[Login] OAuth browser session completed");
 
       // Extract and process the redirect URL to establish Supabase session
-      if (authResult.url) {
-        console.log("[Login] Processing redirect URL...");
-        const url = new URL(authResult.url);
-        const params = url.searchParams;
 
-        // Check if we have the necessary tokens in the URL
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
+      console.log("[Login] Processing redirect URL...");
+      const url = new URL(authResult.url);
+      const params = url.searchParams;
 
-        if (accessToken && refreshToken) {
+      // Check if we have the necessary tokens in the URL
+      const accessToken = params.get('access_token');
+      const refreshToken = params.get('refresh_token');
+
+      if (accessToken && refreshToken) {
           console.log("[Login] Setting Supabase session from redirect tokens...");
           const { error: setSessionError } = await supabase.auth.setSession({
             access_token: accessToken,
@@ -378,38 +385,39 @@ export default function LoginScreen(): React.JSX.Element {
           });
 
           if (setSessionError) {
-            console.error("[Login] Error setting session:", setSessionError);
-            throw new Error("Failed to establish session. Please try again.");
+            console.log("[Login] Error setting session:", setSessionError);
+            console.log("Failed to establish session. Please try again.");
           }
-        }
       }
 
       // Give Supabase a moment to fully establish the session
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise<void>((resolve) => setTimeout(resolve, 500));
 
       const { data: sessionData, error: sessionError } =
         await supabase.auth.getSession();
 
       if (sessionError) {
-        console.error(
+        console.log(
           "[Login] Failed to fetch Supabase session:",
           sessionError
         );
-        throw new Error("Login failed. Please try again.");
+        console.log("Login failed. Please try again.");
       }
 
       const supabaseToken = sessionData.session?.access_token;
 
       if (!supabaseToken) {
-        console.error("[Login] No access token in session:", sessionData);
-        throw new Error("Missing authentication token. Please try again.");
+        console.log("[Login] No access token in session:", sessionData);
+        console.log("Missing authentication token. Please try again.");
       }
 
       console.log(
         "[Login] Supabase token received, authenticating with backend..."
       );
 
-      // Use unified OAuth flow (tries signup first, then login on 409)
+      // Use unified OAuth flow (tries signup 
+      //first, then login on 409)
+      if (!supabaseToken) return;
       const backend = await authenticateWithOAuth(supabaseToken, provider);
 
       if (!backend.ok) {

@@ -48,7 +48,11 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
-  const { user, refreshUser, logout, updateUserInfo } = useUser();
+  const userContext = useUser();
+  const user = userContext?.user;
+  const refreshUser = userContext?.refreshUser;
+  const logout = userContext?.logout;
+  const updateUserInfo = userContext?.updateUserInfo;
   const router = useRouter();
 
   // Animation values
@@ -124,7 +128,9 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
         return;
       }
 
-      await updateUserInfo(payload);
+      if (updateUserInfo) {
+        await updateUserInfo(payload);
+      }
 
       // Update local state optimistically and refresh from server
       setProfile({ ...editedProfile });
@@ -132,7 +138,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       Alert.alert("Success", "Profile updated successfully!");
       await refreshUser?.();
     } catch (err) {
-      console.error("Error updating profile:", err);
+      console.log("Error updating profile:", err);
       Alert.alert("Error", "Failed to update profile. Please try again.");
     }
   };
@@ -343,7 +349,9 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             style={styles.logoutButton}
             onPress={async () => {
               try {
-                await logout();
+                if (logout) {
+                  await logout();
+                }
                 router.replace("/(auth)/Login");
               } catch (e) {
                 console.warn("Logout failed", e);

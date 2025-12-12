@@ -93,7 +93,7 @@ export async function schedulePantryExpirationNotifications(): Promise<void> {
     // Schedule next daily check
     await scheduleDailyPantryCheck();
   } catch (error) {
-    console.error('[PantryNotifications] Error scheduling pantry notifications:', error);
+    console.log('[PantryNotifications] Error scheduling pantry notifications:', error);
     throw error;
   }
 }
@@ -156,7 +156,7 @@ async function scheduleExpiringSoonNotification(
 
     console.log(`[PantryNotifications] Scheduled expiring notification for ${item.name}`);
   } catch (error) {
-    console.error('[PantryNotifications] Error scheduling expiring notification:', error);
+    console.log('[PantryNotifications] Error scheduling expiring notification:', error);
   }
 }
 
@@ -207,7 +207,7 @@ async function scheduleExpiredItemNotification(
 
     console.log(`[PantryNotifications] Scheduled expired notification for ${item.name}`);
   } catch (error) {
-    console.error('[PantryNotifications] Error scheduling expired notification:', error);
+    console.log('[PantryNotifications] Error scheduling expired notification:', error);
   }
 }
 
@@ -246,7 +246,7 @@ async function scheduleDailyPantryCheck(): Promise<void> {
 
     console.log('[PantryNotifications] Daily pantry check scheduled for 9 AM');
   } catch (error) {
-    console.error('[PantryNotifications] Error scheduling daily check:', error);
+    console.log('[PantryNotifications] Error scheduling daily check:', error);
   }
 }
 
@@ -269,7 +269,7 @@ export async function cancelAllPantryNotifications(): Promise<void> {
 
     console.log('[PantryNotifications] All pantry notifications cancelled');
   } catch (error) {
-    console.error('[PantryNotifications] Error cancelling notifications:', error);
+    console.log('[PantryNotifications] Error cancelling notifications:', error);
   }
 }
 
@@ -286,7 +286,7 @@ export async function cancelPantryItemNotification(itemId: number): Promise<void
 
     console.log(`[PantryNotifications] Cancelled notifications for item ${itemId}`);
   } catch (error) {
-    console.error('[PantryNotifications] Error cancelling item notification:', error);
+    console.log('[PantryNotifications] Error cancelling item notification:', error);
   }
 }
 
@@ -352,7 +352,7 @@ export async function getExpiringItemsSummary(): Promise<{
       expired,
     };
   } catch (error) {
-    console.error('[PantryNotifications] Error getting expiring items summary:', error);
+    console.log('[PantryNotifications] Error getting expiring items summary:', error);
     return {
       expiringToday: [],
       expiringSoon: [],
@@ -396,7 +396,7 @@ export async function getScheduledPantryNotifications(): Promise<Notifications.N
       n.identifier.startsWith(NOTIFICATION_IDENTIFIER_PREFIX)
     );
   } catch (error) {
-    console.error('[PantryNotifications] Error getting scheduled notifications:', error);
+    console.log('[PantryNotifications] Error getting scheduled notifications:', error);
     return [];
   }
 }
@@ -413,6 +413,6 @@ export async function reschedulePantryItemNotification(itemId: number): Promise<
     // Reschedule all pantry notifications
     await schedulePantryExpirationNotifications();
   } catch (error) {
-    console.error('[PantryNotifications] Error rescheduling item notification:', error);
+    console.log('[PantryNotifications] Error rescheduling item notification:', error);
   }
 }

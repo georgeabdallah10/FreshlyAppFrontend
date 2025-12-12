@@ -1,10 +1,10 @@
-import { Storage } from "../utils/storage";
 import { BASE_URL } from "../env/baseUrl";
+import { Storage } from "../utils/storage";
 
 async function getAuthHeaders(): Promise<Record<string, string> | null> {
   const token = await Storage.getItem("access_token");
   if (!token) {
-    console.error("[pantry.ts] Not authenticated: missing access token");
+    console.log("[pantry.ts] Not authenticated: missing access token");
     return null;
   }
   return {
@@ -73,7 +73,7 @@ export async function listMyPantryItems(
   const res = await fetch(url, { headers });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[pantry.ts] List pantry failed:", { status: res.status, error: text });
+    console.log("[pantry.ts] List pantry failed:", { status: res.status, error: text });
     return [];
   }
 
@@ -131,7 +131,7 @@ export async function createMyPantryItem(
 
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[pantry.ts] Create pantry item failed:", { status: res.status, error: text });
+    console.log("[pantry.ts] Create pantry item failed:", { status: res.status, error: text });
     return null;
   }
   return res.json();
@@ -161,7 +161,7 @@ export async function updatePantryItem(
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[pantry.ts] Update pantry item failed:", { status: res.status, error: text });
+    console.log("[pantry.ts] Update pantry item failed:", { status: res.status, error: text });
     return null;
   }
   return res.json();
@@ -177,7 +177,7 @@ export async function deletePantryItem(itemId: number): Promise<boolean> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    console.error("[pantry.ts] Delete pantry item failed:", { status: res.status, error: text });
+    console.log("[pantry.ts] Delete pantry item failed:", { status: res.status, error: text });
     return false;
   }
   return true;
@@ -224,7 +224,7 @@ export async function upsertPantryItemByName(
   const normalizedIncoming = normalizePantryItemName(input.ingredient_name);
   if (!normalizedIncoming) {
     // Keep this as user-facing validation error
-    console.error("[pantry.ts] Ingredient name is required to add pantry items.");
+    console.log("[pantry.ts] Ingredient name is required to add pantry items.");
     return { item: null, merged: false, snapshot: [] };
   }
 

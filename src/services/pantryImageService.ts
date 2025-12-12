@@ -109,7 +109,7 @@ async function generateAndUploadImage(
     });
 
     if (!response.ok) {
-      console.error(`❌ Image generation failed: ${response.status}`);
+      console.log(`❌ Image generation failed: ${response.status}`);
       return null;
     }
 
@@ -117,7 +117,7 @@ async function generateAndUploadImage(
     // Backend now returns only { image_url, prompt }
     const imageUrl = result.image_url;
     if (!imageUrl) {
-      console.error(`❌ No image_url in response:`, result);
+      console.log(`❌ No image_url in response:`, result);
       return null;
     }
 
@@ -138,7 +138,7 @@ async function generateAndUploadImage(
         }
       }
     } catch (e) {
-      console.error("⚠️ Failed to read image response data; using safe fallback.", e);
+      console.log("⚠️ Failed to read image response data; using safe fallback.", e);
       const base64Data = await imageResponse.text();
       const binary = atob(base64Data);
       imageBlob = new Uint8Array(binary.length);
@@ -175,7 +175,7 @@ async function generateAndUploadImage(
 
     return null;
   } catch (error) {
-    console.error(`Failed to generate pantry image for ${itemName}:`, error);
+    console.log(`Failed to generate pantry image for ${itemName}:`, error);
     return null;
   }
 }

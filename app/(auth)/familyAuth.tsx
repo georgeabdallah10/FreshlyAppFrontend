@@ -1,6 +1,6 @@
 // ==================== FamilyMemberFlow.tsx ====================
-import { useUser } from "@/context/usercontext";
 import { useFamilyContext } from "@/context/familycontext";
+import { useUser } from "@/context/usercontext";
 import {
   createFamily,
   joinFamilyByCode,
@@ -42,8 +42,13 @@ interface FamilyMemberFlowProps {
 
 const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: FamilyMemberFlowProps = {}) => {
   const router = useRouter();
-  const {user, updateUserInfo} = useUser();
-  const { refreshFamilies, setSelectedFamilyId } = useFamilyContext();
+  const userContext = useUser();
+  const familyContext = useFamilyContext();
+  
+  const user = userContext?.user;
+  const updateUserInfo = userContext?.updateUserInfo;
+  const refreshFamilies = familyContext?.refreshFamilies;
+  const setSelectedFamilyId = familyContext?.setSelectedFamilyId;
   const [currentScreen, setCurrentScreen] = useState<Screen>("initial");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -196,12 +201,20 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       const res = await createFamily(familyName.trim()); // { id, display_name, invite_code }
       const invite = res.invite_code || res.inviteCode || "";
       const fid = res.id as number;
-      updateUserInfo({
-        status:"owner"
-      })
+      
+      if (updateUserInfo) {
+        updateUserInfo({
+          status:"owner"
+        });
+      }
 
-      await refreshFamilies();
-      setSelectedFamilyId(fid ? String(fid) : null);
+      if (refreshFamilies) {
+        await refreshFamilies();
+      }
+      
+      if (setSelectedFamilyId) {
+        setSelectedFamilyId(fid ? String(fid) : null);
+      }
 
       setGeneratedInviteCode(invite);
       setCurrentFamilyId(fid);
@@ -279,7 +292,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       const fid = res.family_id ?? res.familyId ?? res.family?.id ?? res.id;
 
       if (!fid)
-        throw new Error(
+        console.log(
           "Successfully joined, but could not load family details. Please refresh the app."
         );
 
@@ -287,9 +300,12 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       setShowJoinModal(false);
       setJoinCode("");
       setCurrentScreen("memberList");
-      updateUserInfo({
-        status: "member"
-      })
+      
+      if (updateUserInfo) {
+        updateUserInfo({
+          status: "member"
+        });
+      }
 
       await refreshMembers(fid);
 
@@ -303,8 +319,12 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
              if (onComplete) {
                onComplete();
              }
-              refreshFamilies();
-              setSelectedFamilyId(fid ? String(fid) : null);
+              if (refreshFamilies) {
+                refreshFamilies();
+              }
+              if (setSelectedFamilyId) {
+                setSelectedFamilyId(fid ? String(fid) : null);
+              }
             }
           }
         ]

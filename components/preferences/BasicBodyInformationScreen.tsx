@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
     Animated,
-    Modal,
     StyleSheet,
+    Switch,
     Text,
     TextInput,
     TouchableOpacity,
@@ -14,6 +14,8 @@ type BasicBodyInformationScreenProps = {
   height: number | null;
   weight: number | null;
   gender: "male" | "female" | null;
+  isAthlete: boolean;
+  trainingLevel: "light" | "casual" | "intense" | null;
   ageError?: string | null;
   heightError?: string | null;
   weightError?: string | null;
@@ -22,6 +24,8 @@ type BasicBodyInformationScreenProps = {
     value: string
   ) => void;
   onUnitChange?: (field: "height" | "weight", unit: string) => void;
+  onAthleteToggle: (value: boolean) => void;
+  onTrainingLevelChange: (value: "light" | "casual" | "intense" | null) => void;
 };
 
 type HeightUnit = "cm" | "ft";
@@ -34,19 +38,25 @@ const BasicBodyInformationScreen: React.FC<
   height,
   weight,
   gender,
+  isAthlete,
+  trainingLevel,
   ageError,
   heightError,
   weightError,
   onChange,
   onUnitChange,
+  onAthleteToggle,
+  onTrainingLevelChange,
 }) => {
   const [focusedField, setFocusedField] = useState<
     "age" | "height" | "weight" | null
   >(null);
-  const [heightUnit, setHeightUnit] = useState<HeightUnit>("cm");
-  const [weightUnit, setWeightUnit] = useState<WeightUnit>("kg");
-  const [showHeightUnitPicker, setShowHeightUnitPicker] = useState(false);
-  const [showWeightUnitPicker, setShowWeightUnitPicker] = useState(false);
+  const [heightUnit, setHeightUnit] = useState<HeightUnit>("ft");
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>("lbs");
+  const [unitSystem, setUnitSystem] = useState<"imperial" | "metric">(
+    "imperial"
+  );
+  const [switchWidth, setSwitchWidth] = useState(0);
   const [heightFeet, setHeightFeet] = useState("");
   const [heightInches, setHeightInches] = useState("");
   const [weightLbsInput, setWeightLbsInput] = useState("");
@@ -55,6 +65,7 @@ const BasicBodyInformationScreen: React.FC<
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+  const unitThumbAnim = useRef(new Animated.Value(0)).current;
 
   // Entrance animation - super fast and snappy
   useEffect(() => {
@@ -73,30 +84,30 @@ const BasicBodyInformationScreen: React.FC<
     ]).start();
   }, []);
 
-  const handleHeightUnitChange = (unit: HeightUnit) => {
-    setHeightUnit(unit);
-    setShowHeightUnitPicker(false);
-    onUnitChange?.("height", unit);
-    // Clear height value when switching units to avoid confusion
+  const applyUnitSystem = (system: "imperial" | "metric") => {
+    const nextHeightUnit: HeightUnit = system === "imperial" ? "ft" : "cm";
+    const nextWeightUnit: WeightUnit = system === "imperial" ? "lbs" : "kg";
+    setUnitSystem(system);
+    setHeightUnit(nextHeightUnit);
+    setWeightUnit(nextWeightUnit);
+    onUnitChange?.("height", nextHeightUnit);
+    onUnitChange?.("weight", nextWeightUnit);
     onChange("height", "");
-    if (unit === "cm") {
-      setHeightFeet("");
-      setHeightInches("");
-    }
-  };
-
-  const handleWeightUnitChange = (unit: WeightUnit) => {
-    setWeightUnit(unit);
-    setShowWeightUnitPicker(false);
-    onUnitChange?.("weight", unit);
-    // Clear weight value when switching units to avoid confusion
     onChange("weight", "");
-    setWeightLbsInput("");
+    setHeightFeet("");
+    setHeightInches("");
     setWeightKgInput("");
+    setWeightLbsInput("");
+    Animated.spring(unitThumbAnim, {
+      toValue: system === "imperial" ? 0 : 1,
+      useNativeDriver: false,
+      friction: 8,
+      tension: 120,
+    }).start();
   };
 
   const getHeightPlaceholder = () => {
-    return "100-250 cm";
+    return heightUnit === "cm" ? "100-250 cm" : "4'0\" - 7'0\"";
   };
 
   const getWeightPlaceholder = () => {
@@ -112,14 +123,16 @@ const BasicBodyInformationScreen: React.FC<
   };
 
   useEffect(() => {
-    if (heightUnit === "ft" && height !== null && !Number.isNaN(height)) {
-      const totalInches = Math.round(height / 2.54);
-      const ft = Math.floor(totalInches / 12);
-      const inch = totalInches % 12;
-      setHeightFeet(ft ? String(ft) : "");
-      setHeightInches(String(inch));
-    }
-  }, [height, heightUnit]);
+    if (heightUnit !== "ft") return;
+    if (focusedField === "height") return;
+    if (height === null || Number.isNaN(height)) return;
+    if (heightFeet !== "" || heightInches !== "") return;
+    const totalInches = Math.round(height / 2.54);
+    const ft = Math.floor(totalInches / 12);
+    const inch = totalInches % 12;
+    setHeightFeet(ft ? String(ft) : "");
+    setHeightInches(String(inch));
+  }, [height, heightUnit, focusedField, heightFeet, heightInches]);
 
   const parsedFeet = heightFeet ? Number(heightFeet) : NaN;
   const parsedInches = heightInches ? Number(heightInches) : NaN;
@@ -146,11 +159,14 @@ const BasicBodyInformationScreen: React.FC<
     const feetValid = !Number.isNaN(ft) && ft >= 3 && ft <= 8;
     const inchesValid = !Number.isNaN(inch) && inch >= 0 && inch <= 11;
 
+    if (!feetValue && !inchesValue) {
+      onChange("height", "");
+      return;
+    }
+
     if (feetValid && inchesValid) {
       const totalInches = ft * 12 + inch;
       onChange("height", String(totalInches));
-    } else {
-      onChange("height", "");
     }
   };
 
@@ -219,8 +235,8 @@ const BasicBodyInformationScreen: React.FC<
         <Text style={styles.genderTitle}>Gender *</Text>
         <View style={styles.genderRow}>
           {[
-            { id: "male" as const, label: "Male" },
-            { id: "female" as const, label: "Female" },
+            { id: "male" as const, label: "Male" , color: ""},
+            { id: "female" as const, label: "Female", color: "" },
           ].map((option) => {
             const isSelected = gender === option.id;
             return (
@@ -247,6 +263,118 @@ const BasicBodyInformationScreen: React.FC<
         </View>
       </View>
 
+      {/* Athlete Mode */}
+      <View style={styles.inputGroup}>
+        <View style={styles.labelRow}>
+          <View>
+            <Text style={styles.inputLabel}>Athlete Mode</Text>
+            <Text style={styles.helperText}>Turn on if you train often</Text>
+          </View>
+          <Switch
+            value={isAthlete}
+            onValueChange={(val) => {
+              onAthleteToggle(val);
+              if (!val) onTrainingLevelChange(null);
+            }}
+            thumbColor={isAthlete ? "#00C853" : "#FFFFFF"}
+            trackColor={{ false: "#E5E7EB", true: "#C8F8DF" }}
+          />
+        </View>
+
+        {isAthlete && (
+          <View style={styles.trainingSection}>
+            <Text style={styles.trainingTitle}>Training level</Text>
+            <Text style={styles.helperText}>How hard do you usually train?</Text>
+            <View style={styles.trainingRow}>
+              {[
+                { id: "light", label: "Light", sub: "3–4 days a week" },
+                { id: "casual", label: "Casual", sub: "5–6 days a week" },
+                { id: "intense", label: "Intense", sub: "Daily or 2× a day" },
+              ].map((opt) => {
+                const active = trainingLevel === opt.id;
+                return (
+                  <TouchableOpacity
+                    key={opt.id}
+                    style={[styles.trainingOption, active && styles.trainingOptionActive]}
+                    onPress={() => onTrainingLevelChange(opt.id as "light" | "casual" | "intense")}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={[styles.trainingLabel, active && styles.trainingLabelActive]}>
+                      {opt.label}
+                    </Text>
+                    <Text style={[styles.trainingSub, active && styles.trainingSubActive]}>
+                      {opt.sub}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Unit system switch (small, below gender) */}
+      <View
+        style={styles.unitSwitch}
+        onLayout={(e) => setSwitchWidth(e.nativeEvent.layout.width)}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.unitThumb,
+            {
+              width: switchWidth ? switchWidth / 2 - 10 : "46%",
+              backgroundColor:
+                unitSystem === "imperial"
+                  ? "rgba(16, 185, 129, 0.15)"
+                  : "rgba(249, 115, 22, 0.12)",
+              borderColor:
+                unitSystem === "imperial"
+                  ? "rgba(16, 185, 129, 0.35)"
+                  : "rgba(249, 115, 22, 0.35)",
+              transform: [
+                {
+                  translateX: unitThumbAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [4, switchWidth ? switchWidth / 2 : 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+        <TouchableOpacity
+          style={styles.unitOption}
+          activeOpacity={0.9}
+          onPress={() => applyUnitSystem("imperial")}
+        >
+          <Text
+            style={[
+              styles.unitLabel,
+              unitSystem === "imperial" && styles.unitLabelActive,
+            ]}
+          >
+            Imperial
+          </Text>
+          <Text style={styles.unitHint}>lbs / ft</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.unitOption}
+          activeOpacity={0.9}
+          onPress={() => applyUnitSystem("metric")}
+        >
+          <Text
+            style={[
+              styles.unitLabel,
+              unitSystem === "metric" && styles.unitLabelActiveOrange,
+            ]}
+          >
+            Metric
+          </Text>
+          <Text style={styles.unitHint}>kg / cm</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Height Input with Unit Picker */}
       <View
         style={[
@@ -256,15 +384,10 @@ const BasicBodyInformationScreen: React.FC<
         ]}
       >
         <View style={styles.labelRow}>
-          <Text style={styles.inputLabel}>Height *</Text>
-          <TouchableOpacity
-            style={styles.unitButton}
-            onPress={() => setShowHeightUnitPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.unitButtonText}>{heightUnit}</Text>
-            <Text style={styles.unitButtonArrow}>▼</Text>
-          </TouchableOpacity>
+          <Text style={styles.inputLabel}>
+            {heightUnit === "cm" ? "Height * (cm)" : "Height * (ft / in)"}
+          </Text>
+          <Text style={styles.unitChip}>{heightUnit}</Text>
         </View>
         {heightUnit === "cm" ? (
           <TextInput
@@ -329,15 +452,10 @@ const BasicBodyInformationScreen: React.FC<
         ]}
       >
         <View style={styles.labelRow}>
-          <Text style={styles.inputLabel}>Weight *</Text>
-          <TouchableOpacity
-            style={styles.unitButton}
-            onPress={() => setShowWeightUnitPicker(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.unitButtonText}>{weightUnit}</Text>
-            <Text style={styles.unitButtonArrow}>▼</Text>
-          </TouchableOpacity>
+          <Text style={styles.inputLabel}>
+            {weightUnit === "kg" ? "Weight * (kg)" : "Weight * (lbs)"}
+          </Text>
+          <Text style={styles.unitChip}>{weightUnit}</Text>
         </View>
         <TextInput
           style={styles.input}
@@ -372,105 +490,6 @@ const BasicBodyInformationScreen: React.FC<
         ) : null}
       </View>
 
-      {/* Height Unit Picker Modal */}
-      <Modal
-        visible={showHeightUnitPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowHeightUnitPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowHeightUnitPicker(false)}
-        >
-          <View style={styles.pickerContainer}>
-            <Text style={styles.pickerTitle}>Select Height Unit</Text>
-            <TouchableOpacity
-              style={[
-                styles.pickerOption,
-                heightUnit === "cm" && styles.pickerOptionSelected,
-              ]}
-              onPress={() => handleHeightUnitChange("cm")}
-            >
-              <Text
-                style={[
-                  styles.pickerOptionText,
-                  heightUnit === "cm" && styles.pickerOptionTextSelected,
-                ]}
-              >
-                Centimeters (cm)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.pickerOption,
-                heightUnit === "ft" && styles.pickerOptionSelected,
-              ]}
-              onPress={() => handleHeightUnitChange("ft")}
-            >
-              <Text
-                style={[
-                  styles.pickerOptionText,
-                  heightUnit === "ft" && styles.pickerOptionTextSelected,
-                ]}
-              >
-                Feet & Inches (ft)
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Weight Unit Picker Modal */}
-      <Modal
-        visible={showWeightUnitPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowWeightUnitPicker(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowWeightUnitPicker(false)}
-        >
-          <View style={styles.pickerContainer}>
-            <Text style={styles.pickerTitle}>Select Weight Unit</Text>
-            <TouchableOpacity
-              style={[
-                styles.pickerOption,
-                weightUnit === "kg" && styles.pickerOptionSelected,
-              ]}
-              onPress={() => handleWeightUnitChange("kg")}
-            >
-              <Text
-                style={[
-                  styles.pickerOptionText,
-                  weightUnit === "kg" && styles.pickerOptionTextSelected,
-                ]}
-              >
-                Kilograms (kg)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.pickerOption,
-                weightUnit === "lbs" && styles.pickerOptionSelected,
-              ]}
-              onPress={() => handleWeightUnitChange("lbs")}
-            >
-              <Text
-                style={[
-                  styles.pickerOptionText,
-                  weightUnit === "lbs" && styles.pickerOptionTextSelected,
-                ]}
-              >
-                Pounds (lbs)
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </Animated.View>
   );
 };
@@ -527,25 +546,18 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#111111",
   },
-  unitButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F7F8FA",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    gap: 4,
+  helperText: {
+    fontSize: 12,
+    color: "#9CA3AF",
   },
-  unitButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  unitButtonArrow: {
-    fontSize: 10,
-    color: "#666666",
+  unitChip: {
+    backgroundColor: "#EEF7F2",
+    color: "#0A8F5D",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: "700",
   },
   genderContainer: {
     marginBottom: 16,
@@ -570,8 +582,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   genderOptionSelected: {
-    borderColor: "#00C853",
-    backgroundColor: "#E8F8F2",
+    borderColor: "#FD8100",
+    backgroundColor: "#FFF4EC",
   },
   genderLabel: {
     fontSize: 16,
@@ -579,7 +591,7 @@ const styles = StyleSheet.create({
     color: "#111111",
   },
   genderLabelSelected: {
-    color: "#00C853",
+    color: "#FD8100",
   },
   heightSplitRow: {
     flexDirection: "row",
@@ -620,46 +632,94 @@ const styles = StyleSheet.create({
   weightRestrictionTextInvalid: {
     color: "#FF3B30",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
+  unitSwitch: {
+    flexDirection: "row",
     alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255, 255, 255, 0.7)",
+    borderRadius: 14,
+    padding: 4,
+    paddingRight: 6,
+    marginTop: -4,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.12)",
+    overflow: "hidden",
   },
-  pickerContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 20,
-    width: "80%",
-    maxWidth: 320,
+  unitThumb: {
+    position: "absolute",
+    top: 3,
+    bottom: 3,
+    left: 3,
+    borderRadius: 10,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.25)",
+    shadowColor: "#10B981",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
-  pickerTitle: {
-    fontSize: 18,
+  unitOption: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  unitLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#6B7280",
+  },
+  unitLabelActive: {
+    color: "#0A8F5D",
+  },
+  unitLabelActiveOrange: {
+    color: "#F97316",
+  },
+  unitHint: {
+    fontSize: 11,
+    color: "#9CA3AF",
+  },
+  trainingSection: {
+    marginTop: 12,
+    gap: 8,
+  },
+  trainingTitle: {
+    fontSize: 14,
     fontWeight: "700",
     color: "#111111",
-    marginBottom: 16,
-    textAlign: "center",
   },
-  pickerOption: {
-    padding: 16,
+  trainingRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  trainingOption: {
+    flex: 1,
+    backgroundColor: "#F7F8FA",
     borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#EEEFF3",
-    marginBottom: 12,
-    backgroundColor: "#F7F8FA",
   },
-  pickerOptionSelected: {
+  trainingOptionActive: {
     borderColor: "#00C853",
     backgroundColor: "#E8F8F2",
   },
-  pickerOptionText: {
-    fontSize: 16,
-    fontWeight: "600",
+  trainingLabel: {
+    fontSize: 14,
+    fontWeight: "700",
     color: "#111111",
-    textAlign: "center",
   },
-  pickerOptionTextSelected: {
+  trainingLabelActive: {
     color: "#00C853",
+  },
+  trainingSub: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginTop: 4,
+  },
+  trainingSubActive: {
+    color: "#0A8F5D",
   },
 });
 

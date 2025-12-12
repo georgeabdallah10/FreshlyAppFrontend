@@ -30,6 +30,15 @@ type PreferenceOption = {
   label: string;
 };
 
+type Goal = "lose-weight" | "weight-gain" | "muscle-gain" | "balanced" | "leaner";
+
+type DietaryPreference =
+  | "halal"
+  | "kosher"
+  | "vegetarian"
+  | "vegan"
+  | "pescatarian";
+
 type PreferenceScreenKey = "culturalLifestyle" | "goal";
 
 type PreferenceScreenConfig = {
@@ -46,6 +55,8 @@ type BasicBodyInformation = {
   height: number | null;
   weight: number | null;
   gender: "male" | "female" | null;
+  isAthlete: boolean;
+  trainingLevel: "light" | "casual" | "intense" | null;
 };
 
 type BodyUnits = {
@@ -56,8 +67,10 @@ type BodyUnits = {
 type OnboardingPreferenceState = {
   culturalLifestyle: string[];
   allergies: string[];
-  goal: string;
+  goal: string[];
   body: BasicBodyInformation;
+  isAthlete?: boolean;
+  trainingLevel?: "light" | "casual" | "intense" | null;
   calorieTarget: number | null;
 };
 
@@ -118,14 +131,16 @@ const OnboardingPreferences = () => {
   const [editingAllergyIndex, setEditingAllergyIndex] =
     useState<number | null>(null);
   const [culturalLifestylePreferences, setCulturalLifestylePreferences] =
-    useState<string[]>([]);
-  const [goal, setGoal] = useState<string>("balanced");
+    useState<DietaryPreference[]>([]);
+  const [goals, setGoals] = useState<Goal[]>(["balanced"]);
   const [bodyInformation, setBodyInformation] = useState<BasicBodyInformation>(
     {
       age: null,
       height: null,
       weight: null,
       gender: null,
+      isAthlete: false,
+      trainingLevel: null,
     }
   );
   const [bodyUnits, setBodyUnits] = useState<BodyUnits>({
@@ -155,6 +170,11 @@ const OnboardingPreferences = () => {
   const optionScaleRefs = useRef<Record<string, Animated.Value>>({});
   const transitionLockRef = useRef(false);
   const isSavingRef = useRef(false);
+  const primaryGoal = useMemo(() => {
+    const meaningful = goals.filter((g) => g !== "balanced");
+    if (meaningful.length) return meaningful[meaningful.length - 1];
+    return goals[0] ?? "balanced";
+  }, [goals]);
 
   // Pre-fill user preferences from context when editing from profile
   useEffect(() => {
@@ -168,6 +188,8 @@ const OnboardingPreferences = () => {
           height: user.height ?? null,
           weight: user.weight ?? null,
           gender: user.gender ?? null,
+          isAthlete: false,
+          trainingLevel: null,
         });
       }
 
@@ -181,7 +203,7 @@ const OnboardingPreferences = () => {
     if (prefrences) {
       // Pre-fill goal
       if (prefrences.goal) {
-        setGoal(prefrences.goal);
+        setGoals([prefrences.goal as Goal]);
       }
 
       // Pre-fill diet codes (cultural/lifestyle preferences)
@@ -190,7 +212,9 @@ const OnboardingPreferences = () => {
         const culturalPrefs = prefrences.diet_codes.filter(
           (code: string) => !code.startsWith("allergy-")
         );
-        setCulturalLifestylePreferences(culturalPrefs);
+        setCulturalLifestylePreferences(
+          culturalPrefs.filter(Boolean) as DietaryPreference[]
+        );
 
         // Extract allergies from allergy codes
         const allergyItems = prefrences.diet_codes
@@ -223,7 +247,8 @@ const OnboardingPreferences = () => {
           { id: "pescatarian", label: "Pescatarian" },
         ],
         selectedValues: culturalLifestylePreferences,
-        onChange: setCulturalLifestylePreferences,
+        onChange: (values: string[]) =>
+          setCulturalLifestylePreferences(values as DietaryPreference[]),
       },
       {
         key: "goal",
@@ -232,14 +257,15 @@ const OnboardingPreferences = () => {
           { id: "lose-weight", label: "Lose Weight" },
           { id: "weight-gain", label: "Gain Weight" },
           { id: "muscle-gain", label: "Muscle Gain" },
+          { id: "leaner", label: "Get Leaner" },
           { id: "balanced", label: "Balanced" },
         ],
-        selectedValues: goal ? [goal] : [],
-        onChange: (value: string[]) => setGoal(value[0] || "balanced"),
-        singleSelect: true,
+        selectedValues: goals,
+        onChange: (values: string[]) =>
+          setGoals((values as Goal[]).length ? (values as Goal[]) : ["balanced"]),
       },
     ],
-    [culturalLifestylePreferences, goal]
+    [culturalLifestylePreferences, goals]
   );
 
   const stageSequence = useMemo(() => {
@@ -284,13 +310,14 @@ const OnboardingPreferences = () => {
 
   const stageFlags = useMemo(
     () => ({
+      isGoalStage: currentStageKey === "goal",
       isAllergiesStage: currentStageKey === "allergies",
       isBodyStage: currentStageKey === "body",
       isCalorieStage: currentStageKey === "calories",
     }),
     [currentStageKey]
   );
-  const { isAllergiesStage, isBodyStage, isCalorieStage } = stageFlags;
+  const { isGoalStage, isAllergiesStage, isBodyStage, isCalorieStage } = stageFlags;
 
   const currentPreferenceScreen = useMemo(
     () =>
@@ -337,6 +364,12 @@ const OnboardingPreferences = () => {
     [bodyErrors, bodyInformation]
   );
 
+  const hasGoalConflict = useMemo(() => {
+    const hasLose = goals.includes("lose-weight");
+    const hasGain = goals.includes("weight-gain");
+    return hasLose && hasGain;
+  }, [goals]);
+
   const allergiesCount = allergies.length;
 
   useEffect(() => {
@@ -344,9 +377,9 @@ const OnboardingPreferences = () => {
     if (prefilledFromSaved) return;
     const dietCodes = prefrences?.diet_codes ?? [];
 
-    const savedLifestyle = dietCodes.filter((code) =>
-      lifestyleOptionIds.includes(code ?? "")
-    );
+    const savedLifestyle = dietCodes
+      .filter((code) => lifestyleOptionIds.includes(code ?? ""))
+      .filter(Boolean) as DietaryPreference[];
     const savedAllergies = dietCodes
       .filter((code) => (code ?? "").startsWith("allergy-"))
       .map((code) =>
@@ -370,7 +403,7 @@ const OnboardingPreferences = () => {
     ) {
       setCulturalLifestylePreferences(savedLifestyle);
       setAllergies(savedAllergies);
-      if (prefrences?.goal) setGoal(prefrences.goal);
+      if (prefrences?.goal) setGoals([prefrences.goal as Goal]);
       if (typeof prefrences?.calorie_target === "number") {
         setCalorieTarget(prefrences.calorie_target);
       }
@@ -379,6 +412,8 @@ const OnboardingPreferences = () => {
         height: user?.height ?? null,
         weight: user?.weight ?? null,
         gender: user?.gender ?? null,
+        isAthlete: false,
+        trainingLevel: null,
       });
       setBodyUnits((prev) => ({
         ...prev,
@@ -423,7 +458,8 @@ const OnboardingPreferences = () => {
         bodyInformation.age !== null &&
         bodyInformation.height !== null &&
         bodyInformation.weight !== null &&
-        bodyInformation.gender !== null;
+        bodyInformation.gender !== null &&
+        (!bodyInformation.isAthlete || bodyInformation.trainingLevel !== null);
       return allFilled && !bodyHasInvalidEntries;
     }
     // All other stages are skippable
@@ -440,7 +476,10 @@ const OnboardingPreferences = () => {
     () => "Next",
     [hasSelection]
   );
-  const isNextDisabled = useMemo(() => !hasSelection, [hasSelection]);
+  const isNextDisabled = useMemo(
+    () => (isGoalStage && hasGoalConflict) || !hasSelection,
+    [hasGoalConflict, hasSelection, isGoalStage]
+  );
 
   const optionItems = useMemo(() => {
     if (!currentPreferenceScreen) return [];
@@ -598,6 +637,24 @@ const OnboardingPreferences = () => {
     [bodyUnits]
   );
 
+  const handleAthleteToggle = useCallback((value: boolean) => {
+    setBodyInformation((prev) => ({
+      ...prev,
+      isAthlete: value,
+      trainingLevel: value ? prev.trainingLevel : null,
+    }));
+  }, []);
+
+  const handleTrainingLevelChange = useCallback(
+    (value: "light" | "casual" | "intense" | null) => {
+      setBodyInformation((prev) => ({
+        ...prev,
+        trainingLevel: value,
+      }));
+    },
+    []
+  );
+
   const runStageTransition = useCallback(
     (direction: "forward" | "backward") => {
       if (transitionLockRef.current) return;
@@ -694,7 +751,11 @@ const OnboardingPreferences = () => {
           diet_codes: [...preferenceCodes, ...allergyCodes],
           allergen_ingredient_ids: [],
           disliked_ingredient_ids: [],
-          goal: goal,
+          goal: primaryGoal,
+          is_athlete: bodyInformation.isAthlete,
+          training_level: bodyInformation.isAthlete
+            ? bodyInformation.trainingLevel
+            : null,
           calorie_target: calorieTarget ?? 0,
         });
 
@@ -732,7 +793,7 @@ const OnboardingPreferences = () => {
     currentStageKey,
     culturalLifestylePreferences,
     fromProfile,
-    goal,
+    primaryGoal,
     router,
     runStageTransition,
   ]);
@@ -960,6 +1021,12 @@ const OnboardingPreferences = () => {
                   />
                 ))}
               </View>
+
+              {isGoalStage && hasGoalConflict ? (
+                <Text style={styles.goalConflictText}>
+                  You can’t select both Lose Weight and Gain Weight. Please adjust your choices.
+                </Text>
+              ) : null}
             </Animated.View>
 
             {renderNextButton()}
@@ -1096,11 +1163,15 @@ const OnboardingPreferences = () => {
               height={bodyInformation.height}
               weight={bodyInformation.weight}
               gender={bodyInformation.gender}
+              isAthlete={bodyInformation.isAthlete}
+              trainingLevel={bodyInformation.trainingLevel}
               ageError={bodyErrors.age}
               heightError={bodyErrors.height}
               weightError={bodyErrors.weight}
               onChange={handleBodyInputChange}
               onUnitChange={handleBodyUnitChange}
+              onAthleteToggle={handleAthleteToggle}
+              onTrainingLevelChange={handleTrainingLevelChange}
             />
             {renderNextButton()}
           </ScrollView>
@@ -1134,7 +1205,10 @@ const OnboardingPreferences = () => {
               height={bodyInformation.height}
               weight={bodyInformation.weight}
               gender={bodyInformation.gender}
-              goal={goal}
+              goals={goals}
+              dietaryPreferences={culturalLifestylePreferences}
+              isAthlete={bodyInformation.isAthlete}
+              trainingLevel={bodyInformation.trainingLevel}
               calorieTarget={calorieTarget}
               onCalorieTargetChange={handleCalorieTargetChange}
             />
@@ -1231,6 +1305,14 @@ const styles = StyleSheet.create({
   optionsContainer: {
     marginBottom: 32,
     gap: 12,
+  },
+  goalConflictText: {
+    marginTop: -12,
+    marginBottom: 12,
+    color: "#FF3B30",
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   optionItem: {
     flexDirection: "row",

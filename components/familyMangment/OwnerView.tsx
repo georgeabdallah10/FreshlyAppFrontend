@@ -6,6 +6,7 @@ import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
+  deleteFamily,
   listFamilyMembers,
   regenerateInviteCode,
   removeFamilyMember,
@@ -43,6 +44,7 @@ interface OwnerViewProps {
   onBack: () => void;
   onRegenerateCode?: () => Promise<string>;
   onKickMember?: (memberId: string) => Promise<void>;
+  onDeleteFamily?: () => Promise<void>;
 }
 
 const OwnerView: React.FC<OwnerViewProps> = ({
@@ -52,6 +54,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   onBack,
   onRegenerateCode,
   onKickMember,
+  onDeleteFamily,
 }) => {
   const router = useRouter();
   const userContext = useUser();
@@ -149,6 +152,12 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
+  // Settings dropdown state
+  const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
+  const [isDeletingFamily, setIsDeletingFamily] = useState(false);
+  const settingsDropdownAnim = useRef(new Animated.Value(0)).current;
+  const settingsDropdownScale = useRef(new Animated.Value(0.9)).current;
+
   // Keep local list in sync when parent provides normalized members
   useEffect(() => {
     if (members && members.length) {
@@ -235,6 +244,93 @@ const OwnerView: React.FC<OwnerViewProps> = ({
       }),
     ]).start();
   }, []);
+
+  // Settings dropdown animation
+  useEffect(() => {
+    if (showSettingsDropdown) {
+      Animated.parallel([
+        Animated.timing(settingsDropdownAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.spring(settingsDropdownScale, {
+          toValue: 1,
+          friction: 8,
+          tension: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(settingsDropdownAnim, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(settingsDropdownScale, {
+          toValue: 0.9,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [showSettingsDropdown, settingsDropdownAnim, settingsDropdownScale]);
+
+  // Toggle settings dropdown
+  const toggleSettingsDropdown = useCallback(() => {
+    setShowSettingsDropdown((prev) => !prev);
+  }, []);
+
+  // Close dropdown when clicking outside
+  const closeSettingsDropdown = useCallback(() => {
+    setShowSettingsDropdown(false);
+  }, []);
+
+  // API delete family
+  const apiDeleteFamily = useCallback(async () => {
+    if (!resolvedFamilyData?.id) return;
+    await deleteFamily(Number(resolvedFamilyData.id));
+  }, [resolvedFamilyData?.id]);
+
+  const runDeleteFamily = onDeleteFamily ?? apiDeleteFamily;
+
+  // Handle delete family with confirmation
+  const handleDeleteFamily = useCallback(() => {
+    closeSettingsDropdown();
+    showToast(
+      "confirm",
+      `Are you sure you want to delete "${resolvedFamilyData?.name ?? "this family"}"? This action cannot be undone and all members will be removed.`,
+      "Delete Family",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+          onPress: () => setToast({ ...toast, visible: false }),
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setToast({ ...toast, visible: false });
+            try {
+              setIsDeletingFamily(true);
+              await runDeleteFamily();
+              showToast("success", "Family has been deleted");
+              // Navigate back after short delay
+              setTimeout(() => {
+                onBack();
+              }, 500);
+            } catch (error: any) {
+              showToast("error", error?.message || "Failed to delete family");
+            } finally {
+              setIsDeletingFamily(false);
+            }
+          },
+        },
+      ]
+    );
+  }, [closeSettingsDropdown, resolvedFamilyData?.name, showToast, toast, runDeleteFamily, onBack]);
 
   const apiRegenerateCode = useCallback(async (): Promise<string> => {
     if (!resolvedFamilyData?.id) return "";
@@ -541,7 +637,45 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Family</Text>
-        <View style={styles.placeholder} />
+        <View style={styles.settingsContainer}>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={toggleSettingsDropdown}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="ellipsis-vertical" size={22} color="#6B7280" />
+          </TouchableOpacity>
+          {showSettingsDropdown && (
+            <>
+              <TouchableOpacity
+                style={styles.dropdownOverlay}
+                activeOpacity={1}
+                onPress={closeSettingsDropdown}
+              />
+              <Animated.View
+                style={[
+                  styles.settingsDropdown,
+                  {
+                    opacity: settingsDropdownAnim,
+                    transform: [{ scale: settingsDropdownScale }],
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.dropdownItem}
+                  onPress={handleDeleteFamily}
+                  activeOpacity={0.7}
+                  disabled={isDeletingFamily}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  <Text style={styles.dropdownItemTextDestructive}>
+                    {isDeletingFamily ? "Deleting..." : "Delete Family"}
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </>
+          )}
+        </View>
       </View>
 
       <Animated.ScrollView
@@ -847,8 +981,50 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: "#1F2937",
   },
-  placeholder: {
+  settingsContainer: {
+    position: "relative",
     width: 32,
+    alignItems: "flex-end",
+  },
+  settingsButton: {
+    padding: 4,
+  },
+  dropdownOverlay: {
+    position: "absolute",
+    top: -100,
+    left: -500,
+    right: -500,
+    bottom: -1000,
+    zIndex: 99,
+  },
+  settingsDropdown: {
+    position: "absolute",
+    top: 36,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 4,
+    minWidth: 160,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    zIndex: 100,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownItemTextDestructive: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#DC2626",
   },
   scrollView: {
     flex: 1,

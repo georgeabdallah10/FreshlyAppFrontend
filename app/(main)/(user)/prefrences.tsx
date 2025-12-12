@@ -1,7 +1,14 @@
 import BasicBodyInformationScreen from "@/components/preferences/BasicBodyInformationScreen";
 import RecommendedCaloriesScreen from "@/components/preferences/RecommendedCaloriesScreen";
 import { useUser } from "@/context/usercontext";
-import { setPrefrences } from "@/src/user/setPrefrences";
+import {
+  saveUserPreferences,
+  setPrefrences,
+  type DietType,
+  type Goal,
+  type TrainingLevel,
+  type UserPreferencesInput,
+} from "@/src/user/setPrefrences";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -148,6 +155,13 @@ const OnboardingPreferences = () => {
     weightUnit: "kg",
   });
   const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
+  const [calorieMin, setCalorieMin] = useState<number | null>(null);
+  const [calorieMax, setCalorieMax] = useState<number | null>(null);
+  const [macros, setMacros] = useState<{
+    proteinGrams: number;
+    carbGrams: number;
+    fatGrams: number;
+  } | null>(null);
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
   const [prefilledFromSaved, setPrefilledFromSaved] = useState(false);
   const [bodyErrors, setBodyErrors] = useState<{
@@ -161,6 +175,19 @@ const OnboardingPreferences = () => {
   });
   const handleCalorieTargetChange = useCallback(
     (value: number) => setCalorieTarget(value),
+    []
+  );
+  const handleCalorieRangeChange = useCallback(
+    (min: number, max: number) => {
+      setCalorieMin(min);
+      setCalorieMax(max);
+    },
+    []
+  );
+  const handleMacrosChange = useCallback(
+    (newMacros: { proteinGrams: number; carbGrams: number; fatGrams: number }) => {
+      setMacros(newMacros);
+    },
     []
   );
 
@@ -732,43 +759,119 @@ const OnboardingPreferences = () => {
 
       isSavingRef.current = true;
       try {
-        const preferenceCodes = [...culturalLifestylePreferences];
-        const allergyCodes = allergies.map((allergy) =>
-          `allergy-${allergy.toLowerCase().replace(/\s+/g, "-")}`
-        );
+        // Determine diet type from cultural/lifestyle preferences
+        const dietType: DietType = culturalLifestylePreferences.length > 0
+          ? (culturalLifestylePreferences[0] as DietType)
+          : null;
 
-        if (updateUserInfo) {
-          await updateUserInfo({
-            age: bodyInformation.age,
-            height: bodyInformation.height,
-            weight: bodyInformation.weight,
-            gender: bodyInformation.gender,
-            calories: calorieTarget,
-          });
+        // Validate required fields
+        if (
+          bodyInformation.age === null ||
+          bodyInformation.height === null ||
+          bodyInformation.weight === null ||
+          bodyInformation.gender === null
+        ) {
+          alert("Missing required body information. Please go back and complete all fields.");
+          isSavingRef.current = false;
+          return;
         }
 
-        const result = await setPrefrences({
-          diet_codes: [...preferenceCodes, ...allergyCodes],
-          allergen_ingredient_ids: [],
-          disliked_ingredient_ids: [],
-          goal: primaryGoal,
-          is_athlete: bodyInformation.isAthlete,
-          training_level: bodyInformation.isAthlete
-            ? bodyInformation.trainingLevel
+        // Build the complete UserPreferences input
+        const preferencesInput: UserPreferencesInput = {
+          // Body Information
+          age: bodyInformation.age,
+          gender: bodyInformation.gender,
+          heightCm: bodyInformation.height,
+          weightKg: bodyInformation.weight,
+
+          // Athlete Settings
+          athleteMode: bodyInformation.isAthlete,
+          trainingLevel: bodyInformation.isAthlete
+            ? (bodyInformation.trainingLevel as TrainingLevel)
             : null,
-          calorie_target: calorieTarget ?? 0,
-        });
+
+          // Goal
+          goal: primaryGoal as Goal,
+
+          // Diet & Allergies
+          dietType: dietType,
+          foodAllergies: allergies,
+
+          // Nutrition Targets
+          targetCalories: calorieTarget,
+          proteinGrams: macros?.proteinGrams ?? 0,
+          carbGrams: macros?.carbGrams ?? 0,
+          fatGrams: macros?.fatGrams ?? 0,
+
+          // Safe Range
+          calorieMin: calorieMin ?? 1200,
+          calorieMax: calorieMax ?? 4000,
+        };
+
+        // Use the new unified API call
+        const result = await saveUserPreferences(preferencesInput);
 
         if (result.ok) {
+          // Also update local user info for immediate UI reflection
+          if (updateUserInfo) {
+            await updateUserInfo({
+              age: bodyInformation.age,
+              height: bodyInformation.height,
+              weight: bodyInformation.weight,
+              gender: bodyInformation.gender,
+              calories: calorieTarget,
+            }).catch(() => {
+              // Silently fail - preferences were already saved
+            });
+          }
+
           if (fromProfile === "true") {
             router.replace("/(main)/(home)/profile");
           } else {
             router.replace("/(main)/(home)/main");
           }
         } else {
-          alert(
-            "Something went wrong while saving your preferences. Please try again."
+          // Fall back to legacy API if new API fails (backward compatibility)
+          console.log("New API failed, trying legacy API:", result.message);
+
+          const preferenceCodes = [...culturalLifestylePreferences];
+          const allergyCodes = allergies.map((allergy) =>
+            `allergy-${allergy.toLowerCase().replace(/\s+/g, "-")}`
           );
+
+          if (updateUserInfo) {
+            await updateUserInfo({
+              age: bodyInformation.age,
+              height: bodyInformation.height,
+              weight: bodyInformation.weight,
+              gender: bodyInformation.gender,
+              calories: calorieTarget,
+            });
+          }
+
+          const legacyResult = await setPrefrences({
+            diet_codes: [...preferenceCodes, ...allergyCodes],
+            allergen_ingredient_ids: [],
+            disliked_ingredient_ids: [],
+            goal: primaryGoal,
+            is_athlete: bodyInformation.isAthlete,
+            training_level: bodyInformation.isAthlete
+              ? bodyInformation.trainingLevel
+              : null,
+            calorie_target: calorieTarget ?? 0,
+          });
+
+          if (legacyResult.ok) {
+            if (fromProfile === "true") {
+              router.replace("/(main)/(home)/profile");
+            } else {
+              router.replace("/(main)/(home)/main");
+            }
+          } else {
+            alert(
+              "Something went wrong while saving your preferences. Please try again."
+            );
+          }
         }
       } catch (error) {
         console.log("Error saving preferences:", error);
@@ -959,7 +1062,7 @@ const OnboardingPreferences = () => {
             </TouchableOpacity>
           )}
           <Text style={styles.welcomeTitle}>
-            Now let's{"\n"}set up{"\n"}your{"\n"}preferences
+            Now let's set up your preferences
           </Text>
           <View style={styles.logoContainer}>
             <Image
@@ -969,7 +1072,7 @@ const OnboardingPreferences = () => {
             />
           </View>
           <TouchableOpacity
-            style={[styles.nextButtonBase, styles.nextButtonActive]}
+            style={[styles.nextButtonBase, styles.nextButtonActive, styles.welcomeNextButton]}
             onPress={handleNext}
             activeOpacity={0.9}
           >
@@ -1211,6 +1314,8 @@ const OnboardingPreferences = () => {
               trainingLevel={bodyInformation.trainingLevel}
               calorieTarget={calorieTarget}
               onCalorieTargetChange={handleCalorieTargetChange}
+              onCalorieRangeChange={handleCalorieRangeChange}
+              onMacrosChange={handleMacrosChange}
             />
             {renderNextButton("Complete Setup")}
           </ScrollView>
@@ -1247,10 +1352,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   welcomeTitle: {
-    fontSize: 36,
+    fontSize: 42,
     fontWeight: "700",
     color: COLORS.dark,
-    lineHeight: 44,
+    lineHeight: 50,
     textAlign: "center",
     alignSelf: "center",
   },
@@ -1258,8 +1363,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   logoImage: {
-    width: 450,
-    height: 450,
+    width: 260,
+    height: 260,
+  },
+  welcomeNextButton: {
+    width: "100%",
+    alignSelf: "center",
   },
   scrollContent: {
     flexGrow: 1,
@@ -1268,16 +1377,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: COLORS.lightGray,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 28,
+    alignSelf: "flex-start",
   },
   backIcon: {
-    fontSize: 20,
+    fontSize: 24,
     color: COLORS.dark,
   },
   title: {

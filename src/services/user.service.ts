@@ -5,6 +5,13 @@
  */
 
 import { apiClient } from '../client/apiClient';
+import {
+  fetchUserPreferences as fetchUserPreferencesApi,
+  updateUserPreferences as updateUserPreferencesApi,
+  type UserPreferencesInput,
+  type UserPreferencesOut,
+  type UserPreferencesUpdateInput,
+} from '../user/setPrefrences';
 
 // ============================================
 // TYPES
@@ -22,6 +29,10 @@ export interface User {
   updatedAt?: string;
 }
 
+/**
+ * @deprecated Use UserPreferencesOut from setPrefrences.ts instead
+ * Legacy type kept for backward compatibility
+ */
 export interface UserPreferences {
   dietaryRestrictions?: string[];
   allergies?: string[];
@@ -32,6 +43,9 @@ export interface UserPreferences {
   budgetPreference?: string;
   timePreference?: string;
 }
+
+// Re-export new types for convenience
+export type { UserPreferencesInput, UserPreferencesOut, UserPreferencesUpdateInput };
 
 export interface UpdateUserInput {
   name?: string;
@@ -68,15 +82,25 @@ export async function updateUser(input: UpdateUserInput): Promise<User> {
 /**
  * Get user preferences
  */
-export async function getUserPreferences(): Promise<UserPreferences> {
-  return await apiClient.get<UserPreferences>('/users/me/preferences');
+export async function getUserPreferences(): Promise<UserPreferencesOut | null> {
+  const res = await fetchUserPreferencesApi();
+  if (!res.ok) {
+    throw { message: res.message, status: res.status };
+  }
+  return res.data;
 }
 
 /**
  * Update user preferences
  */
-export async function updateUserPreferences(preferences: UserPreferences): Promise<UserPreferences> {
-  return await apiClient.put<UserPreferences>('/users/me/preferences', preferences);
+export async function updateUserPreferences(
+  preferences: UserPreferencesUpdateInput
+): Promise<UserPreferencesOut> {
+  const res = await updateUserPreferencesApi(preferences);
+  if (!res.ok || !res.data) {
+    throw { message: res.message, status: res.status };
+  }
+  return res.data;
 }
 
 /**

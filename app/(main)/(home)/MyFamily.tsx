@@ -4,6 +4,7 @@ import OwnerView from "@/components/familyMangment/OwnerView";
 import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
 import {
+  deleteFamily,
   leaveFamily,
   listFamilyMembers,
   regenerateInviteCode,
@@ -229,6 +230,25 @@ const FamilyManagementScreen = () => {
     }
   };
 
+  const handleDeleteFamily = async () => {
+    if (!familyData) return;
+    try {
+      await deleteFamily(Number(familyData.id));
+      setMembers([]);
+      setCurrentUserRole("user");
+      if (setSelectedFamilyId) {
+        setSelectedFamilyId(null);
+      }
+      if (refreshFamilies) {
+        await refreshFamilies();
+      }
+      router.replace("/(auth)/familyAuth");
+    } catch (error) {
+      console.log("Error deleting family:", error);
+      throw error;
+    }
+  };
+
   if (isLoading || familiesLoading) {
     return (
       <View style={styles.container}>
@@ -257,6 +277,7 @@ const FamilyManagementScreen = () => {
           onBack={() => router.back()}
           onRegenerateCode={handleRegenerateCode}
           onKickMember={handleKickMember}
+          onDeleteFamily={handleDeleteFamily}
         />
       ) : currentUserRole === "member" || currentUserRole === "admin" ?  (
         <MemberView

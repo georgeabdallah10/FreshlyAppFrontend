@@ -72,6 +72,7 @@ const BasicBodyInformationScreen: React.FC<
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
   const unitThumbAnim = useRef(new Animated.Value(0)).current;
+  const genderAnim = useRef(new Animated.Value(gender === "female" ? 1 : 0)).current;
 
   // Entrance animation - super fast and snappy
   useEffect(() => {
@@ -127,6 +128,14 @@ const BasicBodyInformationScreen: React.FC<
     }
     return weightLbsInput;
   };
+
+  useEffect(() => {
+    Animated.timing(genderAnim, {
+      toValue: gender === "female" ? 1 : 0,
+      duration: 200,
+      useNativeDriver: false,
+    }).start();
+  }, [gender, genderAnim]);
 
   useEffect(() => {
     if (heightUnit !== "ft") return;
@@ -245,24 +254,44 @@ const BasicBodyInformationScreen: React.FC<
             { id: "female" as const, label: "Female", color: "" },
           ].map((option) => {
             const isSelected = gender === option.id;
+            const isMale = option.id === "male";
+            const bgColor = genderAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: isMale
+                ? ["rgba(0, 200, 83, 0.15)", "#FFFFFF"]
+                : ["#FFFFFF", "rgba(253, 129, 0, 0.15)"],
+            });
+            const borderColor = genderAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: isMale
+                ? ["rgba(0, 200, 83, 0.35)", "#EEEFF3"]
+                : ["#EEEFF3", "rgba(253, 129, 0, 0.35)"],
+            });
+            const textColor = genderAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: isMale ? ["#00C853", "#111111"] : ["#111111", "#FD8100"],
+            });
             return (
               <TouchableOpacity
                 key={option.id}
                 style={[
                   styles.genderOption,
-                  isSelected && styles.genderOptionSelected,
                 ]}
                 onPress={() => onChange("gender", option.id)}
                 activeOpacity={0.8}
               >
-                <Text
+                <Animated.View
                   style={[
-                    styles.genderLabel,
-                    isSelected && styles.genderLabelSelected,
+                    styles.genderAnimated,
+                    { backgroundColor: bgColor, borderColor },
                   ]}
                 >
-                  {option.label}
-                </Text>
+                  <Animated.Text
+                    style={[styles.genderLabel, { color: textColor }]}
+                  >
+                    {option.label}
+                  </Animated.Text>
+                </Animated.View>
               </TouchableOpacity>
             );
           })}
@@ -580,9 +609,10 @@ const styles = StyleSheet.create({
   },
   genderOption: {
     flex: 1,
+  },
+  genderAnimated: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#EEEFF3",
     paddingVertical: 12,
     alignItems: "center",
     backgroundColor: "#FFFFFF",

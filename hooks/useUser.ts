@@ -10,8 +10,13 @@ import {
     UpdateUserInput,
     User,
     userApi,
-    UserPreferences,
+    UserPreferencesOut,
+    UserPreferencesUpdateInput,
 } from '@/src/services/user.service';
+import {
+    fetchUserPreferences,
+    updateUserPreferences as updateUserPreferencesApi,
+} from '@/src/user/setPrefrences';
 import { useMutation, UseMutationOptions, useQuery, useQueryClient, UseQueryOptions } from '@tanstack/react-query';
 
 // ============================================
@@ -33,8 +38,8 @@ export function useUser(options?: Omit<UseQueryOptions<User, ApiError>, 'queryKe
 /**
  * Get user preferences
  */
-export function useUserPreferences(options?: Omit<UseQueryOptions<UserPreferences, ApiError>, 'queryKey' | 'queryFn'>) {
-  return useQuery<UserPreferences, ApiError>({
+export function useUserPreferences(options?: Omit<UseQueryOptions<UserPreferencesOut | null, ApiError>, 'queryKey' | 'queryFn'>) {
+  return useQuery<UserPreferencesOut | null, ApiError>({
     queryKey: queryKeys.user.preferences(),
     queryFn: () => userApi.getUserPreferences(),
     staleTime: 1000 * 60 * 10, // 10 minutes
@@ -95,25 +100,27 @@ export function useUpdateUser(options?: UseMutationOptions<User, ApiError, Updat
 /**
  * Update user preferences
  */
-export function useUpdateUserPreferences(options?: UseMutationOptions<UserPreferences, ApiError, UserPreferences>) {
+export function useUpdateUserPreferences(options?: UseMutationOptions<UserPreferencesOut, ApiError, UserPreferencesUpdateInput>) {
   const queryClient = useQueryClient();
 
-  return useMutation<UserPreferences, ApiError, UserPreferences>({
-    mutationFn: (preferences: UserPreferences) => userApi.updateUserPreferences(preferences),
+  return useMutation<UserPreferencesOut, ApiError, UserPreferencesUpdateInput>({
+    mutationFn: (preferences: UserPreferencesUpdateInput) => userApi.updateUserPreferences(preferences),
     onMutate: async (updatedPrefs) => {
       await queryClient.cancelQueries({ queryKey: queryKeys.user.preferences() });
       
-      const previousPrefs = queryClient.getQueryData<UserPreferences>(queryKeys.user.preferences());
+      const previousPrefs = queryClient.getQueryData<UserPreferencesOut | null>(queryKeys.user.preferences());
 
-      queryClient.setQueryData<UserPreferences>(queryKeys.user.preferences(), {
-        ...previousPrefs,
-        ...updatedPrefs,
-      });
+      if (previousPrefs) {
+        queryClient.setQueryData<UserPreferencesOut>(queryKeys.user.preferences(), {
+          ...previousPrefs,
+          ...updatedPrefs,
+        });
+      }
 
       return { previousPrefs };
     },
     onError: (err, variables, context: any) => {
-      if (context?.previousPrefs) {
+      if (context?.previousPrefs !== undefined) {
         queryClient.setQueryData(queryKeys.user.preferences(), context.previousPrefs);
       }
     },

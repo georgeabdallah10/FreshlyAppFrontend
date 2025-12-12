@@ -327,6 +327,53 @@ export async function regenerateInviteCode(familyId: number) {
   }
 }
 
+// 🗑️ Delete a family (owner only)
+export async function deleteFamily(familyId: number): Promise<string> {
+  const headers = await getAuthHeader();
+
+  try {
+    const res = await fetch(`${API_URL}/families/${familyId}`, {
+      method: "DELETE",
+      headers,
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      let errorMessage = "Failed to delete family";
+
+      if (res.status === 401) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (res.status === 403) {
+        errorMessage = "Only family owners can delete the family.";
+      } else if (res.status === 404) {
+        errorMessage = "Family not found.";
+      } else if (res.status === 429) {
+        errorMessage = "Too many requests. Please wait before trying again.";
+      } else if (res.status >= 500) {
+        errorMessage = "Server error. Please try again later.";
+      } else if (errorText) {
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorData.detail || errorMessage;
+        } catch {
+          errorMessage = errorText.substring(0, 100);
+        }
+      }
+
+      throw buildError(errorMessage, res.status);
+    }
+
+    // The endpoint returns a string on success
+    const data = await res.text();
+    return data;
+  } catch (error: any) {
+    if (error.message?.toLowerCase().includes("fetch")) {
+      throw buildError("Network error. Please check your internet connection.");
+    }
+    throw error;
+  }
+}
+
 // 👀 List members in a family
 export async function listFamilyMembers(familyId: number) {
   const headers = await getAuthHeader();

@@ -2,7 +2,12 @@ import { getCurrentUser, updateUserInfo as updateUserInfoApi } from "@/src/auth/
 import { supabase } from "@/src/supabase/client";
 import { listMyFamilies, type FamilyResponse } from "@/src/user/family";
 import { listMyPantryItems } from "@/src/user/pantry";
-import { getMyprefrences, type UserPreferenceOut } from "@/src/user/setPrefrences";
+import {
+  fetchUserPreferences,
+  getMyprefrences,
+  type UserPreferencesOut,
+  type UserPreferenceOut,
+} from "@/src/user/setPrefrences";
 import { Storage } from "@/src/utils/storage";
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 
@@ -47,8 +52,13 @@ type UserContextType = {
       calories: number | null;
     }>
   ) => Promise<User>;
+  /** @deprecated Use userPreferences instead */
   prefrences: UserPreferenceOut | null;
-  pantryItems:PantryItem[] ;
+  /** New unified preferences object aligned with backend schema */
+  userPreferences: UserPreferencesOut | null;
+  /** Refresh preferences from the backend */
+  refreshPreferences: () => Promise<void>;
+  pantryItems: PantryItem[];
   loadPantryItems: (force?: boolean) => Promise<void>;
   activeFamilyId: number | null;
   refreshFamilyMembership: () => Promise<number | null>;
@@ -65,6 +75,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [user, setUser] = useState<User | null>(null);
   const [prefrences, setPrefrences] = useState<UserPreferenceOut | null>(null);
+  const [userPreferences, setUserPreferences] = useState<UserPreferencesOut | null>(null);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [activeFamilyId, setActiveFamilyId] = useState<number | null>(null);
   const [families, setFamilies] = useState<FamilyResponse[]>([]);
@@ -88,6 +99,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         // Clear local state on sign out
         setUser(null);
         setPrefrences(null);
+        setUserPreferences(null);
         setPantryItems([]);
         setActiveFamilyId(null);
         setFamilies([]);
@@ -196,17 +208,29 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
 
   // Don't auto-load pantry items on mount - let the component request them when ready
 
-  useEffect(() => {
-    const userPrefrences = async () => {
-      try {
-        const res = await getMyprefrences();
-        if (res?.ok) setPrefrences(res.data);
-      } catch (err) {
-        console.log(err);
+  // Refresh preferences from backend (new format)
+  const refreshPreferences = useCallback(async () => {
+    try {
+      // Try new API first
+      const newRes = await fetchUserPreferences();
+      if (newRes.ok && newRes.data) {
+        setUserPreferences(newRes.data);
       }
-    };
-    userPrefrences();
+
+      // Also fetch legacy format for backward compatibility
+      const legacyRes = await getMyprefrences();
+      if (legacyRes?.ok) {
+        setPrefrences(legacyRes.data);
+      }
+    } catch (err) {
+      console.log('[UserContext] refreshPreferences error:', err);
+    }
   }, []);
+
+  // Load preferences on mount
+  useEffect(() => {
+    refreshPreferences();
+  }, [refreshPreferences]);
 
   // Load family membership on mount - only run once
   useEffect(() => {
@@ -255,6 +279,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
       await Storage.deleteItem("refresh_token");
       await Storage.deleteItem("tutorialCompleted"); // Reset tutorial on logout
       setUser(null);
+      setPrefrences(null);
+      setUserPreferences(null);
       setActiveFamilyId(null);
       setIsInFamily(false);
       setFamilies([]);
@@ -269,9 +295,11 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({
         user,
         setUser,
         logout,
-        refreshUser, 
+        refreshUser,
         updateUserInfo,
         prefrences,
+        userPreferences,
+        refreshPreferences,
         pantryItems,
         loadPantryItems,
         activeFamilyId,

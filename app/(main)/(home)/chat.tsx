@@ -20,6 +20,7 @@ import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   ScrollView,
@@ -27,6 +28,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
 
@@ -709,6 +711,7 @@ export default function ChatAIScreen() {
   
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [message, setMessage] = useState("");
+  const [isInputExpanded, setIsInputExpanded] = useState(false);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedAction, setSelectedAction] = useState<"camera" | "gallery" | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -1621,29 +1624,31 @@ Rules:
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>SAVR AI</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={handleNewConversation}
-          >
-            <Ionicons name="add" size={24} color="#00A86B" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerButton}
-            onPress={() => setShowConversationList(!showConversationList)}
-          >
-            <Ionicons name="menu" size={24} color="#00A86B" />
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View style={styles.screenContent}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#000" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>SAVR AI</Text>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={handleNewConversation}
+              >
+                <Ionicons name="add" size={24} color="#00A86B" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerButton}
+                onPress={() => setShowConversationList(!showConversationList)}
+              >
+                <Ionicons name="menu" size={24} color="#00A86B" />
+              </TouchableOpacity>
+            </View>
+          </View>
 
       {/* Conversation Sidebar */}
       {showConversationList && (
@@ -1725,6 +1730,8 @@ Rules:
         ref={scrollViewRef}
         style={styles.messagesContainer}
         contentContainerStyle={styles.messagesContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       >
         {messages.length === 0 && (
           <View style={styles.emptyState}>
@@ -1786,9 +1793,17 @@ Rules:
           </TouchableOpacity>
         )}
 
-        <View style={styles.inputWrapper}>
+        <View
+          style={[
+            styles.inputWrapper,
+            isInputExpanded ? styles.inputWrapperExpanded : styles.inputWrapperCollapsed,
+          ]}
+        >
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              isInputExpanded ? styles.inputExpanded : styles.inputCollapsed,
+            ]}
             placeholder="Write your message"
             placeholderTextColor="#B4B8BF"
             value={message}
@@ -1798,6 +1813,8 @@ Rules:
             }}
             multiline
             maxLength={MAX_MESSAGE_LENGTH + 50}
+            onFocus={() => setIsInputExpanded(true)}
+            onBlur={() => setIsInputExpanded(false)}
           />
 
           <View style={styles.bottomRow}>
@@ -1951,6 +1968,8 @@ Rules:
         onHide={() => setToast({ ...toast, visible: false })}
         topOffset={60}
       />
+        </View>
+      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
@@ -1960,6 +1979,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFF",
     paddingTop: 50,
+  },
+  screenContent: {
+    flex: 1,
   },
   header: {
     flexDirection: "row",
@@ -2148,16 +2170,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ECEEF2",
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    minHeight: 120,
+    paddingVertical: 10,
+  },
+  inputWrapperCollapsed: {
+    minHeight: 90,
+    paddingVertical: 10,
+  },
+  inputWrapperExpanded: {
+    minHeight: 150,
+    paddingVertical: 14,
   },
   input: {
     flexGrow: 1,
     fontSize: 16,
     lineHeight: 22,
     color: "#000",
-    maxHeight: 120,
     paddingVertical: 4,
+    textAlignVertical: "top",
+  },
+  inputCollapsed: {
+    maxHeight: 120,
+  },
+  inputExpanded: {
+    maxHeight: 220,
   },
   bottomRow: {
     flexDirection: "row",

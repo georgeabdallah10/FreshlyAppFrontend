@@ -234,7 +234,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
         <Text style={styles.pulseValue}>
           {displayValue !== null ? displayValue : "—"}
         </Text>
-        <Text style={styles.pulseUnit}>cal/day</Text>
+        <Text style={styles.pulseUnit}>Calorie per Day</Text>
       </Animated.View>
 
       <View style={styles.stepperRow}>

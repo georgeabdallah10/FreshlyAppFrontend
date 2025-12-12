@@ -1022,7 +1022,7 @@ ${JSON_DIRECTIVE}`;
           title="Which cooking methods do you have?"
         >
           {[
-            { key: "all", label: "All available methods", icon: "apps-outline" as const, },
+            { key: "all", label: "All available methods", icon: "" as const, },
             { key: "stovetop", label: "Stovetop", icon: "flame" as const },
             { key: "oven", label: "Oven", icon: "business" as const },
             { key: "microwave", label: "Microwave", icon: "radio-outline" as const },
@@ -1032,7 +1032,6 @@ ${JSON_DIRECTIVE}`;
             <OptionRow
               key={m.key}
               mode="check"
-              icon={m.icon}
               label={m.label}
               selected={form.cookingMethods.includes(m.key)}
               onPress={() =>

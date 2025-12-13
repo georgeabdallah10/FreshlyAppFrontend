@@ -316,14 +316,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
             try {
               setIsDeletingFamily(true);
               await runDeleteFamily();
-              showToast("success", "Family has been deleted");
-              // Navigate back after short delay
-              setTimeout(() => {
-                onBack();
-              }, 500);
+              // Navigate to home page with toast param
+              router.replace("/(main)/(home)/main?familyDeleted=true");
             } catch (error: any) {
               showToast("error", error?.message || "Failed to delete family");
-            } finally {
               setIsDeletingFamily(false);
             }
           },

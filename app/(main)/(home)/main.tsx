@@ -1,9 +1,10 @@
+import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
 import NotificationBell from "@/components/NotificationBell";
 import { AddProductModal } from "@/components/quickAddModal";
 import HomeTutorial, { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
-import { useRouter, useSegments } from "expo-router";
+import { useLocalSearchParams, useRouter, useSegments } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -192,7 +193,22 @@ const HomeDashboard = () => {
   const [activeTab, setActiveTab] = useState("home");
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { familyDeleted } = useLocalSearchParams<{ familyDeleted?: string }>();
   const { data: pendingShareCount = 0 } = usePendingRequestCount();
+
+  // Toast state for showing messages from navigation
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
+
+  // Show toast if familyDeleted param is present
+  useEffect(() => {
+    if (familyDeleted === "true") {
+      setToastMessage("Family deleted successfully");
+      setShowToast(true);
+      // Clear the param from URL
+      router.setParams({ familyDeleted: undefined });
+    }
+  }, [familyDeleted]);
 
   // Tutorial state
   const [showTutorial, setShowTutorial] = useState(false);
@@ -455,6 +471,15 @@ const HomeDashboard = () => {
         visible={showTutorial}
         onComplete={handleTutorialComplete}
         targetMeasurements={targetMeasurements}
+      />
+
+      {/* Toast for navigation messages */}
+      <ToastBanner
+        visible={showToast}
+        type="success"
+        message={toastMessage}
+        onHide={() => setShowToast(false)}
+        topOffset={60}
       />
     </View>
   );

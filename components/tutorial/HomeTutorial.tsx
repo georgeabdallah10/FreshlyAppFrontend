@@ -80,9 +80,21 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'step-10',
+    title: 'FAQ & Help',
+    description: 'Need help? Tap here to access frequently asked questions and get support.',
+    targetKey: 'faqButton',
+  },
+  {
+    id: 'step-11',
+    title: 'Notifications',
+    description: 'Stay updated! View alerts about expiring items, meal reminders, and family activity.',
+    targetKey: 'notificationsButton',
+  },
+  {
+    id: 'step-12',
     title: 'Congratulations! 🎉',
     description: "You're all set! You now know how to use all the main features of SAVR. Start exploring and enjoy your journey to smarter shopping and healthier living!",
-    targetKey: 'settingsButton', // Reuse last target for final message
+    targetKey: 'notificationsButton', // Reuse last target for final message
   },
 ];
 

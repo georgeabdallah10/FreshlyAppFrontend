@@ -5,7 +5,6 @@ import {
   saveUserPreferences,
   setPrefrences,
   type DietType,
-  type Goal,
   type TrainingLevel,
   type UserPreferencesInput,
 } from "@/src/user/setPrefrences";
@@ -1062,7 +1061,7 @@ const OnboardingPreferences = () => {
             </TouchableOpacity>
           )}
           <Text style={styles.welcomeTitle}>
-            Now let's set up your preferences
+            Now Let's Set Up Your Preferences!
           </Text>
           <View style={styles.logoContainer}>
             <Image

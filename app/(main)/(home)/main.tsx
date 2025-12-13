@@ -211,6 +211,10 @@ const HomeDashboard = () => {
   const familyButtonRef = useRef<View>(null);
   const settingsButtonRef = useRef<View>(null);
 
+  // Header button refs
+  const faqButtonRef = useRef<View>(null);
+  const notificationsButtonRef = useRef<View>(null);
+
   // Check if tutorial should be shown - AFTER animations complete
   useEffect(() => {
     const checkAndShowTutorial = async () => {
@@ -267,6 +271,8 @@ const HomeDashboard = () => {
     measureElement(chatButtonRef, 'chatButton');
     measureElement(familyButtonRef, 'familyButton');
     measureElement(settingsButtonRef, 'settingsButton');
+    measureElement(faqButtonRef, 'faqButton');
+    measureElement(notificationsButtonRef, 'notificationsButton');
   };
 
   const handleTutorialComplete = () => {
@@ -334,6 +340,7 @@ const HomeDashboard = () => {
       >
         <View style={styles.header}>
           <TouchableOpacity
+            ref={faqButtonRef}
             style={styles.menuButton}
             activeOpacity={0.6}
             onPress={() => router.push("/(main)/(home)/faq")}
@@ -353,14 +360,16 @@ const HomeDashboard = () => {
               resizeMode="contain"
             />
           </View>
-          <NotificationBell
-            iconSize={24}
-            iconColor="#1F2937"
-            badgeColor="#FF3B30"
-            onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
-            extraCount={pendingShareCount}
-            containerStyle={styles.notificationButton}
-          />
+          <View ref={notificationsButtonRef}>
+            <NotificationBell
+              iconSize={24}
+              iconColor="#1F2937"
+              badgeColor="#FF3B30"
+              onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
+              extraCount={pendingShareCount}
+              containerStyle={styles.notificationButton}
+            />
+          </View>
         </View>
 
         {/* Welcome Text */}

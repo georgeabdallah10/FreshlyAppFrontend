@@ -743,6 +743,7 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
       ) : null}
 
       <View style={styles.cardActionsRow}>
+        {/*}
         <TouchableOpacity
           style={[styles.matchGroceryButton, styles.cardActionButton]}
           onPress={() => onMatchGrocery(data)}
@@ -750,7 +751,7 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
         >
           <Ionicons name="cart-outline" size={20} color="#FFF" />
           <Text style={styles.matchGroceryText}>Match My Grocery</Text>
-        </TouchableOpacity>
+        </TouchableOpacity>*/}
 
         <TouchableOpacity
           style={[styles.saveMealButton, styles.cardActionButton, isSaving && styles.saveMealButtonDisabled]}
@@ -1014,6 +1015,32 @@ PROTEIN SCALING:
 - For athletes: Target ~1.6-2.2g protein per kg body weight daily
 - For non-athletes: Target ~1.2-1.6g protein per kg body weight daily
 - Use weight_kg from user_physiology to validate protein amounts
+
+============================================
+MACRO–CALORIE VALIDATION (REQUIRED)
+Macro adjustments are allowed ONLY to resolve calorie mismatch and must stay as close as possible to daily_macro_targets
+
+Macros are numerical targets and MUST be internally consistent.
+
+After calculating meal-level macros:
+	•	Protein kcal = proteinGrams × 4
+	•	Carb kcal = carbGrams × 4
+	•	Fat kcal = fatGrams × 9
+
+RULE:
+	•	(Protein kcal + Carb kcal + Fat kcal) MUST be within ±3% of the meal calorie target.
+	•	Protein grams are FIXED once calculated (do not reduce protein).
+	•	If adjustment is needed:
+	1.	Adjust carbohydrates first (±5–10g)
+	2.	Then adjust fat slightly if still needed
+	•	Never change the meal calorie target or dailyCaloriePercentage to force a fit.
+
+ATHLETE ADJUSTMENT SAFETY:
+	•	Any athlete-specific macro bias (e.g., +carbs for intense training) MUST still obey the ±3% calorie rule.
+	•	If conflicts arise, calorie consistency overrides macro bias.
+
+OUTPUT RULE:
+	•	The final proteinGrams, carbGrams, and fatGrams MUST mathematically match the reported calories.
 
 ============================================
 CONSISTENCY RULES (NEVER VIOLATE)

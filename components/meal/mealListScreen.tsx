@@ -51,7 +51,7 @@ const CATEGORIES = [
   "Dinner",
   "Snack",
   "Dessert",
-  "Favourites",
+  "Favorites",
 ] as const;
 
 type Category = (typeof CATEGORIES)[number];
@@ -231,7 +231,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     const q = searchQuery.trim().toLowerCase();
     let list = meals;
 
-    if (selectedCategory === "Favourites") {
+    if (selectedCategory === "Favorites") {
       list = list.filter((m) => m.isFavorite);
     } else if (selectedCategory !== "All") {
       list = list.filter((m) => m.mealType === selectedCategory);

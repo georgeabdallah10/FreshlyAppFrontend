@@ -1,4 +1,12 @@
 // api/home/chat.ts  (React Native frontend)
+// ============================================
+// CONVERSATION LIFECYCLE RULES (STRICT):
+// 1. conversation_id must be REQUIRED for follow-up messages
+// 2. system prompt may ONLY be sent on NEW conversations (no conversation_id)
+// 3. Frontend sends ONLY the new user message (no history resends)
+// 4. Only clear conversation_id when user explicitly starts "New Chat"
+// ============================================
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from "../env/baseUrl";
 
@@ -40,20 +48,82 @@ function getBaseUrl(): string {
   return BASE_URL;
 }
 
-// Updated askAI to use authenticated chat only
+/**
+ * askAI - ONE-OFF AI queries (no conversation history)
+ *
+ * USE ONLY FOR:
+ * - Quick meal generation in quickMeals.tsx
+ * - Dev tools or one-off utilities
+ *
+ * DO NOT USE FOR:
+ * - Main chat screen (use sendMessage with conversation_id instead)
+ *
+ * This function intentionally does NOT track conversations.
+ * Each call is independent with no history.
+ */
 export async function askAI({
-  prompt,   
-  system,      
+  prompt,
+  system,
 }: {
   prompt: string;
   system: string;
 }): Promise<string> {
-  // Always use authenticated chat now
-  const result = await sendMessage({ prompt, system });
-  return result.reply;
+  const token = await getAuthToken();
+  if (!token) {
+    console.log('[askAI] Authentication required - please log in');
+    throw new Error('Authentication required');
+  }
+
+  const baseUrl = getBaseUrl();
+  console.log('[askAI] One-off query (no conversation tracking)');
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 50000);
+
+  try {
+    const resp = await fetch(`${baseUrl}/chat`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      // One-off query: send system + prompt, no conversation_id
+      body: JSON.stringify({ prompt, system }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) {
+      const errorText = await resp.text();
+      console.log('[askAI] Error response:', errorText);
+      throw new Error(`HTTP ${resp.status}: ${errorText}`);
+    }
+
+    const data = await resp.json();
+    return data.reply;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error.name === 'AbortError') {
+      console.log('[askAI] Request timed out after 50 seconds');
+      throw new Error('TIMEOUT');
+    }
+
+    console.log('[askAI] Fetch error:', error);
+    throw error;
+  }
 }
 
-// Authenticated chat with history
+/**
+ * sendMessage - MAIN CHAT with conversation lifecycle
+ *
+ * CRITICAL RULES:
+ * 1. If conversationId is provided: Do NOT send system (backend manages context)
+ * 2. If conversationId is undefined: This starts a NEW conversation, system is allowed
+ * 3. NEVER include message history - backend is the source of truth
+ * 4. Payload must ONLY be: { prompt, conversation_id?, system? (first msg only) }
+ */
 export async function sendMessage({
   prompt,
   system,
@@ -65,47 +135,73 @@ export async function sendMessage({
 }): Promise<ChatResponse> {
   const token = await getAuthToken();
   if (!token) {
-    console.log('Authentication required - please log in');
+    console.log('[sendMessage] Authentication required - please log in');
+    throw new Error('Authentication required');
   }
 
   const baseUrl = getBaseUrl();
-  console.log('Sending message to:', `${baseUrl}/chat`);
-  console.log('Token exists:', !!token);
-  
+
+  // CRITICAL: Build payload based on conversation state
+  const payload: {
+    prompt: string;
+    conversation_id?: number;
+    system?: string;
+  } = { prompt };
+
+  if (conversationId !== undefined) {
+    // FOLLOW-UP MESSAGE: Include conversation_id, NEVER include system
+    payload.conversation_id = conversationId;
+
+    // Log warning if system was passed for a follow-up (should not happen)
+    if (system) {
+      console.warn('[sendMessage] WARNING: system prompt ignored for follow-up message (conversation_id exists)');
+    }
+
+    console.log('[sendMessage] Follow-up message in conversation:', conversationId);
+  } else {
+    // NEW CONVERSATION: system prompt is allowed (optional)
+    if (system) {
+      payload.system = system;
+    }
+    console.log('[sendMessage] Starting NEW conversation');
+  }
+
   // Create AbortController for timeout
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
-  
+
   try {
     const resp = await fetch(`${baseUrl}/chat`, {
       method: "POST",
-      headers: { 
+      headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${token}`
       },
-      body: JSON.stringify({ prompt, system, conversation_id: conversationId }),
+      body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    
+
     clearTimeout(timeoutId);
-    console.log('Response status:', resp.status);
-    console.log('Response headers:', resp.headers);
-    
+    console.log('[sendMessage] Response status:', resp.status);
+
     if (!resp.ok) {
       const errorText = await resp.text();
-      console.log('ERROR [Chat] Error response:', errorText);
-      console.log(`HTTP ${resp.status}: ${errorText}`);
+      console.log('[sendMessage] Error response:', errorText);
+      throw new Error(`HTTP ${resp.status}: ${errorText}`);
     }
-    return await resp.json();
+
+    const data = await resp.json();
+    console.log('[sendMessage] Success, conversation_id:', data.conversation_id);
+    return data;
   } catch (error: any) {
     clearTimeout(timeoutId);
-    
+
     if (error.name === 'AbortError') {
-      console.log('ERROR [Chat] Request timed out after 50 seconds');
-      console.log('TIMEOUT');
+      console.log('[sendMessage] Request timed out after 50 seconds');
+      throw new Error('TIMEOUT');
     }
-    
-    console.log('ERROR [Chat] Fetch error:', error);
+
+    console.log('[sendMessage] Fetch error:', error);
     throw error;
   }
 }

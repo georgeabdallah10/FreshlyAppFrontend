@@ -543,6 +543,11 @@ Rules:
     setMealGenerated(false);
   }, [showMealComponent]);
 
+  const goHome = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push("/(main)/(home)/main");
+  }, [router]);
+
   const back = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (phase === 0) {
@@ -1188,25 +1193,40 @@ ${JSON_DIRECTIVE}`;
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={back}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          disabled={isGenerating}
-          style={styles.headerButton}
-        >
-          <Ionicons 
-            name="arrow-back" 
-            size={24} 
-            color={isGenerating ? COLORS.disabled : COLORS.grey} 
-          />
-        </TouchableOpacity>
+        <View style={styles.headerLeftGroup}>
+          <TouchableOpacity
+            onPress={back}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            disabled={isGenerating}
+            style={styles.headerButton}
+          >
+            <Ionicons 
+              name="arrow-back" 
+              size={24} 
+              color={isGenerating ? COLORS.disabled : COLORS.grey} 
+            />
+          </TouchableOpacity>
+        </View>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Quick Meals</Text>
           <Text style={styles.headerSubtitle}>
             Step {phase + 1} of {TOTAL_PHASES}
           </Text>
         </View>
-        <View style={{ width: 24 }} />
+        <View style={styles.headerRightGroup}>
+          <TouchableOpacity
+            onPress={goHome}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            disabled={isGenerating}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              name="home-outline"
+              size={22}
+              color={isGenerating ? COLORS.disabled : COLORS.grey}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Enhanced Progress Bar */}
@@ -1488,6 +1508,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
   },
+  headerLeftGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: 52,
+  },
   headerButton: {
     width: 40,
     height: 40,
@@ -1511,6 +1536,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.sub,
     marginTop: 2,
+  },
+  headerRightGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    width: 52,
   },
   progressContainer: {
     paddingHorizontal: 20,

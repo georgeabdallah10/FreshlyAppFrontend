@@ -2,6 +2,17 @@
  * ============================================
  * CHAT HOOKS - React Query Integration
  * ============================================
+ *
+ * CONVERSATION LIFECYCLE RULES (STRICT):
+ * 1. conversation_id must be REQUIRED for follow-up messages
+ * 2. system prompt may ONLY be sent on NEW conversations (no conversation_id)
+ * 3. Frontend sends ONLY the new user message (no history resends)
+ * 4. Only clear conversation_id when user explicitly starts "New Chat"
+ *
+ * NOTE: These hooks follow the same patterns as the direct service functions.
+ * If using these hooks, ensure you manage conversation_id correctly:
+ * - For new chats: Don't pass conversationId
+ * - For follow-ups: Always pass conversationId, never pass system
  */
 
 import { ApiError } from '@/src/client/apiClient';
@@ -61,18 +72,33 @@ export function useConversationMessages(conversationId: number, options?: Omit<U
 // ============================================
 
 /**
- * Send a message
+ * Send a message (MAIN CHAT with conversation lifecycle)
+ *
+ * USAGE RULES:
+ * - NEW CONVERSATION: Call with { prompt, system } (no conversationId)
+ *   The response will contain conversation_id to lock in for follow-ups
+ * - FOLLOW-UP MESSAGE: Call with { prompt, conversationId } (no system)
+ *   System prompt is managed by backend
+ *
+ * IMPORTANT: This hook manages optimistic updates automatically.
+ * Never re-append user messages after receiving AI response.
  */
 export function useSendMessage(options?: UseMutationOptions<ChatResponse, ApiError, SendMessageInput>) {
   const queryClient = useQueryClient();
 
   return useMutation<ChatResponse, ApiError, SendMessageInput>({
-    mutationFn: (input: SendMessageInput) => chatApi.sendMessage(input),
+    mutationFn: (input: SendMessageInput) => {
+      // Warn if system is passed for follow-up messages
+      if (input.conversationId !== undefined && input.system) {
+        console.warn('[useSendMessage] WARNING: system prompt should not be passed for follow-up messages');
+      }
+      return chatApi.sendMessage(input);
+    },
     onMutate: async (newMessage) => {
-      // Optimistically add user message to UI
+      // Optimistically add user message to UI (only if we have a conversation)
       if (newMessage.conversationId) {
         await queryClient.cancelQueries({ queryKey: queryKeys.chat.messages(newMessage.conversationId) });
-        
+
         const previousMessages = queryClient.getQueryData<ChatMessage[]>(
           queryKeys.chat.messages(newMessage.conversationId)
         );
@@ -114,7 +140,8 @@ export function useSendMessage(options?: UseMutationOptions<ChatResponse, ApiErr
       }
     },
     onError: (err, variables, context: any) => {
-      // Rollback on error
+      // Rollback optimistic update on error - PRESERVE conversation_id
+      // Only rollback the messages, never clear conversation state
       if (variables.conversationId && context?.previousMessages) {
         queryClient.setQueryData(
           queryKeys.chat.messages(variables.conversationId),
@@ -158,7 +185,17 @@ export function useUpdateConversationTitle(options?: UseMutationOptions<Conversa
 }
 
 /**
- * Quick AI query hook (no conversation history)
+ * useAskAI - ONE-OFF AI queries (no conversation history)
+ *
+ * USE ONLY FOR:
+ * - Quick meal generation in quickMeals.tsx
+ * - Dev tools or one-off utilities
+ *
+ * DO NOT USE FOR:
+ * - Main chat screen (use useSendMessage with conversation_id instead)
+ *
+ * This hook intentionally does NOT track conversations.
+ * Each call is independent with no history.
  */
 export function useAskAI(options?: UseMutationOptions<string, ApiError, { prompt: string; system?: string }>) {
   return useMutation<string, ApiError, { prompt: string; system?: string }>({

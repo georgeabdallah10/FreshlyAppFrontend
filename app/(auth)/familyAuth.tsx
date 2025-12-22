@@ -10,7 +10,7 @@ import {
 } from "@/src/user/family";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import AppTextInput from "@/components/ui/AppTextInput";
 import {
@@ -19,12 +19,14 @@ import {
   Modal,
   Platform,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "@/context/ThemeContext";
 import { ColorTokens } from "@/theme/colors";
 
@@ -45,6 +47,8 @@ interface FamilyMemberFlowProps {
 
 const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: FamilyMemberFlowProps = {}) => {
   const router = useRouter();
+  const params = useLocalSearchParams<{ fromOnboarding?: string }>();
+  const isFromOnboarding = params.fromOnboarding === "true";
   const userContext = useUser();
   const familyContext = useFamilyContext();
   const { theme } = useThemeContext();
@@ -459,13 +463,15 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={styles.skipButton}
-        activeOpacity={0.7}
-        onPress={() => router.replace('/(main)/(user)/prefrences')}
-      >
-        <Text style={styles.skipButtonText}>Skip for now</Text>
-      </TouchableOpacity>
+      {isFromOnboarding && (
+        <TouchableOpacity
+          style={styles.skipButton}
+          activeOpacity={0.7}
+          onPress={() => router.replace('/(main)/(user)/prefrences')}
+        >
+          <Text style={styles.skipButtonText}>Skip for now</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -871,7 +877,11 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
   );
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle={theme.mode === "dark" ? "light-content" : "dark-content"}
+        backgroundColor={palette.background}
+      />
       <ToastBanner
         visible={toast.visible}
         type={toast.type}
@@ -885,7 +895,7 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
       {renderAddMemberModal()}
       {renderJoinFamilyModal()}
       {renderCreateFamilyModal()}
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -915,12 +925,11 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
     container: {
       flex: 1,
       backgroundColor: palette.background,
-      paddingTop: 20,
     },
     content: {
       flex: 1,
       paddingHorizontal: 24,
-      paddingTop: 70,
+      paddingTop: 16,
     },
     title: {
       fontSize: 32,
@@ -941,9 +950,9 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
       flexDirection: "row",
       alignItems: "center",
       alignSelf: "flex-start",
-      marginBottom: 24,
+      marginBottom: 16,
       paddingVertical: 8,
-      paddingHorizontal: 4,
+      paddingHorizontal: 0,
     },
     backButtonText: {
       fontSize: 17,
@@ -953,7 +962,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
     },
     illustrationContainer: {
       alignItems: "center",
-      marginBottom: 56,
+      marginBottom: 40,
     },
     illustration: {
       width: 160,

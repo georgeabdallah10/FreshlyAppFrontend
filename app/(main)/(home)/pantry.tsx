@@ -15,7 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -38,6 +44,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useThemeContext } from "@/context/ThemeContext";
 import { ColorTokens } from "@/theme/colors";
+import IconButton from "@/components/iconComponent";
 
 const withAlpha = (hex: string, alpha: number) => {
   const normalized = hex.replace("#", "");
@@ -93,9 +100,36 @@ const DEFAULT_CATEGORIES = [
 ];
 
 const UNIT_OPTIONS = [
-  "g", "kg", "oz", "lb", "tsp", "tbsp", "fl oz", "cup", "pt", "qt", "gal",
-  "mL", "L", "ea", "pc", "slice", "clove", "bunch", "head", "sprig", "can",
-  "jar", "bottle", "pack", "box", "bag", "stick", "dozen", "pinch", "dash",
+  "g",
+  "kg",
+  "oz",
+  "lb",
+  "tsp",
+  "tbsp",
+  "fl oz",
+  "cup",
+  "pt",
+  "qt",
+  "gal",
+  "mL",
+  "L",
+  "ea",
+  "pc",
+  "slice",
+  "clove",
+  "bunch",
+  "head",
+  "sprig",
+  "can",
+  "jar",
+  "bottle",
+  "pack",
+  "box",
+  "bag",
+  "stick",
+  "dozen",
+  "pinch",
+  "dash",
 ];
 
 const categoryIdFromName = (n: string) =>
@@ -125,11 +159,27 @@ type ApprovePayload = {
 };
 
 const DEFAULT_EXPIRATION_DAYS: Record<string, number> = {
-  Produce: 7, Fruits: 7, Vegetables: 7, Dairy: 10, Meat: 3, Seafood: 2,
-  "Grains & Pasta": 180, Bakery: 5, "Canned & Jarred": 365, Frozen: 180,
-  Snacks: 60, Beverages: 30, "Spices & Herbs": 365, Baking: 180,
-  "Condiments & Sauces": 90, "Oils & Vinegars": 180, "Breakfast & Cereal": 90,
-  "Legumes & Nuts": 120, "Sweets & Desserts": 30, Household: 365, Other: 30,
+  Produce: 7,
+  Fruits: 7,
+  Vegetables: 7,
+  Dairy: 10,
+  Meat: 3,
+  Seafood: 2,
+  "Grains & Pasta": 180,
+  Bakery: 5,
+  "Canned & Jarred": 365,
+  Frozen: 180,
+  Snacks: 60,
+  Beverages: 30,
+  "Spices & Herbs": 365,
+  Baking: 180,
+  "Condiments & Sauces": 90,
+  "Oils & Vinegars": 180,
+  "Breakfast & Cereal": 90,
+  "Legumes & Nuts": 120,
+  "Sweets & Desserts": 30,
+  Household: 365,
+  Other: 30,
 };
 
 const toDateOnly = (d: Date) => {
@@ -157,7 +207,7 @@ const PantryDashboard = () => {
   const { theme } = useThemeContext();
   const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  
+
   const contextFamilyId = userContext?.activeFamilyId;
   const refreshFamilyMembership = userContext?.refreshFamilyMembership;
   const logout = userContext?.logout;
@@ -175,6 +225,8 @@ const PantryDashboard = () => {
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCategoryFilterDropdown, setShowCategoryFilterDropdown] = useState(false);
+  const [showFavouritesOnly, setShowFavouritesOnly] = useState(false);
 
   // Product fields
   const [newProductExpiresAt, setNewProductExpiresAt] = useState<string>("");
@@ -197,7 +249,9 @@ const PantryDashboard = () => {
   const [groceryItems, setGroceryItems] = useState<PantryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(null);
+  const [quantityUpdatingId, setQuantityUpdatingId] = useState<string | null>(
+    null
+  );
   const [familyStatusChecked, setFamilyStatusChecked] = useState(false);
 
   // Rate limiting
@@ -207,7 +261,9 @@ const PantryDashboard = () => {
 
   // Phase F6: Grocery sync visual feedback
   const [isGrocerySyncing, setIsGrocerySyncing] = useState(false);
-  const grocerySyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const grocerySyncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   // Animations
   const dropdownAnim = useRef(new Animated.Value(0)).current;
@@ -216,13 +272,15 @@ const PantryDashboard = () => {
   const tooltipAnim = useRef(new Animated.Value(0)).current;
   const fabScale = useRef(new Animated.Value(1)).current;
   const unitDropdownAnim = useRef(new Animated.Value(0)).current;
+  const categoryFilterDropdownAnim = useRef(new Animated.Value(0)).current;
 
   // Scanner state
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [pendingProduct, setPendingProduct] = useState<any>(null);
   const [perm, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
-  const [currentScannedProduct, setCurrentScannedProduct] = useState<ApprovePayload>();
+  const [currentScannedProduct, setCurrentScannedProduct] =
+    useState<ApprovePayload>();
   const scanCooldownRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canScanRef = useRef(true);
   const lastCodeRef = useRef<string | null>(null);
@@ -280,10 +338,10 @@ const PantryDashboard = () => {
     if (grocerySyncTimeoutRef.current) {
       clearTimeout(grocerySyncTimeoutRef.current);
     }
-    
+
     // Show syncing indicator
     setIsGrocerySyncing(true);
-    
+
     // After a brief delay, show completion toast and hide indicator
     grocerySyncTimeoutRef.current = setTimeout(() => {
       setIsGrocerySyncing(false);
@@ -310,7 +368,9 @@ const PantryDashboard = () => {
     if (!dateStr) return palette.border;
     const today = new Date();
     const exp = new Date(dateStr);
-    const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 3600 * 24));
+    const diffDays = Math.ceil(
+      (exp.getTime() - today.getTime()) / (1000 * 3600 * 24)
+    );
     if (diffDays <= 0) return palette.error;
     if (diffDays <= 3) return palette.accent;
     if (diffDays <= 7) return palette.warning;
@@ -327,9 +387,11 @@ const PantryDashboard = () => {
     checkFamilyStatus();
   }, [refreshFamilyMembership]);
 
-
   useEffect(() => {
-    if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+    if (
+      Platform.OS === "android" &&
+      UIManager.setLayoutAnimationEnabledExperimental
+    ) {
       UIManager.setLayoutAnimationEnabledExperimental(true);
     }
   }, []);
@@ -346,7 +408,10 @@ const PantryDashboard = () => {
 
   useEffect(() => {
     if (currentScannedProduct && currentScannedProduct.ingredient_name) {
-      console.log("Waiting for pending request:", currentScannedProduct.ingredient_name);
+      console.log(
+        "Waiting for pending request:",
+        currentScannedProduct.ingredient_name
+      );
     }
   }, [currentScannedProduct?.ingredient_name]);
 
@@ -385,26 +450,33 @@ const PantryDashboard = () => {
   const effectiveFamilyId = isInFamily ? contextFamilyId ?? null : null;
   const isFamilyScope = isInFamily;
 
-  const refreshList = useCallback(async (force: boolean = false) => {
-    if (!loadPantryItems) return;
-    
-    try {
-      setLoading(true);
-      await loadPantryItems(force);
-    } catch (err: any) {
-      console.log("loadPantryItems error", err);
-      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
-        return;
+  const refreshList = useCallback(
+    async (force: boolean = false) => {
+      if (!loadPantryItems) return;
+
+      try {
+        setLoading(true);
+        await loadPantryItems(force);
+      } catch (err: any) {
+        console.log("loadPantryItems error", err);
+        if (
+          await handleAuthFailure(err, "Session expired. Please log in again.")
+        ) {
+          return;
+        }
+        showToast("error", "Failed to load pantry items.");
+      } finally {
+        setLoading(false);
       }
-      showToast("error", "Failed to load pantry items.");
-    } finally {
-      setLoading(false);
-    }
-  }, [loadPantryItems, showToast, handleAuthFailure]);
+    },
+    [loadPantryItems, showToast, handleAuthFailure]
+  );
 
   // Sync context pantry items to local state and update categories
   useEffect(() => {
-    const mapped = (Array.isArray(contextPantryItems) ? contextPantryItems : []).map(mapApiItemToUI);
+    const mapped = (
+      Array.isArray(contextPantryItems) ? contextPantryItems : []
+    ).map(mapApiItemToUI);
     setGroceryItems(mapped);
 
     // Gather all category names: default, user-added, and from items
@@ -450,6 +522,15 @@ const PantryDashboard = () => {
       useNativeDriver: true,
     }).start();
   }, [showCategoryDropdown]);
+
+  useEffect(() => {
+    Animated.timing(categoryFilterDropdownAnim, {
+      toValue: showCategoryFilterDropdown ? 1 : 0,
+      duration: showCategoryFilterDropdown ? 160 : 120,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [showCategoryFilterDropdown]);
 
   useEffect(() => {
     if (showAddProduct) {
@@ -529,16 +610,16 @@ const PantryDashboard = () => {
       });
       setGroceryItems((prev) =>
         prev.map((gi) =>
-          gi.id === item.id
-            ? { ...gi, quantity: `${nextQty}` }
-            : gi
+          gi.id === item.id ? { ...gi, quantity: `${nextQty}` } : gi
         )
       );
       // Phase F6: Show grocery sync feedback after quantity update
       showGrocerySyncFeedback();
     } catch (err) {
       console.log("adjust quantity error", err);
-      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+      if (
+        await handleAuthFailure(err, "Session expired. Please log in again.")
+      ) {
         return;
       }
       showToast("error", "Could not update quantity.");
@@ -546,7 +627,6 @@ const PantryDashboard = () => {
       setQuantityUpdatingId((prev) => (prev === item.id ? null : prev));
     }
   };
-
 
   const openCreateSheet = () => {
     if (isFamilyScope && !effectiveFamilyId) {
@@ -566,9 +646,13 @@ const PantryDashboard = () => {
     setEditingItemId(Number(item.id));
     setNewProductName(item.name);
     setNewProductQuantity(item.quantity === "—" ? "" : item.quantity);
-    setNewProductCategory(item.category.toLowerCase() === "all" ? "" : item.category);
+    setNewProductCategory(
+      item.category.toLowerCase() === "all" ? "" : item.category
+    );
     setShowAddProduct(true);
-    setNewProductExpiresAt(item.expires_at ? String(item.expires_at).slice(0, 10) : "");
+    setNewProductExpiresAt(
+      item.expires_at ? String(item.expires_at).slice(0, 10) : ""
+    );
     setNewProductUnit("");
   };
 
@@ -606,10 +690,15 @@ const PantryDashboard = () => {
         }
 
         if (editingItemId == null) {
-          if (newProductCategory && DEFAULT_EXPIRATION_DAYS[newProductCategory]) {
+          if (
+            newProductCategory &&
+            DEFAULT_EXPIRATION_DAYS[newProductCategory]
+          ) {
             const d = new Date();
             d.setHours(0, 0, 0, 0);
-            d.setDate(d.getDate() + DEFAULT_EXPIRATION_DAYS[newProductCategory]);
+            d.setDate(
+              d.getDate() + DEFAULT_EXPIRATION_DAYS[newProductCategory]
+            );
             return toDateOnly(d);
           }
           return null;
@@ -649,7 +738,9 @@ const PantryDashboard = () => {
         );
         showToast(
           "success",
-          result.merged ? "Item quantity updated in pantry." : "Item added to pantry."
+          result.merged
+            ? "Item quantity updated in pantry."
+            : "Item added to pantry."
         );
         // Phase F6: Show grocery sync feedback after add
         showGrocerySyncFeedback();
@@ -664,10 +755,15 @@ const PantryDashboard = () => {
       setNewProductExpiresAt("");
     } catch (err) {
       console.log("saveProduct error", err);
-      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+      if (
+        await handleAuthFailure(err, "Session expired. Please log in again.")
+      ) {
         return;
       }
-      showToast("error", editingItemId ? "Failed to update item." : "Failed to add item.");
+      showToast(
+        "error",
+        editingItemId ? "Failed to update item." : "Failed to add item."
+      );
     }
   };
 
@@ -697,13 +793,16 @@ const PantryDashboard = () => {
       showGrocerySyncFeedback();
     } catch (err: any) {
       console.log("deletePantryItem error", err);
-      if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+      if (
+        await handleAuthFailure(err, "Session expired. Please log in again.")
+      ) {
         return;
       }
 
       let errorMessage = "Unable to delete item. ";
       if (err.message?.toLowerCase().includes("network")) {
-        errorMessage = "No internet connection. Please check your network and try again.";
+        errorMessage =
+          "No internet connection. Please check your network and try again.";
       } else if (err.message?.toLowerCase().includes("timeout")) {
         errorMessage = "Request timed out. Please try again.";
       } else if (err.message?.toLowerCase().includes("not found")) {
@@ -718,13 +817,14 @@ const PantryDashboard = () => {
     }
   };
 
-  const filteredItems = groceryItems.filter((i) => {
+  const filteredItems = groceryItems.filter((i: any) => {
     const inCategory =
       selectedCategory === "all"
         ? true
         : categoryIdFromName(i.category) === selectedCategory;
     const inSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return inCategory && inSearch;
+    const inFavourites = showFavouritesOnly ? i.isFavorite : true;
+    return inCategory && inSearch && inFavourites;
   });
   const needsFamilySelection = isFamilyScope && !effectiveFamilyId;
 
@@ -736,13 +836,19 @@ const PantryDashboard = () => {
     if (!perm) {
       const req = await requestPermission();
       if (!req?.granted) {
-        showToast('error', 'Camera permission is required, Please enable it in settings..');
+        showToast(
+          "error",
+          "Camera permission is required, Please enable it in settings.."
+        );
         return;
       }
     } else if (!perm.granted) {
       const req = await requestPermission();
       if (!req?.granted) {
-        showToast('error', 'Camera permission is required, Please enable it in settings..');
+        showToast(
+          "error",
+          "Camera permission is required, Please enable it in settings.."
+        );
         return;
       }
     }
@@ -765,7 +871,11 @@ const PantryDashboard = () => {
 
       if (!canScanRef.current) return;
 
-      if (code && code === lastCodeRef.current && now - lastScanAtRef.current < 1200) {
+      if (
+        code &&
+        code === lastCodeRef.current &&
+        now - lastScanAtRef.current < 1200
+      ) {
         return;
       }
 
@@ -809,7 +919,7 @@ const PantryDashboard = () => {
         onHide={() => setToast((t) => ({ ...t, visible: false }))}
         topOffset={60}
       />
-      
+
       {/* Phase F6: Grocery sync indicator */}
       {isGrocerySyncing && (
         <View style={styles.grocerySyncBanner}>
@@ -817,19 +927,18 @@ const PantryDashboard = () => {
           <Text style={styles.grocerySyncText}>Updating grocery list...</Text>
         </View>
       )}
-      
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => router.back()}
+        >
           <Text style={styles.headerIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Pantry</Text>
         <TouchableOpacity style={styles.headerButton} onPress={openScanner}>
-          <Image
-            source={require("../../../assets/icons/barcode.png")}
-            style={[styles.menuCardIcon, { marginBottom: 0 }]}
-            resizeMode="contain"
-          />
+          <IconButton iconName="barcode-outline" iconSize={30} />
         </TouchableOpacity>
       </View>
 
@@ -840,9 +949,6 @@ const PantryDashboard = () => {
           </Text>
         </View>
       )}
-
-      
-
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -881,74 +987,138 @@ const PantryDashboard = () => {
 
       {/* Categories */}
       <View style={styles.categoriesWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesContainer}
-          contentContainerStyle={styles.categoriesContent}
-        >
+        <View style={styles.categoryFilterRow}>
           <TouchableOpacity
             style={styles.addCategoryButton}
             onPress={() => setShowAddCategory(true)}
           >
             <Text style={styles.addCategoryIcon}>+</Text>
           </TouchableOpacity>
-          {categories.map((category, index) => {
-            const colors = [palette.primary, palette.accent, palette.charcoal];
-            const color = colors[index % 3];
-            const isActive = selectedCategory === category.id;
-            
-            return (
-              <TouchableOpacity
-                key={category.id}
-                style={[
-                  styles.categoryButton,
-                  isActive && { backgroundColor: color },
-                ]}
-                onPress={() => setSelectedCategory(category.id)}
-              >
-                <Text
+
+          <TouchableOpacity
+            style={styles.categoryDropdownTrigger}
+            onPress={() => setShowCategoryFilterDropdown((prev) => !prev)}
+          >
+            <Text style={styles.categoryDropdownText}>
+              {categories.find((c) => c.id === selectedCategory)?.name || "All"}
+            </Text>
+            <Text style={styles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.favouritesButton,
+              showFavouritesOnly && styles.favouritesButtonActive,
+            ]}
+            onPress={() => setShowFavouritesOnly((prev) => !prev)}
+          >
+            <Ionicons
+              name={showFavouritesOnly ? "heart" : "heart-outline"}
+              size={22}
+              color={showFavouritesOnly ? palette.error : palette.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {showCategoryFilterDropdown && (
+          <Animated.View
+            style={[
+              styles.categoryFilterDropdown,
+              {
+                opacity: categoryFilterDropdownAnim,
+                transform: [
+                  {
+                    scaleY: categoryFilterDropdownAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    }),
+                  },
+                  {
+                    translateY: categoryFilterDropdownAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-6, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <ScrollView style={{ maxHeight: 250 }}>
+              {categories.map((category) => (
+                <TouchableOpacity
+                  key={category.id}
                   style={[
-                    styles.categoryText,
-                    isActive && styles.categoryTextActive,
+                    styles.dropdownItem,
+                    selectedCategory === category.id && styles.dropdownItemSelected,
                   ]}
+                  onPress={() => {
+                    setSelectedCategory(category.id);
+                    setShowCategoryFilterDropdown(false);
+                  }}
                 >
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      selectedCategory === category.id && styles.dropdownItemTextSelected,
+                    ]}
+                  >
+                    {category.name}
+                  </Text>
+                  {selectedCategory === category.id && (
+                    <Text style={styles.dropdownCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
       </View>
 
       {/* Grocery List */}
       {loading ? (
         <View style={[styles.emptyState, { paddingTop: 40 }]}>
           <ActivityIndicator size="large" color={palette.primary} />
-          <Text style={{ marginTop: 8, color: palette.textMuted }}>Loading pantry…</Text>
+          <Text style={{ marginTop: 8, color: palette.textMuted }}>
+            Loading pantry…
+          </Text>
         </View>
       ) : needsFamilySelection ? (
         <View style={styles.emptyState}>
-          <Ionicons name="people-outline" size={44} color={palette.textMuted} style={styles.emptyIcon} />
-          <Text style={styles.emptyText}>Select a family to view its pantry.</Text>
+          <Ionicons
+            name="people-outline"
+            size={44}
+            color={palette.textMuted}
+            style={styles.emptyIcon}
+          />
+          <Text style={styles.emptyText}>
+            Select a family to view its pantry.
+          </Text>
         </View>
       ) : filteredItems.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={44} color={palette.textMuted} style={styles.emptyIcon} />
+          <Ionicons
+            name="search-outline"
+            size={44}
+            color={palette.textMuted}
+            style={styles.emptyIcon}
+          />
           <Text style={styles.emptyText}>No Data Available</Text>
         </View>
       ) : (
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.listContent, { paddingBottom: bottomNavInset + 40 }]}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: bottomNavInset + 40 },
+          ]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item, index }) => {
             const colors = [palette.primary, palette.accent, palette.charcoal];
             const accentColor = colors[index % 3];
             const isDropdownOpen = expandedItemId === item.id;
             const isAdjusting = quantityUpdatingId === item.id;
-            
+
             return (
               <View style={styles.itemContainer}>
                 <View
@@ -964,7 +1134,9 @@ const PantryDashboard = () => {
                   <View style={styles.itemLeft}>
                     <PantryItemImage
                       itemName={item.name}
-                      imageUrl={item.image?.startsWith('http') ? item.image : undefined}
+                      imageUrl={
+                        item.image?.startsWith("http") ? item.image : undefined
+                      }
                       size={56}
                       borderColor={getExpirationColor(item.expires_at)}
                       borderWidth={2}
@@ -975,13 +1147,18 @@ const PantryDashboard = () => {
                       <Text style={styles.itemName}>{item.name}</Text>
                       <Text style={styles.itemQuantity}>
                         {formatQuantityDisplay(item.quantity)} {item.unit}
-                        {item.expires_at ? `  –  ${formatExpiration(item.expires_at)}` : ""}
+                        {item.expires_at
+                          ? `  –  ${formatExpiration(item.expires_at)}`
+                          : ""}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.itemActions}>
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: palette.primaryLight }]}
+                      style={[
+                        styles.actionButton,
+                        { backgroundColor: palette.primaryLight },
+                      ]}
                       onPress={() => openEditSheet(item)}
                     >
                       <Image
@@ -991,7 +1168,10 @@ const PantryDashboard = () => {
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: palette.errorLight }]}
+                      style={[
+                        styles.actionButton,
+                        { backgroundColor: palette.errorLight },
+                      ]}
                       onPress={() => handleDeleteItem(item.id)}
                     >
                       <Image
@@ -1062,7 +1242,10 @@ const PantryDashboard = () => {
             style={{ flex: 1 }}
             pointerEvents="box-none"
           >
-            <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View
+              style={{ flex: 1, justifyContent: "flex-end" }}
+              pointerEvents="box-none"
+            >
               <TouchableOpacity
                 activeOpacity={1}
                 onPress={(e) => e.stopPropagation()}
@@ -1099,9 +1282,15 @@ const PantryDashboard = () => {
                       onChangeText={setNewCategoryName}
                     />
                   </View>
-                  <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={handleAddCategory}
+                  >
                     <LinearGradient
-                      colors={[palette.primary, withAlpha(palette.primary, 0.85)]}
+                      colors={[
+                        palette.primary,
+                        withAlpha(palette.primary, 0.85),
+                      ]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.buttonGradient}
@@ -1129,7 +1318,10 @@ const PantryDashboard = () => {
             keyboardVerticalOffset={0}
             pointerEvents="box-none"
           >
-            <View style={{ flex: 1, justifyContent: 'flex-end' }} pointerEvents="box-none">
+            <View
+              style={{ flex: 1, justifyContent: "flex-end" }}
+              pointerEvents="box-none"
+            >
               <TouchableOpacity
                 activeOpacity={1}
                 onPress={(e) => e.stopPropagation()}
@@ -1137,7 +1329,10 @@ const PantryDashboard = () => {
                 <ScrollView
                   keyboardShouldPersistTaps="handled"
                   showsVerticalScrollIndicator={false}
-                  contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}
+                  contentContainerStyle={{
+                    flexGrow: 1,
+                    justifyContent: "flex-end",
+                  }}
                   bounces={false}
                 >
                   <Animated.View
@@ -1161,251 +1356,263 @@ const PantryDashboard = () => {
                       {editingItemId ? "Edit Product" : "Add Product"}
                     </Text>
 
-                  <TouchableOpacity
-                    style={styles.modalInput}
-                    onPress={() => setShowCategoryDropdown((prev) => !prev)}
-                  >
-                    <Image
-                      source={require("../../../assets/icons/category.png")}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                    <Text
-                      style={[
-                        styles.modalTextInput,
-                        !newProductCategory && styles.placeholderText,
-                      ]}
+                    <TouchableOpacity
+                      style={styles.modalInput}
+                      onPress={() => setShowCategoryDropdown((prev) => !prev)}
                     >
-                      {newProductCategory || "Select category"}
-                    </Text>
-                    <Text style={styles.dropdownIcon}>▼</Text>
-                  </TouchableOpacity>
-
-                  {showCategoryDropdown && (
-                    <Animated.View
-                      style={[
-                        styles.dropdownMenu,
-                        {
-                          opacity: dropdownAnim,
-                          transform: [
-                            {
-                              scaleY: dropdownAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [0.95, 1],
-                              }),
-                            },
-                            {
-                              translateY: dropdownAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [-6, 0],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}
-                    >
-                      <ScrollView style={{ maxHeight: 200 }}>
-                        {categories
-                          .filter((c) => c.id !== "all")
-                          .map((category) => (
-                            <TouchableOpacity
-                              key={category.id}
-                              style={[
-                                styles.dropdownItem,
-                                newProductCategory === category.name &&
-                                  styles.dropdownItemSelected,
-                              ]}
-                              onPress={() => {
-                                setNewProductCategory(category.name);
-                                setShowCategoryDropdown(false);
-                              }}
-                            >
-                              <Text
-                                style={[
-                                  styles.dropdownItemText,
-                                  newProductCategory === category.name &&
-                                    styles.dropdownItemTextSelected,
-                                ]}
-                              >
-                                {category.name}
-                              </Text>
-                              {newProductCategory === category.name && (
-                                <Text style={styles.dropdownCheck}>✓</Text>
-                              )}
-                            </TouchableOpacity>
-                          ))}
-                      </ScrollView>
-                    </Animated.View>
-                  )}
-
-                  <View style={styles.modalInput}>
-                    <Image
-                      source={require("../../../assets/icons/bag.png")}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                    <AppTextInput
-                      style={styles.modalTextInput}
-                      placeholder="Enter product name"
-                      placeholderTextColor={palette.textMuted}
-                      value={newProductName}
-                      onChangeText={setNewProductName}
-                    />
-                  </View>
-
-                  <View style={styles.qRow}>
-                    <View style={[styles.modalInput, styles.qInput]}>
                       <Image
-                        source={require("../../../assets/icons/box.png")}
+                        source={require("../../../assets/icons/category.png")}
+                        style={styles.menuCardIcon}
+                        resizeMode="contain"
+                      />
+                      <Text
+                        style={[
+                          styles.modalTextInput,
+                          !newProductCategory && styles.placeholderText,
+                        ]}
+                      >
+                        {newProductCategory || "Select category"}
+                      </Text>
+                      <Text style={styles.dropdownIcon}>▼</Text>
+                    </TouchableOpacity>
+
+                    {showCategoryDropdown && (
+                      <Animated.View
+                        style={[
+                          styles.dropdownMenu,
+                          {
+                            opacity: dropdownAnim,
+                            transform: [
+                              {
+                                scaleY: dropdownAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [0.95, 1],
+                                }),
+                              },
+                              {
+                                translateY: dropdownAnim.interpolate({
+                                  inputRange: [0, 1],
+                                  outputRange: [-6, 0],
+                                }),
+                              },
+                            ],
+                          },
+                        ]}
+                      >
+                        <ScrollView style={{ maxHeight: 200 }}>
+                          {categories
+                            .filter((c) => c.id !== "all")
+                            .map((category) => (
+                              <TouchableOpacity
+                                key={category.id}
+                                style={[
+                                  styles.dropdownItem,
+                                  newProductCategory === category.name &&
+                                    styles.dropdownItemSelected,
+                                ]}
+                                onPress={() => {
+                                  setNewProductCategory(category.name);
+                                  setShowCategoryDropdown(false);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    newProductCategory === category.name &&
+                                      styles.dropdownItemTextSelected,
+                                  ]}
+                                >
+                                  {category.name}
+                                </Text>
+                                {newProductCategory === category.name && (
+                                  <Text style={styles.dropdownCheck}>✓</Text>
+                                )}
+                              </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                      </Animated.View>
+                    )}
+
+                    <View style={styles.modalInput}>
+                      <Image
+                        source={require("../../../assets/icons/bag.png")}
+                        style={styles.menuCardIcon}
+                        resizeMode="contain"
+                      />
+                      <AppTextInput
+                        style={styles.modalTextInput}
+                        placeholder="Enter product name"
+                        placeholderTextColor={palette.textMuted}
+                        value={newProductName}
+                        onChangeText={setNewProductName}
+                      />
+                    </View>
+
+                    <View style={styles.qRow}>
+                      <View style={[styles.modalInput, styles.qInput]}>
+                        <Image
+                          source={require("../../../assets/icons/box.png")}
+                          style={styles.menuCardIcon}
+                          resizeMode="contain"
+                        />
+                        <TextInput
+                          style={styles.modalTextInput}
+                          placeholder="Quantity"
+                          placeholderTextColor={palette.textMuted}
+                          keyboardType="numeric"
+                          value={newProductQuantity}
+                          onChangeText={setNewProductQuantity}
+                          returnKeyType="done"
+                        />
+                      </View>
+
+                      <View style={styles.unitPickerContainer}>
+                        <TouchableOpacity
+                          style={styles.unitPicker}
+                          activeOpacity={0.9}
+                          onPress={() => {
+                            setShowUnitDropdown((p) => !p);
+                            setUnitSearch("");
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.unitPickerText,
+                              !newProductUnit && styles.placeholderText,
+                            ]}
+                          >
+                            {newProductUnit || "Unit"}
+                          </Text>
+                          <Text style={styles.dropdownIcon}>▼</Text>
+                        </TouchableOpacity>
+
+                        {showUnitDropdown && (
+                          <Animated.View
+                            style={[
+                              styles.unitDropdown,
+                              {
+                                opacity: unitDropdownAnim,
+                                transform: [
+                                  {
+                                    scaleY: unitDropdownAnim.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [0.95, 1],
+                                    }),
+                                  },
+                                  {
+                                    translateY: unitDropdownAnim.interpolate({
+                                      inputRange: [0, 1],
+                                      outputRange: [-6, 0],
+                                    }),
+                                  },
+                                ],
+                              },
+                            ]}
+                          >
+                            <View style={styles.unitSearchBar}>
+                              <AppTextInput
+                                style={styles.unitSearchInput}
+                                placeholder="Search unit…"
+                                placeholderTextColor={palette.textMuted}
+                                value={unitSearch}
+                                onChangeText={setUnitSearch}
+                                autoFocus
+                              />
+                            </View>
+
+                            <FlatList
+                              data={UNIT_OPTIONS.filter((u) =>
+                                u
+                                  .toLowerCase()
+                                  .includes(unitSearch.toLowerCase())
+                              )}
+                              keyExtractor={(u) => u}
+                              keyboardShouldPersistTaps="handled"
+                              style={{ maxHeight: 200 }}
+                              renderItem={({ item }) => (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.unitOption,
+                                    newProductUnit === item &&
+                                      styles.unitOptionSelected,
+                                  ]}
+                                  onPress={() => {
+                                    setNewProductUnit(item);
+                                    setShowUnitDropdown(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.unitOptionText,
+                                      newProductUnit === item &&
+                                        styles.unitOptionTextSelected,
+                                    ]}
+                                  >
+                                    {item}
+                                  </Text>
+                                  {newProductUnit === item && (
+                                    <Text style={styles.dropdownCheck}>✓</Text>
+                                  )}
+                                </TouchableOpacity>
+                              )}
+                              ListEmptyComponent={
+                                <View style={styles.unitEmpty}>
+                                  <Text style={styles.unitEmptyText}>
+                                    No matches
+                                  </Text>
+                                </View>
+                              }
+                            />
+                          </Animated.View>
+                        )}
+                      </View>
+                    </View>
+
+                    <View style={styles.modalInput}>
+                      <Image
+                        source={require("../../../assets/icons/calendar.png")}
                         style={styles.menuCardIcon}
                         resizeMode="contain"
                       />
                       <TextInput
                         style={styles.modalTextInput}
-                        placeholder="Quantity"
+                        placeholder="Expiration (YYYY-MM-DD) — optional"
                         placeholderTextColor={palette.textMuted}
-                        keyboardType="numeric"
-                        value={newProductQuantity}
-                        onChangeText={setNewProductQuantity}
-                        returnKeyType="done"
+                        value={newProductExpiresAt}
+                        onChangeText={setNewProductExpiresAt}
+                        keyboardType="numbers-and-punctuation"
                       />
                     </View>
+                    <Text style={styles.hintText}>
+                      Tip: Leave blank to auto-set based on category when
+                      creating.
+                    </Text>
 
-                    <View style={styles.unitPickerContainer}>
-                      <TouchableOpacity
-                        style={styles.unitPicker}
-                        activeOpacity={0.9}
-                        onPress={() => {
-                          setShowUnitDropdown((p) => !p);
-                          setUnitSearch("");
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.unitPickerText,
-                            !newProductUnit && styles.placeholderText,
-                          ]}
-                        >
-                          {newProductUnit || "Unit"}
-                        </Text>
-                        <Text style={styles.dropdownIcon}>▼</Text>
-                      </TouchableOpacity>
-
-                      {showUnitDropdown && (
-                        <Animated.View
-                          style={[
-                            styles.unitDropdown,
-                            {
-                              opacity: unitDropdownAnim,
-                              transform: [
-                                {
-                                  scaleY: unitDropdownAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [0.95, 1],
-                                  }),
-                                },
-                                {
-                                  translateY: unitDropdownAnim.interpolate({
-                                    inputRange: [0, 1],
-                                    outputRange: [-6, 0],
-                                  }),
-                                },
-                              ],
-                            },
-                          ]}
-                        >
-                          <View style={styles.unitSearchBar}>
-                            <AppTextInput
-                              style={styles.unitSearchInput}
-                              placeholder="Search unit…"
-                              placeholderTextColor={palette.textMuted}
-                              value={unitSearch}
-                              onChangeText={setUnitSearch}
-                              autoFocus
-                            />
-                          </View>
-
-                          <FlatList
-                            data={UNIT_OPTIONS.filter((u) =>
-                              u.toLowerCase().includes(unitSearch.toLowerCase())
-                            )}
-                            keyExtractor={(u) => u}
-                            keyboardShouldPersistTaps="handled"
-                            style={{ maxHeight: 200 }}
-                            renderItem={({ item }) => (
-                              <TouchableOpacity
-                                style={[
-                                  styles.unitOption,
-                                  newProductUnit === item && styles.unitOptionSelected,
-                                ]}
-                                onPress={() => {
-                                  setNewProductUnit(item);
-                                  setShowUnitDropdown(false);
-                                }}
-                              >
-                                <Text
-                                  style={[
-                                    styles.unitOptionText,
-                                    newProductUnit === item &&
-                                      styles.unitOptionTextSelected,
-                                  ]}
-                                >
-                                  {item}
-                                </Text>
-                                {newProductUnit === item && (
-                                  <Text style={styles.dropdownCheck}>✓</Text>
-                                )}
-                              </TouchableOpacity>
-                            )}
-                            ListEmptyComponent={
-                              <View style={styles.unitEmpty}>
-                                <Text style={styles.unitEmptyText}>No matches</Text>
-                              </View>
-                            }
-                          />
-                        </Animated.View>
-                      )}
-                    </View>
-                  </View>
-
-                  <View style={styles.modalInput}>
-                    <Image
-                      source={require("../../../assets/icons/calendar.png")}
-                      style={styles.menuCardIcon}
-                      resizeMode="contain"
-                    />
-                    <TextInput
-                      style={styles.modalTextInput}
-                      placeholder="Expiration (YYYY-MM-DD) — optional"
-                      placeholderTextColor={palette.textMuted}
-                      value={newProductExpiresAt}
-                      onChangeText={setNewProductExpiresAt}
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                  <Text style={styles.hintText}>
-                    Tip: Leave blank to auto-set based on category when creating.
-                  </Text>
-
-                  <TouchableOpacity style={styles.modalButton} onPress={handleSaveProduct}>
-                    <LinearGradient
-                      colors={[palette.primary, withAlpha(palette.primary, 0.85)]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.buttonGradient}
+                    <TouchableOpacity
+                      style={styles.modalButton}
+                      onPress={handleSaveProduct}
                     >
-                      <Text style={styles.modalButtonText}>
-                        {editingItemId ? "Save" : "Add"}
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </Animated.View>
-              </ScrollView>
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </TouchableOpacity>
-    </Modal>
+                      <LinearGradient
+                        colors={[
+                          palette.primary,
+                          withAlpha(palette.primary, 0.85),
+                        ]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.buttonGradient}
+                      >
+                        <Text style={styles.modalButtonText}>
+                          {editingItemId ? "Save" : "Add"}
+                        </Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </Animated.View>
+                </ScrollView>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Scanner Modal */}
       <Modal visible={showQRScanner} transparent animationType="fade">
@@ -1460,7 +1667,9 @@ const PantryDashboard = () => {
                 setShowQRScanner(false);
 
                 setNewProductName(payload.ingredient_name || "");
-                setNewProductQuantity(payload.quantity ? String(payload.quantity) : "");
+                setNewProductQuantity(
+                  payload.quantity ? String(payload.quantity) : ""
+                );
                 setNewProductCategory(payload.category || "");
 
                 setCurrentScannedProduct(payload);
@@ -1483,16 +1692,26 @@ const PantryDashboard = () => {
                 console.log("Approved product payload:", payload);
                 showToast(
                   "success",
-                  mergeResult.merged ? "Item quantity updated from scan." : "Item added from scan."
+                  mergeResult.merged
+                    ? "Item quantity updated from scan."
+                    : "Item added from scan."
                 );
                 // Phase F6: Show grocery sync feedback after scan add
                 showGrocerySyncFeedback();
               } catch (err) {
                 console.log("scan approve error", err);
-                if (await handleAuthFailure(err, "Session expired. Please log in again.")) {
+                if (
+                  await handleAuthFailure(
+                    err,
+                    "Session expired. Please log in again."
+                  )
+                ) {
                   return;
                 }
-                showToast("error", "Could not add scanned item. Please try again.");
+                showToast(
+                  "error",
+                  "Could not add scanned item. Please try again."
+                );
               }
             }}
             onCancel={() => {
@@ -1552,499 +1771,558 @@ const PantryDashboard = () => {
   );
 };
 
-const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: palette.background,
-  },
-  // Phase F6: Grocery sync banner styles
-  grocerySyncBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: palette.primaryLight,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  grocerySyncText: {
-    color: palette.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: palette.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerIcon: { fontSize: 20, color: palette.primary, fontWeight: "600" },
-  headerTitle: { fontSize: 24, fontWeight: "700", color: palette.text },
-  familyNote: {
-    marginHorizontal: 20,
-    marginTop: 12,
-  },
-  familyNoteText: {
-    color: palette.primary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  scopeToggle: {
-    flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  scopeButton: {
-    flex: 1,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.white,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  scopeButtonActive: {
-    backgroundColor: palette.primary,
-    borderColor: palette.primary,
-    shadowColor: palette.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  scopeButtonDisabled: {
-    opacity: 0.5,
-  },
-  scopeButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: palette.textMuted,
-  },
-  scopeButtonTextActive: {
-    color: palette.white,
-  },
-  familySelectorContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 6,
-    paddingBottom: 4,
-  },
-  familyLoadingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  familyLoadingText: {
-    color: palette.textMuted,
-    fontSize: 14,
-  },
-  familySelectorHint: {
-    color: palette.textMuted,
-    fontSize: 14,
-  },
-  familyPillRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  familyPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: palette.border,
-    backgroundColor: palette.white,
-  },
-  familyPillActive: {
-    backgroundColor: palette.primaryLight,
-    borderColor: palette.primary,
-  },
-  familyPillText: {
-    fontSize: 14,
-    color: palette.text,
-    fontWeight: "600",
-  },
-  familyPillTextActive: {
-    color: palette.primary,
-  },
-  tooltip: {
-    position: "absolute",
-    top: 120,
-    right: 20,
-    backgroundColor: palette.white,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: palette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    zIndex: 10,
-  },
-  tooltipText: { fontSize: 13, color: palette.textMuted, lineHeight: 18 },
-  categoriesWrapper: {
-    backgroundColor: palette.white,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: palette.border,
-    shadowColor: palette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    zIndex: 5,
-  },
-  categoriesContainer: { maxHeight: 70, flexGrow: 0, flexShrink: 0 },
-  categoriesContent: { paddingHorizontal: 20, gap: 12, alignItems: "center" },
-  addCategoryButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: palette.primary,
-    borderStyle: "dashed",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  addCategoryIcon: { fontSize: 24, color: palette.primary, fontWeight: "600" },
-  categoryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    backgroundColor: palette.background,
-  },
-  categoryText: { fontSize: 16, fontWeight: "600", color: palette.text },
-  categoryTextActive: { color: palette.white },
-  listContent: { padding: 20 },
-  itemContainer: {
-    marginBottom: 12,
-  },
-  groceryItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: palette.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 2,
-    shadowColor: palette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  itemLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
-  itemName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: palette.text,
-    marginBottom: 4,
-  },
-  itemQuantity: { fontSize: 14, color: palette.textMuted },
-  itemActions: { flexDirection: "row", gap: 8, alignItems: "center" },
-  actionButton: { 
-    padding: 10,
-    borderRadius: 10,
-  },
-  dropdownToggleButton: {
-    backgroundColor: palette.charcoalLight,
-  },
-  dropdownToggleButtonActive: {
-    backgroundColor: palette.primary,
-  },
-  dropdownToggleText: {
-    fontSize: 16,
-    color: palette.text,
-    fontWeight: "700",
-  },
-  adjustDropdown: {
-    flexDirection: "row",
-    gap: 12,
-    backgroundColor: palette.white,
-    borderWidth: 1,
-    borderColor: palette.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: -8,
-  },
-  adjustButton: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  decrementButton: {
-    backgroundColor: palette.errorLight,
-  },
-  incrementButton: {
-    backgroundColor: palette.primaryLight,
-  },
-  adjustButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: palette.text,
-  },
-  adjustButtonLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: palette.text,
-  },
-  adjustButtonDisabled: {
-    opacity: 0.5,
-  },
-  emptyState: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyIcon: { marginBottom: 16, opacity: 0.6 },
-  emptyText: { fontSize: 18, color: palette.textMuted, fontWeight: "600" },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: withAlpha(palette.text, 0.5),
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: palette.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    paddingBottom: 40,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: palette.border,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.text,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  modalInput: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: palette.background,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-  },
-  modalTextInput: { flex: 1, fontSize: 16, color: palette.text },
-  placeholderText: { color: palette.textMuted },
-  dropdownIcon: { fontSize: 12, color: palette.textMuted },
-  modalButton: {
-    borderRadius: 12,
-    overflow: "hidden",
-    shadowColor: palette.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  buttonGradient: {
-    padding: 18,
-    alignItems: "center",
-  },
-  modalButtonText: { fontSize: 18, fontWeight: "700", color: palette.white },
-  dropdownMenu: {
-    backgroundColor: palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    marginTop: -8,
-    marginBottom: 16,
-    shadowColor: palette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-  },
-  dropdownItemSelected: { backgroundColor: palette.primaryLight },
-  dropdownItemText: { fontSize: 16, color: palette.text },
-  dropdownItemTextSelected: { color: palette.primary, fontWeight: "600" },
-  dropdownCheck: { fontSize: 16, color: palette.primary, fontWeight: "700" },
-  scannerOverlay: { flex: 1, backgroundColor: palette.white, paddingTop: 60 },
-  scannerBack: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: palette.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 20,
-    marginBottom: 20,
-  },
-  scannerBackIcon: { fontSize: 20, color: palette.primary, fontWeight: "600" },
-  scannerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: palette.text,
-    textAlign: "center",
-    marginBottom: 60,
-  },
-  scannerBox: {
-    alignSelf: "center",
-    width: 340,
-    height: 340,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  scannerText: {
-    fontSize: 16,
-    color: palette.textMuted,
-    textAlign: "center",
-    marginTop: 80,
-  },
-  fabButton: {
-    position: "absolute",
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: "hidden",
-    shadowColor: palette.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabGradient: {
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fabIcon: { fontSize: 28, color: palette.white, fontWeight: "300" },
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  searchInput: {
-    backgroundColor: palette.background,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    color: palette.text,
-    borderWidth: 1,
-    borderColor: palette.border,
-  },
-  menuCardIcon: {
-    width: 23,
-    height: 23,
-    marginRight: 6,
-  },
-  qRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
-  qInput: {
-    flex: 1,
-    marginBottom: 0,
-  },
-  unitPickerContainer: {
-    width: 120,
-  },
-  unitPicker: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: palette.background,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-  },
-  unitPickerText: {
-    fontSize: 16,
-    color: palette.text,
-  },
-  unitDropdown: {
-    backgroundColor: palette.white,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: palette.border,
-    marginTop: 6,
-    shadowColor: palette.text,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: "hidden",
-  },
-  unitSearchBar: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: palette.border,
-  },
-  unitSearchInput: {
-    backgroundColor: palette.background,
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    fontSize: 15,
-    color: palette.text,
-  },
-  unitOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  unitOptionSelected: {
-    backgroundColor: palette.primaryLight,
-  },
-  unitOptionText: {
-    fontSize: 16,
-    color: palette.text,
-  },
-  unitOptionTextSelected: {
-    color: palette.primary,
-    fontWeight: "600",
-  },
-  unitEmpty: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  unitEmptyText: {
-    fontSize: 14,
-    color: palette.textMuted,
-  },
-  hintText: {
-    fontSize: 12,
-    color: palette.textMuted,
-    marginBottom: 16,
-    marginTop: -8,
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    // Phase F6: Grocery sync banner styles
+    grocerySyncBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: palette.primaryLight,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    grocerySyncText: {
+      color: palette.primary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: palette.primaryLight,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerIcon: { fontSize: 20, color: palette.primary, fontWeight: "600" },
+    headerTitle: { fontSize: 24, fontWeight: "700", color: palette.text },
+    familyNote: {
+      marginHorizontal: 20,
+      marginTop: 12,
+    },
+    familyNoteText: {
+      color: palette.primary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    scopeToggle: {
+      flexDirection: "row",
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    scopeButton: {
+      flex: 1,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.white,
+      paddingVertical: 10,
+      alignItems: "center",
+    },
+    scopeButtonActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+      shadowColor: palette.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    scopeButtonDisabled: {
+      opacity: 0.5,
+    },
+    scopeButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    scopeButtonTextActive: {
+      color: palette.white,
+    },
+    familySelectorContainer: {
+      paddingHorizontal: 20,
+      paddingTop: 6,
+      paddingBottom: 4,
+    },
+    familyLoadingRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    familyLoadingText: {
+      color: palette.textMuted,
+      fontSize: 14,
+    },
+    familySelectorHint: {
+      color: palette.textMuted,
+      fontSize: 14,
+    },
+    familyPillRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    familyPill: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      backgroundColor: palette.white,
+    },
+    familyPillActive: {
+      backgroundColor: palette.primaryLight,
+      borderColor: palette.primary,
+    },
+    familyPillText: {
+      fontSize: 14,
+      color: palette.text,
+      fontWeight: "600",
+    },
+    familyPillTextActive: {
+      color: palette.primary,
+    },
+    tooltip: {
+      position: "absolute",
+      top: 120,
+      right: 20,
+      backgroundColor: palette.white,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+      zIndex: 10,
+    },
+    tooltipText: { fontSize: 13, color: palette.textMuted, lineHeight: 18 },
+    categoriesWrapper: {
+      backgroundColor: palette.white,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderBottomWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+      zIndex: 5,
+    },
+    categoriesContainer: { maxHeight: 70, flexGrow: 0, flexShrink: 0 },
+    categoriesContent: { paddingHorizontal: 20, gap: 12, alignItems: "center" },
+    addCategoryButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 2,
+      borderColor: palette.primary,
+      borderStyle: "dashed",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    addCategoryIcon: {
+      fontSize: 24,
+      color: palette.primary,
+      fontWeight: "600",
+    },
+    categoryFilterRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      gap: 12,
+    },
+    categoryDropdownTrigger: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    categoryDropdownText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    favouritesButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: palette.background,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    favouritesButtonActive: {
+      backgroundColor: palette.errorLight,
+      borderColor: palette.error,
+    },
+    categoryFilterDropdown: {
+      backgroundColor: palette.white,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginTop: 12,
+      marginHorizontal: 20,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    categoryButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      borderRadius: 24,
+      backgroundColor: palette.background,
+    },
+    categoryText: { fontSize: 16, fontWeight: "600", color: palette.text },
+    categoryTextActive: { color: palette.white },
+    listContent: { padding: 20 },
+    itemContainer: {
+      marginBottom: 12,
+    },
+    groceryItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: palette.white,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 2,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    itemLeft: { flexDirection: "row", alignItems: "center", flex: 1 },
+    itemName: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 4,
+    },
+    itemQuantity: { fontSize: 14, color: palette.textMuted },
+    itemActions: { flexDirection: "row", gap: 8, alignItems: "center" },
+    actionButton: {
+      padding: 10,
+      borderRadius: 10,
+    },
+    dropdownToggleButton: {
+      backgroundColor: palette.charcoalLight,
+    },
+    dropdownToggleButtonActive: {
+      backgroundColor: palette.primary,
+    },
+    dropdownToggleText: {
+      fontSize: 16,
+      color: palette.text,
+      fontWeight: "700",
+    },
+    adjustDropdown: {
+      flexDirection: "row",
+      gap: 12,
+      backgroundColor: palette.white,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      marginTop: -8,
+    },
+    adjustButton: {
+      flex: 1,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+    decrementButton: {
+      backgroundColor: palette.errorLight,
+    },
+    incrementButton: {
+      backgroundColor: palette.primaryLight,
+    },
+    adjustButtonText: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    adjustButtonLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    adjustButtonDisabled: {
+      opacity: 0.5,
+    },
+    emptyState: { flex: 1, justifyContent: "center", alignItems: "center" },
+    emptyIcon: { marginBottom: 16, opacity: 0.6 },
+    emptyText: { fontSize: 18, color: palette.textMuted, fontWeight: "600" },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: withAlpha(palette.text, 0.5),
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      backgroundColor: palette.white,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 24,
+      paddingBottom: 40,
+    },
+    modalHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: palette.border,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 24,
+    },
+    modalInput: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 16,
+    },
+    modalTextInput: { flex: 1, fontSize: 16, color: palette.text },
+    placeholderText: { color: palette.textMuted },
+    dropdownIcon: { fontSize: 12, color: palette.textMuted },
+    modalButton: {
+      borderRadius: 12,
+      overflow: "hidden",
+      shadowColor: palette.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 6,
+    },
+    buttonGradient: {
+      padding: 18,
+      alignItems: "center",
+    },
+    modalButtonText: { fontSize: 18, fontWeight: "700", color: palette.white },
+    dropdownMenu: {
+      backgroundColor: palette.white,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginTop: -8,
+      marginBottom: 16,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    dropdownItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+    },
+    dropdownItemSelected: { backgroundColor: palette.primaryLight },
+    dropdownItemText: { fontSize: 16, color: palette.text },
+    dropdownItemTextSelected: { color: palette.primary, fontWeight: "600" },
+    dropdownCheck: { fontSize: 16, color: palette.primary, fontWeight: "700" },
+    scannerOverlay: { flex: 1, backgroundColor: palette.white, paddingTop: 60 },
+    scannerBack: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: palette.primaryLight,
+      justifyContent: "center",
+      alignItems: "center",
+      marginLeft: 20,
+      marginBottom: 20,
+    },
+    scannerBackIcon: {
+      fontSize: 20,
+      color: palette.primary,
+      fontWeight: "600",
+    },
+    scannerTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 60,
+    },
+    scannerBox: {
+      alignSelf: "center",
+      width: 340,
+      height: 340,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    scannerText: {
+      fontSize: 16,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginTop: 80,
+    },
+    fabButton: {
+      position: "absolute",
+      right: 20,
+      bottom: 20,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      overflow: "hidden",
+      shadowColor: palette.accent,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    fabGradient: {
+      width: "100%",
+      height: "100%",
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    fabIcon: { fontSize: 28, color: palette.white, fontWeight: "300" },
+    searchContainer: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+    },
+    searchInput: {
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      fontSize: 16,
+      color: palette.text,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    menuCardIcon: {
+      width: 23,
+      height: 23,
+      marginRight: 6,
+    },
+    qRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 16,
+    },
+    qInput: {
+      flex: 1,
+      marginBottom: 0,
+    },
+    unitPickerContainer: {
+      width: 120,
+    },
+    unitPicker: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      paddingVertical: 16,
+      paddingHorizontal: 14,
+    },
+    unitPickerText: {
+      fontSize: 16,
+      color: palette.text,
+    },
+    unitDropdown: {
+      backgroundColor: palette.white,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginTop: 6,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
+      overflow: "hidden",
+    },
+    unitSearchBar: {
+      paddingHorizontal: 12,
+      paddingTop: 12,
+      paddingBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    unitSearchInput: {
+      backgroundColor: palette.background,
+      borderRadius: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      fontSize: 15,
+      color: palette.text,
+    },
+    unitOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    unitOptionSelected: {
+      backgroundColor: palette.primaryLight,
+    },
+    unitOptionText: {
+      fontSize: 16,
+      color: palette.text,
+    },
+    unitOptionTextSelected: {
+      color: palette.primary,
+      fontWeight: "600",
+    },
+    unitEmpty: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    unitEmptyText: {
+      fontSize: 14,
+      color: palette.textMuted,
+    },
+    hintText: {
+      fontSize: 12,
+      color: palette.textMuted,
+      marginBottom: 16,
+      marginTop: -8,
+    },
+  });
 
 export default PantryDashboard;

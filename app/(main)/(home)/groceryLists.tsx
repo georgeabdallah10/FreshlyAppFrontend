@@ -1,10 +1,12 @@
 import ToastBanner from "@/components/generalMessage";
 import { useGroceryList } from "@/context/groceryListContext";
+import { useThemeContext } from "@/context/ThemeContext";
 import { useUser } from "@/context/usercontext";
 import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
 import type { GroceryListOut } from "@/src/services/grocery.service";
+import { ColorTokens } from "@/theme/colors";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -29,23 +31,35 @@ interface ToastState {
   topOffset?: number;
 }
 
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  white: "#FFFFFF",
-  text: "#0A0A0A",
-  textMuted: "#666666",
-  border: "#E0E0E0",
-  background: "#FAFAFA",
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  accent: colors.warning,
+  accentLight: withAlpha(colors.warning, 0.12),
+  card: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  background: colors.background,
+});
 
 const GroceryListsScreen: React.FC = () => {
   const router = useRouter();
   const groceryContext = useGroceryList();
   const userContext = useUser();
   const scrollContentStyle = useScrollContentStyle();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   const myLists = groceryContext?.myLists ?? [];
   const familyLists = groceryContext?.familyLists ?? [];
@@ -178,7 +192,7 @@ const GroceryListsScreen: React.FC = () => {
                 styles.progressBarFill,
                 {
                   width: `${progress}%`,
-                  backgroundColor: isFamily ? COLORS.accent : COLORS.primary,
+                  backgroundColor: isFamily ? palette.accent : palette.primary,
                 },
               ]}
             />
@@ -199,7 +213,7 @@ const GroceryListsScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="cart-outline" size={48} color={COLORS.textMuted} style={styles.emptyStateIcon} />
+      <Ionicons name="cart-outline" size={48} color={palette.textMuted} style={styles.emptyStateIcon} />
       <Text style={styles.emptyStateTitle}>No Grocery Lists Yet</Text>
       <Text style={styles.emptyStateDescription}>
         Add a meal to create your first grocery list
@@ -333,7 +347,7 @@ const GroceryListsScreen: React.FC = () => {
           <>
             {loading && sections.length === 0 ? (
               <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <ActivityIndicator size="large" color={palette.primary} />
               <Text style={styles.loadingText}>Loading grocery lists...</Text>
             </View>
           ) : (
@@ -351,8 +365,8 @@ const GroceryListsScreen: React.FC = () => {
                 <RefreshControl
                   refreshing={refreshing}
                   onRefresh={handleRefresh}
-                  tintColor={COLORS.primary}
-                  colors={[COLORS.primary]}
+                  tintColor={palette.primary}
+                  colors={[palette.primary]}
                 />
               }
               showsVerticalScrollIndicator={false}
@@ -367,225 +381,226 @@ const GroceryListsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 22,
-    backgroundColor: COLORS.primaryLight,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  backButtonText: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    flex: 1,
-    textAlign: "center",
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: COLORS.textMuted,
-  },
-  listContainer: {
-    padding: 20,
-  },
-  listContainerEmpty: {
-    flex: 1,
-  },
-  sectionHeader: {
-    paddingVertical: 12,
-    paddingHorizontal: 4,
-  },
-  sectionHeaderText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  listCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-  },
-  listCardHeader: {
-    marginBottom: 16,
-  },
-  listCardTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
-    gap: 12,
-  },
-  listCardTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.text,
-    flex: 1,
-  },
-  listCardSubtitle: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-  },
-  scopeBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  scopeBadgePersonal: {
-    backgroundColor: COLORS.primaryLight,
-  },
-  scopeBadgeFamily: {
-    backgroundColor: COLORS.accentLight,
-  },
-  scopeBadgeText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  scopeBadgeTextPersonal: {
-    color: COLORS.primary,
-  },
-  scopeBadgeTextFamily: {
-    color: COLORS.accent,
-  },
-  progressBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 12,
-  },
-  progressBarBackground: {
-    flex: 1,
-    height: 8,
-    backgroundColor: COLORS.border,
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  progressBarFill: {
-    height: "100%",
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-    minWidth: 40,
-    textAlign: "right",
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  statusText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-  },
-  statusValue: {
-    fontWeight: "600",
-    color: COLORS.text,
-    textTransform: "capitalize",
-  },
-  arrowIcon: {
-    fontSize: 28,
-    color: COLORS.textMuted,
-    fontWeight: "300",
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 40,
-  },
-  emptyStateIcon: {
-    marginBottom: 16,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  emptyStateDescription: {
-    fontSize: 16,
-    color: COLORS.textMuted,
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  segmentedControl: {
-    flexDirection: "row",
-    backgroundColor: COLORS.border,
-    borderRadius: 10,
-    padding: 4,
-    marginHorizontal: 20,
-    marginTop: 12,
-  },
-  segmentButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  segmentButtonActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  segmentButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-  },
-  segmentButtonTextActive: {
-    color: COLORS.text,
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 22,
+      backgroundColor: palette.primaryLight,
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    backButtonText: {
+      fontSize: 22,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      flex: 1,
+      textAlign: "center",
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 16,
+    },
+    loadingText: {
+      fontSize: 16,
+      color: palette.textMuted,
+    },
+    listContainer: {
+      padding: 20,
+    },
+    listContainerEmpty: {
+      flex: 1,
+    },
+    sectionHeader: {
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+    },
+    sectionHeaderText: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    listCard: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      elevation: 3,
+      borderLeftWidth: 4,
+      borderLeftColor: palette.primary,
+    },
+    listCardHeader: {
+      marginBottom: 16,
+    },
+    listCardTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 8,
+      gap: 12,
+    },
+    listCardTitle: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.text,
+      flex: 1,
+    },
+    listCardSubtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+    },
+    scopeBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 12,
+    },
+    scopeBadgePersonal: {
+      backgroundColor: palette.primaryLight,
+    },
+    scopeBadgeFamily: {
+      backgroundColor: palette.accentLight,
+    },
+    scopeBadgeText: {
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    scopeBadgeTextPersonal: {
+      color: palette.primary,
+    },
+    scopeBadgeTextFamily: {
+      color: palette.accent,
+    },
+    progressBarContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      marginBottom: 12,
+    },
+    progressBarBackground: {
+      flex: 1,
+      height: 8,
+      backgroundColor: palette.border,
+      borderRadius: 4,
+      overflow: "hidden",
+    },
+    progressBarFill: {
+      height: "100%",
+      borderRadius: 4,
+    },
+    progressText: {
+      fontSize: 13,
+      fontWeight: "600",
+      color: palette.textMuted,
+      minWidth: 40,
+      textAlign: "right",
+    },
+    statusRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    statusText: {
+      fontSize: 14,
+      color: palette.textMuted,
+    },
+    statusValue: {
+      fontWeight: "600",
+      color: palette.text,
+      textTransform: "capitalize",
+    },
+    arrowIcon: {
+      fontSize: 28,
+      color: palette.textMuted,
+      fontWeight: "300",
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 40,
+    },
+    emptyStateIcon: {
+      marginBottom: 16,
+    },
+    emptyStateTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    emptyStateDescription: {
+      fontSize: 16,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+    segmentedControl: {
+      flexDirection: "row",
+      backgroundColor: palette.border,
+      borderRadius: 10,
+      padding: 4,
+      marginHorizontal: 20,
+      marginTop: 12,
+    },
+    segmentButton: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    segmentButtonActive: {
+      backgroundColor: palette.card,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    segmentButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    segmentButtonTextActive: {
+      color: palette.text,
+    },
+  });
 
 export default GroceryListsScreen;

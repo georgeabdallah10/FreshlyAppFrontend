@@ -503,29 +503,80 @@ const ChatImageViewBase = ({ uri, style, palette }: ChatImageViewProps) => {
 };
 const ChatImageView = React.memo(ChatImageViewBase);
 
-function extractJson(s: string) {
-  const trimmed = s
-    .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
-  return trimmed;
+/**
+ * Extract JSON from a string that may contain surrounding text.
+ * Handles: ```json ... ```, text before JSON, mixed content.
+ */
+function extractJson(s: string): string {
+  // First, try to extract from markdown code block
+  const codeBlockMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (codeBlockMatch) {
+    return codeBlockMatch[1].trim();
+  }
+
+  // Try to find a JSON object anywhere in the string
+  const jsonMatch = s.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    return jsonMatch[0].trim();
+  }
+
+  // Fallback: just clean up the string
+  return s.trim();
 }
 
 /**
- * Detect if a string looks like raw JSON that was meant to be a recipe.
+ * Detect if a string contains raw JSON that was meant to be a recipe.
  * This is a safety check to NEVER show raw JSON to users.
+ * Checks ANYWHERE in the string, not just at the start.
  */
 function looksLikeRawRecipeJson(s: string): boolean {
-  const trimmed = s.trim();
-  // Check if it starts with { and contains recipe-like field names
-  if (trimmed.startsWith('{')) {
-    const lower = trimmed.toLowerCase();
-    const recipeIndicators = ['mealname', 'ingredients', 'instructions', 'headersummary', 'calories'];
-    const matchCount = recipeIndicators.filter(indicator => lower.includes(`"${indicator}"`)).length;
-    return matchCount >= 2;
+  const lower = s.toLowerCase();
+
+  // Check for JSON-like patterns anywhere in the string
+  const hasJsonStart = s.includes('{') && s.includes('}');
+  if (!hasJsonStart) return false;
+
+  // Check for recipe-like field names (with quotes, indicating JSON)
+  const recipeIndicators = ['"mealname"', '"ingredients"', '"instructions"', '"headersummary"', '"calories"', '"servings"', '"mealtype"'];
+  const matchCount = recipeIndicators.filter(indicator => lower.includes(indicator)).length;
+
+  return matchCount >= 2;
+}
+
+/**
+ * Sanitize AI response for display - removes any JSON/code blocks.
+ * Returns clean, human-readable text only.
+ */
+function sanitizeForDisplay(s: string): string {
+  let cleaned = s;
+
+  // Remove markdown code blocks (```json ... ```)
+  cleaned = cleaned.replace(/```(?:json)?[\s\S]*?```/gi, '');
+
+  // Remove any JSON objects { ... }
+  cleaned = cleaned.replace(/\{[\s\S]*?\}/g, '');
+
+  // Clean up extra whitespace and newlines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
+
+  return cleaned;
+}
+
+/**
+ * Get a fallback message when JSON is detected but can't be parsed.
+ */
+function getFallbackMessage(originalText: string): string {
+  // Try to extract any friendly intro text before the JSON
+  const introMatch = originalText.match(/^([^{`]*?)(?:```|{)/);
+  if (introMatch && introMatch[1].trim().length > 20) {
+    const intro = introMatch[1].trim();
+    // Remove trailing "Here's the recipe:" type phrases
+    const cleanIntro = intro.replace(/[.!]?\s*(here'?s?\s*(the|your)?\s*recipe:?|let me show you:?|check this out:?)?\s*$/i, '').trim();
+    if (cleanIntro.length > 15) {
+      return `${cleanIntro}. I've prepared the recipe for you - tap below to view the details.`;
+    }
   }
-  return false;
+  return "I've got a delicious recipe ready for you! Let me know if you'd like me to walk you through it step by step.";
 }
 
 function tryParseRecipe(s: string): RecipeCard | null {
@@ -1707,14 +1758,16 @@ GENERATE MODE Rules:
               return {
                 id: uid(),
                 kind: 'ai_text',
-                text: "Recipe data from previous session. Please request a new recipe.",
+                text: getFallbackMessage(content),
                 isFromHistory: true,
               } as ChatMessage;
             }
+            // SAFETY: Always sanitize AI text to remove any JSON that might have slipped through
+            const sanitizedContent = sanitizeForDisplay(content);
             return {
               id: uid(),
               kind: 'ai_text',
-              text: content,
+              text: sanitizedContent || content,
               isFromHistory: true,
             } as ChatMessage;
           }
@@ -2131,6 +2184,7 @@ GENERATE MODE Rules:
 
       // Append AI response (do NOT re-append user message)
       // Priority: Recipe JSON > Explore suggestions > Plain text
+      // SAFETY: Always sanitize before displaying to prevent JSON leakage
       const recipe = tryParseRecipe(response.reply);
       if (recipe) {
         // GENERATE MODE: Full recipe response
@@ -2140,33 +2194,39 @@ GENERATE MODE Rules:
           { id: uid(), kind: "ai_recipe", recipe },
         ]);
       } else if (looksLikeRawRecipeJson(response.reply)) {
-        // SAFETY: Detected raw JSON that should have been a recipe - show error instead
+        // SAFETY: Detected raw JSON that should have been a recipe
+        // Use friendly fallback message instead of showing raw JSON
         console.log('[ChatAI] Raw JSON detected but failed to parse as recipe');
+        const fallbackText = getFallbackMessage(response.reply);
         setMessages((prev) => [
           ...prev,
-          { id: uid(), kind: "ai_text", text: "I had trouble formatting that recipe. Let me try again - what would you like me to make?" },
+          { id: uid(), kind: "ai_text", text: fallbackText },
         ]);
       } else if (isExploreResponse(response.reply)) {
         // EXPLORE MODE: Parse and display suggestions with tappable chips
         const suggestions = parseSuggestions(response.reply);
+        // Sanitize the text to remove any accidental JSON
+        const sanitizedText = sanitizeForDisplay(response.reply);
         if (suggestions && suggestions.length > 0) {
           setLastSuggestedMeals(suggestions);
           setMessages((prev) => [
             ...prev,
-            { id: uid(), kind: "ai_suggestions", text: response.reply, suggestions },
+            { id: uid(), kind: "ai_suggestions", text: sanitizedText, suggestions },
           ]);
         } else {
           // Has explore keywords but couldn't parse suggestions
           setMessages((prev) => [
             ...prev,
-            { id: uid(), kind: "ai_text", text: response.reply },
+            { id: uid(), kind: "ai_text", text: sanitizedText },
           ]);
         }
       } else {
         // Plain text response (refusals, follow-ups, etc.)
+        // SAFETY: Sanitize to remove any JSON that might have slipped through
+        const sanitizedText = sanitizeForDisplay(response.reply);
         setMessages((prev) => [
           ...prev,
-          { id: uid(), kind: "ai_text", text: response.reply },
+          { id: uid(), kind: "ai_text", text: sanitizedText || response.reply },
         ]);
       }
     } catch (error: any) {
@@ -2275,6 +2335,7 @@ GENERATE MODE Rules:
       setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
 
       // Append recipe or text response
+      // SAFETY: Always sanitize before displaying to prevent JSON leakage
       const recipe = tryParseRecipe(response.reply);
       if (recipe) {
         setMessages((prev) => [
@@ -2283,15 +2344,19 @@ GENERATE MODE Rules:
         ]);
       } else if (looksLikeRawRecipeJson(response.reply)) {
         // SAFETY: Detected raw JSON that should have been a recipe
+        // Use friendly fallback message instead of showing raw JSON
         console.log('[ChatAI] Raw JSON detected in suggestion response');
+        const fallbackText = getFallbackMessage(response.reply);
         setMessages((prev) => [
           ...prev,
-          { id: uid(), kind: "ai_text", text: "I had trouble formatting that recipe. Please try selecting the meal again." },
+          { id: uid(), kind: "ai_text", text: fallbackText },
         ]);
       } else {
+        // SAFETY: Sanitize to remove any JSON that might have slipped through
+        const sanitizedText = sanitizeForDisplay(response.reply);
         setMessages((prev) => [
           ...prev,
-          { id: uid(), kind: "ai_text", text: response.reply },
+          { id: uid(), kind: "ai_text", text: sanitizedText || response.reply },
         ]);
       }
     } catch (error: any) {

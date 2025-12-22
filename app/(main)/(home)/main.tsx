@@ -171,8 +171,8 @@ const HomeDashboard = () => {
       title: "Meal Plans",
       subtitle: "Your favorite meals",
       iconName: "restaurant-outline",
-      iconColor: palette.accent,
-      bgColor: palette.cardAccentTint,
+      iconColor: palette.blue,
+      bgColor: palette.cardBlueTint,
       onPress: () => router.push("/(main)/(home)/meals"),
     },
     {
@@ -189,8 +189,8 @@ const HomeDashboard = () => {
       title: "Quick Meals",
       subtitle: "Whip it up!",
       iconName: "flash-outline",
-      iconColor: palette.success,
-      bgColor: palette.cardSuccessTint,
+      iconColor: palette.orange,
+      bgColor: palette.cardOrangeTint,
       onPress: () => router.push("/(main)/(home)/quickMeals"),
     },
   ];
@@ -333,20 +333,42 @@ const withAlpha = (hex: string, alpha: number) => {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const createPalette = (colors: ColorTokens) => ({
-  background: colors.background,
-  card: colors.card,
-  border: colors.border,
-  text: colors.textPrimary,
-  textMuted: colors.textSecondary,
-  primary: colors.primary,
-  accent: colors.warning,
-  success: colors.success,
-  cardPrimaryTint: withAlpha(colors.primary, 0.14),
-  cardAccentTint: withAlpha(colors.warning, 0.16),
-  cardNeutralTint: withAlpha(colors.textSecondary, 0.08),
-  cardSuccessTint: withAlpha(colors.success, 0.16),
-});
+const createPalette = (colors: ColorTokens) => {
+  // Determine if dark mode based on background color
+  const isDark = colors.background === '#111827';
+
+  // Blue for Meal Plans (calm, muted)
+  const blue = isDark ? '#60A5FA' : '#3B82F6';
+  const blueMuted = isDark ? '#4B7FBF' : '#2563EB';
+
+  // Orange for Quick Meals (warm, energetic - use warning)
+  const orange = colors.warning;
+
+  // Darker green for All Features section
+  const allFeaturesGreen = isDark ? '#059669' : '#047857';
+
+  return {
+    background: colors.background,
+    card: colors.card,
+    border: colors.border,
+    text: colors.textPrimary,
+    textMuted: colors.textSecondary,
+    primary: colors.primary,
+    // Blue for Meal Plans
+    blue,
+    blueMuted,
+    // Orange for Quick Meals
+    orange,
+    // Darker green for All Features
+    allFeaturesGreen,
+    // Card backgrounds
+    cardPrimaryTint: withAlpha(colors.primary, 0.14),      // Pantry - green tint
+    cardBlueTint: withAlpha(blue, 0.14),                   // Meal Plans - blue tint
+    cardNeutralTint: withAlpha(colors.textSecondary, 0.10), // Grocery Lists - neutral
+    cardOrangeTint: withAlpha(orange, 0.16),               // Quick Meals - orange tint
+    cardAllFeaturesTint: withAlpha(allFeaturesGreen, 0.12), // All Features section
+  };
+};
 
 const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: number }) =>
   StyleSheet.create({
@@ -439,7 +461,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: 
       color: palette.primary,
     },
     welcomeAccentSecondary: {
-      color: palette.accent,
+      color: palette.orange,
     },
     menuGrid: {
       flexDirection: "row",
@@ -488,7 +510,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: 
       color: palette.text,
     },
     chatSection: {
-      backgroundColor: palette.cardSuccessTint,
+      backgroundColor: palette.cardAllFeaturesTint,
       borderRadius: 18,
       padding: 16,
       alignItems: "center",
@@ -499,7 +521,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: 
       width: 52,
       height: 52,
       borderRadius: 26,
-      backgroundColor: palette.success,
+      backgroundColor: palette.allFeaturesGreen,
       justifyContent: "center",
       alignItems: "center",
       marginBottom: 10,
@@ -512,7 +534,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: 
     },
     startChatButton: {
       width: "100%",
-      backgroundColor: palette.success,
+      backgroundColor: palette.allFeaturesGreen,
       borderRadius: 50,
       paddingVertical: 14,
       flexDirection: "row",

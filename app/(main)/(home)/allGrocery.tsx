@@ -30,6 +30,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  StatusBar,
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -723,6 +724,10 @@ const AllGroceryScanner = () => {
 
   return (
     <>
+      <StatusBar
+        barStyle={theme.mode === "dark" ? "light-content" : "dark-content"}
+        backgroundColor={palette.background}
+      />
       <ToastBanner
         visible={toast.visible}
         type={toast.type}

@@ -101,7 +101,7 @@ const LocationScreens = () => {
           onPress: () => {
             hideToast();
             if (isOnboarding) {
-              router.replace("/(auth)/familyAuth");
+              router.replace("/(auth)/familyAuth?fromOnboarding=true");
             } else {
               router.replace("/(main)/(home)/main");
             }
@@ -226,7 +226,7 @@ const LocationScreens = () => {
     showToast("success", "Location was successfully set");
     setTimeout(() => {
       if (isOnboarding) {
-        router.replace("/(auth)/familyAuth");
+        router.replace("/(auth)/familyAuth?fromOnboarding=true");
       } else {
         router.replace("/(main)/(home)/main");
       }
@@ -268,7 +268,7 @@ const LocationScreens = () => {
       showToast("success", "Location was successfully set");
       setTimeout(() => {
         if (isOnboarding) {
-          router.replace("/(auth)/familyAuth");
+          router.replace("/(auth)/familyAuth?fromOnboarding=true");
         } else {
           router.replace("/(main)/(home)/main");
         }

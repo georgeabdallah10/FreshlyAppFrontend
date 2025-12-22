@@ -13,6 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   LayoutAnimation,
   Platform,
   Pressable,
@@ -84,7 +85,6 @@ const CATEGORIES = [
   "Dinner",
   "Snack",
   "Dessert",
-  "Favorites",
 ] as const;
 
 type Category = (typeof CATEGORIES)[number];
@@ -111,6 +111,8 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const [meals, setMeals] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showFavouritesOnly, setShowFavouritesOnly] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -131,6 +133,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const categoriesFadeAnim = useRef(new Animated.Value(0)).current;
   const contentFadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
+  const categoryDropdownAnim = useRef(new Animated.Value(0)).current;
 
   const mapMealType = (mt?: string): Category | "All" => {
     const s = String(mt || "").toLowerCase();
@@ -245,6 +248,15 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     }
   }, [scrollToEnd, meals]);
 
+  useEffect(() => {
+    Animated.timing(categoryDropdownAnim, {
+      toValue: showCategoryDropdown ? 1 : 0,
+      duration: showCategoryDropdown ? 160 : 120,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  }, [showCategoryDropdown]);
+
   if (
     Platform.OS === "android" &&
     (UIManager as any).setLayoutAnimationEnabledExperimental
@@ -285,10 +297,12 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     const q = searchQuery.trim().toLowerCase();
     let list = meals;
 
-    if (selectedCategory === "Favorites") {
-      list = list.filter((m) => m.isFavorite);
-    } else if (selectedCategory !== "All") {
+    if (selectedCategory !== "All") {
       list = list.filter((m) => m.mealType === selectedCategory);
+    }
+
+    if (showFavouritesOnly) {
+      list = list.filter((m) => m.isFavorite);
     }
 
     if (q) {
@@ -296,7 +310,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     }
 
     return list;
-  }, [meals, selectedCategory, searchQuery]);
+  }, [meals, selectedCategory, searchQuery, showFavouritesOnly]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -349,18 +363,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       </Animated.View>
 
       {/* Categories */}
-      <Animated.View 
+      <Animated.View
         style={[
           styles.categoriesWrapper,
           { opacity: categoriesFadeAnim }
         ]}
       >
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoriesContainer}
-          contentContainerStyle={styles.categoriesContent}
-        >
+        <View style={styles.categoryFilterRow}>
           <TouchableOpacity
             style={styles.addCategoryChip}
             onPress={onAddCategory}
@@ -368,32 +377,84 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           >
             <Text style={styles.addCategoryPlus}>+</Text>
           </TouchableOpacity>
-          {CATEGORIES.map((category, index) => {
-            const color = chipColors[index % chipColors.length];
-            const isActive = selectedCategory === category;
-            
-            return (
-              <Pressable
-                key={category}
-                onPress={() => onSelectCategory(category)}
-                style={({ pressed }) => [
-                  styles.categoryChip,
-                  isActive && { backgroundColor: color, borderColor: color },
-                  pressed && styles.categoryChipPressed,
-                ]}
-              >
-                <Text
+
+          <TouchableOpacity
+            style={styles.categoryDropdownTrigger}
+            onPress={() => setShowCategoryDropdown((prev) => !prev)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.categoryDropdownText}>{selectedCategory}</Text>
+            <Text style={styles.dropdownIcon}>▼</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.favouritesButton,
+              showFavouritesOnly && styles.favouritesButtonActive,
+            ]}
+            onPress={() => setShowFavouritesOnly((prev) => !prev)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={showFavouritesOnly ? "heart" : "heart-outline"}
+              size={22}
+              color={showFavouritesOnly ? "#EF4444" : palette.textMuted}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {showCategoryDropdown && (
+          <Animated.View
+            style={[
+              styles.categoryFilterDropdown,
+              {
+                opacity: categoryDropdownAnim,
+                transform: [
+                  {
+                    scaleY: categoryDropdownAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.95, 1],
+                    }),
+                  },
+                  {
+                    translateY: categoryDropdownAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-6, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <ScrollView style={{ maxHeight: 250 }}>
+              {CATEGORIES.map((category) => (
+                <TouchableOpacity
+                  key={category}
                   style={[
-                    styles.categoryText,
-                    isActive && styles.categoryTextActive,
+                    styles.dropdownItem,
+                    selectedCategory === category && styles.dropdownItemSelected,
                   ]}
+                  onPress={() => {
+                    onSelectCategory(category);
+                    setShowCategoryDropdown(false);
+                  }}
                 >
-                  {category}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={[
+                      styles.dropdownItemText,
+                      selectedCategory === category && styles.dropdownItemTextSelected,
+                    ]}
+                  >
+                    {category}
+                  </Text>
+                  {selectedCategory === category && (
+                    <Text style={styles.dropdownCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Animated.View>
+        )}
       </Animated.View>
 
       {/* Loading State */}
@@ -444,20 +505,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           <Text style={styles.emptyStateSubtitle}>
             Start by adding your first meal plan or use Quick Meals to generate one!
           </Text>
-          <TouchableOpacity 
-            style={styles.addFirstMealButton}
-            onPress={onAddMeal}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={[palette.accent, palette.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              <Text style={styles.addFirstMealButtonText}>+ Add Your First Meal</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         </Animated.View>
       ) : (
         /* Meal cards */
@@ -673,8 +720,6 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
 
   /* Categories */
   categoriesWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
     marginBottom: 20,
     paddingHorizontal: 20,
   },
@@ -731,6 +776,81 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     fontWeight: "700",
     color: palette.primary,
     lineHeight: 24,
+  },
+  categoryFilterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  categoryDropdownTrigger: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: palette.card,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  categoryDropdownText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: palette.text,
+  },
+  dropdownIcon: {
+    fontSize: 12,
+    color: palette.textMuted,
+  },
+  favouritesButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: palette.card,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  favouritesButtonActive: {
+    backgroundColor: withAlpha("#EF4444", 0.12),
+    borderColor: "#EF4444",
+  },
+  categoryFilterDropdown: {
+    backgroundColor: palette.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: palette.border,
+    marginTop: 12,
+    shadowColor: palette.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  dropdownItemSelected: {
+    backgroundColor: palette.primaryLight,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: palette.text,
+  },
+  dropdownItemTextSelected: {
+    color: palette.primary,
+    fontWeight: "600",
+  },
+  dropdownCheck: {
+    fontSize: 16,
+    color: palette.primary,
+    fontWeight: "700",
   },
 
   /* List */

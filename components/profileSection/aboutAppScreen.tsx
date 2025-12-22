@@ -1,5 +1,6 @@
 // ==================== screens/AboutAppScreen.tsx ====================
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -7,6 +8,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import { useScrollContentStyle } from '@/hooks/useBottomNavInset';
 import Icon from './components/icon';
 
 type Props = {
@@ -14,6 +16,7 @@ type Props = {
 };
 
 const AboutAppScreen: React.FC<Props> = ({ onBack }) => {
+  const scrollContentStyle = useScrollContentStyle();
   return (
     <View style={styles.screenContainer}>
       <View style={styles.headerBar}>
@@ -24,10 +27,10 @@ const AboutAppScreen: React.FC<Props> = ({ onBack }) => {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} contentContainerStyle={scrollContentStyle} showsVerticalScrollIndicator={false}>
         <View style={styles.aboutContainer}>
           <View style={styles.appIconLarge}>
-            <Text style={styles.appIconText}>🚀</Text>
+            <Ionicons name="sparkles" size={50} color="#FFFFFF" />
           </View>
           <Text style={styles.appName}>Profile Dashboard</Text>
           <Text style={styles.appVersion}>Version 1.0.0</Text>
@@ -60,7 +63,7 @@ const AboutAppScreen: React.FC<Props> = ({ onBack }) => {
           </TouchableOpacity>
 
           <Text style={styles.copyright}>
-            © 2025 Profile Dashboard. All rights reserved.
+            (c) 2025 Profile Dashboard. All rights reserved.
           </Text>
         </View>
       </ScrollView>

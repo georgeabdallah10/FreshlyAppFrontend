@@ -6,6 +6,7 @@
  */
 
 import { useUnreadCount } from '@/hooks/useNotifications';
+import { useThemeContext } from '@/context/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React from 'react';
@@ -22,12 +23,14 @@ interface NotificationBellProps {
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   iconSize = 24,
-  iconColor = '#1F2937',
-  badgeColor = '#FF3B30',
+  iconColor,
+  badgeColor,
   onPress,
   extraCount = 0,
   containerStyle,
 }) => {
+  const { theme } = useThemeContext();
+  const { colors } = theme;
   const router = useRouter();
   const { data: unreadData, isLoading } = useUnreadCount();
   const unreadCount = unreadData?.count || 0;
@@ -50,11 +53,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       disabled={isLoading}
     >
       <View style={styles.iconContainer}>
-        <Ionicons name="notifications-outline" size={iconSize} color={iconColor} />
+        <Ionicons
+          name="notifications-outline"
+          size={iconSize}
+          color={iconColor ?? colors.textPrimary}
+        />
         
         {showBadge && (
-          <View style={[styles.badge, { backgroundColor: badgeColor }]}>
-            <Text style={styles.badgeText}>
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: badgeColor ?? colors.error, borderColor: colors.card },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: colors.card }]}>
               {totalCount > 99 ? '99+' : totalCount}
             </Text>
           </View>
@@ -82,15 +94,12 @@ const styles = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   badgeText: {
-    color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '700',
     textAlign: 'center',

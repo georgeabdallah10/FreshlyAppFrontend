@@ -1,6 +1,6 @@
 # Expo Go Compatibility Guide
 
-## ✅ Issues Fixed
+##  Issues Fixed
 
 ### 1. **MMKV Nitro Modules Error**
 **Error**: `NitroModules are not supported in Expo Go!`
@@ -26,24 +26,24 @@ if (IS_EXPO_GO) {
 
 ---
 
-## 🚀 How It Works
+##  How It Works
 
 ### In Expo Go
-- ✅ Uses **AsyncStorage** fallback for storage
-- ✅ React Query persistence **still works**
-- ✅ Zustand user store **still works**
-- ⚠️ **Slightly slower** than native MMKV (but still functional)
-- ⚠️ **No encryption** on AsyncStorage fallback
+-  Uses **AsyncStorage** fallback for storage
+-  React Query persistence **still works**
+-  Zustand user store **still works**
+-  **Slightly slower** than native MMKV (but still functional)
+-  **No encryption** on AsyncStorage fallback
 
 ### In Development Build (Recommended)
-- ✅ Uses **native MMKV** (30x faster)
-- ✅ Full **encryption** support
-- ✅ **Synchronous** API for instant access
-- ✅ Best **performance**
+-  Uses **native MMKV** (30x faster)
+-  Full **encryption** support
+-  **Synchronous** API for instant access
+-  Best **performance**
 
 ---
 
-## 📱 Running the App
+##  Running the App
 
 ### Option 1: Expo Go (Quick Testing)
 ```bash
@@ -80,7 +80,7 @@ npx expo run:android
 
 ---
 
-## 🔄 Storage Behavior
+##  Storage Behavior
 
 ### Expo Go (AsyncStorage Fallback)
 ```typescript
@@ -104,7 +104,7 @@ const value = storage.getString('key');  // Always accurate
 
 ---
 
-## 🎯 Best Practices
+##  Best Practices
 
 ### 1. **For Development**
 Use a **development build** for best experience:
@@ -124,7 +124,7 @@ Always use a **custom build** (not Expo Go) to get:
 
 ---
 
-## 🔧 Detection Logic
+##  Detection Logic
 
 The app automatically detects the environment:
 
@@ -149,7 +149,7 @@ For best performance, use a development build.
 
 ---
 
-## ⚠️ Important Notes
+##  Important Notes
 
 ### Expo Go Limitations
 1. **Storage**: AsyncStorage fallback (no true synchronous API)
@@ -171,10 +171,10 @@ For best performance, use a development build.
 
 ---
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### Error: "NitroModules are not supported"
-✅ **Fixed!** The app now automatically falls back to AsyncStorage.
+ **Fixed!** The app now automatically falls back to AsyncStorage.
 
 ### Storage not persisting in Expo Go
 This is normal behavior. AsyncStorage is async, so there may be delays. Data will eventually persist.
@@ -188,7 +188,7 @@ npx expo run:ios  # or run:android
 
 ---
 
-## 📊 Performance Comparison
+##  Performance Comparison
 
 | Feature | Expo Go | Development Build |
 |---------|---------|-------------------|
@@ -201,17 +201,17 @@ npx expo run:ios  # or run:android
 
 ---
 
-## ✅ Current Status
+##  Current Status
 
-- ✅ App works in **both Expo Go and development builds**
-- ✅ Automatic environment detection
-- ✅ Graceful fallbacks
-- ✅ No breaking changes
-- ✅ All features functional (with performance differences)
+-  App works in **both Expo Go and development builds**
+-  Automatic environment detection
+-  Graceful fallbacks
+-  No breaking changes
+-  All features functional (with performance differences)
 
 ---
 
-## 🚀 Recommended Workflow
+##  Recommended Workflow
 
 1. **Start with Expo Go** for quick iteration
 2. **Test features** and UI
@@ -220,4 +220,4 @@ npx expo run:ios  # or run:android
 
 ---
 
-**The app now runs everywhere!** 🎉
+**The app now runs everywhere!** 

@@ -594,8 +594,8 @@ export default function NotificationExampleScreen() {
       </Text>
 
       <View style={{ marginBottom: 16 }}>
-        <Text>Permissions: {permissionsGranted ? '✅ Granted' : '❌ Denied'}</Text>
-        <Text>Push Token: {expoPushToken ? '✅ Registered' : '❌ Not registered'}</Text>
+        <Text>Permissions: {permissionsGranted ? ' Granted' : ' Denied'}</Text>
+        <Text>Push Token: {expoPushToken ? ' Registered' : ' Not registered'}</Text>
         <Text>Unread Count: {unreadCount}</Text>
       </View>
 

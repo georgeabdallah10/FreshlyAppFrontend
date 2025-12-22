@@ -4,6 +4,7 @@ import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
 import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
   deleteFamily,
@@ -12,7 +13,7 @@ import {
   removeFamilyMember,
   updateFamilyMemberRole,
 } from "@/src/user/family";
-import { createMealForSignleUser } from "@/src/user/meals";
+import { createMealForSingleUser } from "@/src/user/meals";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, {
@@ -33,6 +34,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 import MemberMealsOverlay from "./MemberMealsOverlay";
 
@@ -61,6 +64,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   const user = userContext?.user;
   const familyContext = useFamilyContext();
   const selectedFamily = familyContext?.selectedFamily;
+  const scrollContentStyle = useScrollContentStyle();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const resolvedFamilyData = useMemo(() => {
@@ -546,7 +553,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         notes: meal.notes,
         isFavorite: false, // Start as not favorite in owner's collection
       };
-      await createMealForSignleUser(mealCopy as any);
+      await createMealForSingleUser(mealCopy as any);
       showToast("success", `"${meal.name}" saved to your meals!`);
     } catch (error: any) {
       showToast("error", error?.message || "Failed to save meal");
@@ -630,7 +637,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
     <>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Family</Text>
         <View style={styles.settingsContainer}>
@@ -639,7 +646,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
             onPress={toggleSettingsDropdown}
             activeOpacity={0.7}
           >
-            <Ionicons name="ellipsis-vertical" size={22} color="#6B7280" />
+            <Ionicons name="ellipsis-vertical" size={22} color={palette.textMuted} />
           </TouchableOpacity>
           {showSettingsDropdown && (
             <>
@@ -663,7 +670,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                   activeOpacity={0.7}
                   disabled={isDeletingFamily}
                 >
-                  <Ionicons name="trash-outline" size={18} color="#DC2626" />
+                  <Ionicons name="trash-outline" size={18} color={palette.error} />
                   <Text style={styles.dropdownItemTextDestructive}>
                     {isDeletingFamily ? "Deleting..." : "Delete Family"}
                   </Text>
@@ -683,11 +690,11 @@ const OwnerView: React.FC<OwnerViewProps> = ({
           }
         ]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
       >
         <View style={styles.familyCard}>
           <View style={styles.familyIconContainer}>
-            <Ionicons name="home" size={32} color="#10B981" />
+            <Ionicons name="home" size={32} color={palette.success} />
           </View>
           <Text style={styles.familyName}>{resolvedFamilyData?.name ?? "My Family"}</Text>
           <Text style={styles.familyMemberCount}>
@@ -700,7 +707,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
               onPress={() => setShowInviteModal(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="share-outline" size={20} color="#10B981" />
+              <Ionicons name="share-outline" size={20} color={palette.success} />
               <Text style={styles.inviteButtonText}>Share Invite</Text>
             </TouchableOpacity>
           </View>
@@ -709,7 +716,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Members</Text>
           {loadingMembers ? (
-            <Text style={{ color: "#9CA3AF", marginBottom: 8 }}>Loading…</Text>
+            <Text style={styles.loadingText}>Loading…</Text>
           ) : null}
           {localMembers.map((member) => {
             const isCurrentUser = String(member.id) === String(currentUserId);
@@ -745,7 +752,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                       </Text>
                       {member.role === "owner" && (
                         <View style={styles.ownerBadge}>
-                          <Ionicons name="create" size={12} color="#F59E0B" />
+                          <Ionicons name="create" size={12} color={palette.warning} />
                           <Text style={styles.ownerBadgeText}>Owner</Text>
                         </View>
                       )}
@@ -754,20 +761,20 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                           <Ionicons
                             name="shield-checkmark"
                             size={12}
-                            color="#2563EB"
+                            color={palette.primary}
                           />
                           <Text style={styles.adminBadgeText}>Admin</Text>
                         </View>
                       )}
                     </View>
                     <View style={styles.memberDetail}>
-                      <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
+                      <Ionicons name="mail-outline" size={14} color={palette.textMuted} />
                       <Text style={styles.detailText}>
                         {member.email || "—"}
                       </Text>
                     </View>
                     <View style={styles.memberDetail}>
-                      <Ionicons name="call-outline" size={14} color="#9CA3AF" />
+                      <Ionicons name="call-outline" size={14} color={palette.textMuted} />
                       <Text style={styles.detailText}>
                         {member.phone || "—"}
                       </Text>
@@ -778,10 +785,10 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                 {canManageMember(member) && (
                   <IconButton
                     iconName="settings-outline"
-                    iconColor="#6B7280"
+                    iconColor={palette.textMuted}
                     iconSize={20}
                     containerSize={36}
-                    backgroundColor="#F3F4F6"
+                    backgroundColor={withAlpha(palette.textMuted, 0.12)}
                     borderRadius={18}
                     onPress={() => openActionModal(member)}
                     style={styles.actionTrigger}
@@ -886,7 +893,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
 
               <View style={styles.modalIconContainer}>
                 <View style={styles.modalIcon}>
-                  <Ionicons name="key" size={32} color="#10B981" />
+                  <Ionicons name="key" size={32} color={palette.success} />
                 </View>
               </View>
 
@@ -905,7 +912,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                   onPress={handleCopyCode}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="copy-outline" size={20} color="#10B981" />
+                  <Ionicons name="copy-outline" size={20} color={palette.success} />
                   <Text style={styles.modalButtonSecondaryText}>Copy</Text>
                 </TouchableOpacity>
 
@@ -917,7 +924,7 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                   <Ionicons
                     name="share-social-outline"
                     size={20}
-                    color="#FFF"
+                    color={palette.card}
                   />
                   <Text style={styles.modalButtonPrimaryText}>Share</Text>
                 </TouchableOpacity>
@@ -928,17 +935,17 @@ const OwnerView: React.FC<OwnerViewProps> = ({
                 onPress={handleRegenerateCode}
                 disabled={isRegenerating}
                 activeOpacity={0.8}
-              >
-                {isRegenerating ? (
-                  <Text style={styles.regenerateButtonText}>Generating...</Text>
-                ) : (
-                  <>
-                    <Ionicons name="refresh" size={18} color="#6B7280" />
+                >
+                  {isRegenerating ? (
+                    <Text style={styles.regenerateButtonText}>Generating...</Text>
+                  ) : (
+                    <>
+                    <Ionicons name="refresh" size={18} color={palette.textMuted} />
                     <Text style={styles.regenerateButtonText}>
                       Generate New Code
                     </Text>
-                  </>
-                )}
+                    </>
+                  )}
               </TouchableOpacity>
             </Animated.View>
           </TouchableOpacity>
@@ -958,420 +965,447 @@ const OwnerView: React.FC<OwnerViewProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  settingsContainer: {
-    position: "relative",
-    width: 32,
-    alignItems: "flex-end",
-  },
-  settingsButton: {
-    padding: 4,
-  },
-  dropdownOverlay: {
-    position: "absolute",
-    top: -100,
-    left: -500,
-    right: -500,
-    bottom: -1000,
-    zIndex: 99,
-  },
-  settingsDropdown: {
-    position: "absolute",
-    top: 36,
-    right: 0,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingVertical: 4,
-    minWidth: 160,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    zIndex: 100,
-  },
-  dropdownItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dropdownItemTextDestructive: {
-    fontSize: 15,
-    fontWeight: "500",
-    color: "#DC2626",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  familyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  familyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#ECFDF5",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  familyName: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 4,
-  },
-  familyMemberCount: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    marginBottom: 20,
-  },
-  inviteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: "#ECFDF5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#10B981",
-  },
-  inviteButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#10B981",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 16,
-  },
-  memberCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  roleActionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-  actionTrigger: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  currentUserCard: {
-    borderColor: "#FD8100",
-    shadowColor: "#FD8100",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  ownerCardHighlight: {
-    borderColor: "#F59E0B",
-    shadowColor: "#F59E0B",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  adminCardHighlight: {
-    borderColor: "#2563EB",
-    shadowColor: "#2563EB",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  memberLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  memberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#10B981",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    overflow: "hidden",
-  },
-  memberImage: {
-    width: "100%",
-    height: "100%",
-  },
-  memberInitial: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  memberInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  memberNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 2,
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1F2937",
-  },
-  ownerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: "#FEF3C7",
-    borderRadius: 8,
-  },
-  ownerBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#F59E0B",
-  },
-  adminBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: "#DBEAFE",
-    borderRadius: 8,
-  },
-  adminBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#2563EB",
-  },
-  memberDetail: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 12,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 24,
-  },
-  modalIconContainer: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#ECFDF5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  codeContainer: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 20,
-  },
-  codeText: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#10B981",
-    textAlign: "center",
-    letterSpacing: 2,
-  },
-  modalButtonsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
-  modalButtonSecondary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#ECFDF5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#10B981",
-  },
-  modalButtonSecondaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#10B981",
-  },
-  modalButtonPrimary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#10B981",
-    borderRadius: 12,
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  modalButtonPrimaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  regenerateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-  },
-  regenerateButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6B7280",
-  },
-  buttonRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 16,
-  },
-  requestsButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    position: "relative",
-  },
-  requestsButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  badge: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#FF3B30",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    settingsContainer: {
+      position: "relative",
+      width: 32,
+      alignItems: "flex-end",
+    },
+    settingsButton: {
+      padding: 4,
+    },
+    dropdownOverlay: {
+      position: "absolute",
+      top: -100,
+      left: -500,
+      right: -500,
+      bottom: -1000,
+      zIndex: 99,
+    },
+    settingsDropdown: {
+      position: "absolute",
+      top: 36,
+      right: 0,
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      paddingVertical: 4,
+      minWidth: 160,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      elevation: 8,
+      borderWidth: 1,
+      borderColor: palette.border,
+      zIndex: 100,
+    },
+    dropdownItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    dropdownItemTextDestructive: {
+      fontSize: 15,
+      fontWeight: "500",
+      color: palette.error,
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    familyCard: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      padding: 24,
+      alignItems: "center",
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    familyIconContainer: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    familyName: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 4,
+    },
+    familyMemberCount: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginBottom: 20,
+    },
+    inviteButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.success,
+    },
+    inviteButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.success,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 16,
+    },
+    loadingText: {
+      color: palette.textMuted,
+      marginBottom: 8,
+    },
+    memberCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    roleActionsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      marginTop: 12,
+    },
+    actionTrigger: {
+      padding: 8,
+      marginLeft: 8,
+    },
+    currentUserCard: {
+      borderColor: palette.warning,
+      shadowColor: palette.warning,
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    ownerCardHighlight: {
+      borderColor: palette.warning,
+      shadowColor: palette.warning,
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    adminCardHighlight: {
+      borderColor: palette.primary,
+      shadowColor: palette.primary,
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    memberLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    memberAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: palette.success,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      overflow: "hidden",
+    },
+    memberImage: {
+      width: "100%",
+      height: "100%",
+    },
+    memberInitial: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.card,
+    },
+    memberInfo: {
+      flex: 1,
+      gap: 6,
+    },
+    memberNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 2,
+    },
+    memberName: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    ownerBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      backgroundColor: withAlpha(palette.warning, 0.2),
+      borderRadius: 8,
+    },
+    ownerBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: palette.warning,
+    },
+    adminBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      backgroundColor: withAlpha(palette.primary, 0.15),
+      borderRadius: 8,
+    },
+    adminBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    memberDetail: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    detailText: {
+      fontSize: 13,
+      color: palette.textMuted,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withAlpha(palette.text, 0.5),
+    },
+    modalContent: {
+      backgroundColor: palette.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingBottom: 40,
+      paddingTop: 12,
+    },
+    modalHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: palette.border,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginBottom: 24,
+    },
+    modalIconContainer: {
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    modalIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginBottom: 24,
+      lineHeight: 20,
+    },
+    codeContainer: {
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 20,
+    },
+    codeText: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.success,
+      textAlign: "center",
+      letterSpacing: 2,
+    },
+    modalButtonsRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 16,
+    },
+    modalButtonSecondary: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.success,
+    },
+    modalButtonSecondaryText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.success,
+    },
+    modalButtonPrimary: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: palette.success,
+      borderRadius: 12,
+      shadowColor: palette.success,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    modalButtonPrimaryText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    regenerateButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 12,
+    },
+    regenerateButtonText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: palette.textMuted,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 16,
+    },
+    requestsButton: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: withAlpha(palette.primary, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.primary, 0.35),
+      position: "relative",
+    },
+    requestsButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    badge: {
+      position: "absolute",
+      top: -6,
+      right: -6,
+      backgroundColor: palette.error,
+      borderRadius: 10,
+      minWidth: 20,
+      height: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 5,
+      borderWidth: 2,
+      borderColor: palette.card,
+    },
+    badgeText: {
+      color: palette.card,
+      fontSize: 11,
+      fontWeight: "700",
+    },
+  });
 
 export default OwnerView;

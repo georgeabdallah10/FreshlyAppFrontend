@@ -49,17 +49,19 @@ async function ensureBucketExists(): Promise<boolean> {
       .list('', { limit: 1 });
 
     if (listError) {
-      console.log(`[MealImageService] ❌ Bucket "${BUCKET_NAME}" error:`, listError.message);
-      console.log(`[MealImageService] 📋 Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
-      console.log(`[MealImageService] 🔧 Fix: Ensure bucket RLS policies allow anon/public INSERT (like pantryItems bucket)`);
+      console.log(`[MealImageService] ERROR: Bucket "${BUCKET_NAME}" error:`, listError.message);
+      console.log(`[MealImageService] Setup required: The "${BUCKET_NAME}" bucket is not accessible`);
+      console.log(
+        `[MealImageService] Fix: Ensure bucket RLS policies allow anon/public INSERT (like pantryItems bucket)`
+      );
       return false;
     }
 
     bucketInitialized = true;
-    console.log(`[MealImageService] ✅ Bucket "${BUCKET_NAME}" is accessible`);
+    console.log(`[MealImageService] OK: Bucket "${BUCKET_NAME}" is accessible`);
     return true;
   } catch (error) {
-    console.log(`[MealImageService] ❌ Error checking bucket:`, error);
+    console.log(`[MealImageService] ERROR: Error checking bucket:`, error);
     return false;
   }
 }
@@ -88,7 +90,7 @@ function sanitizeMealName(mealName: string): string {
  */
 async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
   try {
-    console.log(`[MealImageService] 🔧 Starting compression for image...`);
+    console.log(`[MealImageService] Starting compression for image...`);
 
     // Step 1: Download to temp file (ImageManipulator needs file URI)
     const cacheDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
@@ -97,7 +99,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
       return null;
     }
     const tempPath = `${cacheDir}temp-meal-${Date.now()}.png`;
-    console.log(`[MealImageService] 📥 Downloading to temp: ${tempPath}`);
+    console.log(`[MealImageService] Downloading to temp: ${tempPath}`);
 
     const downloadResult = await FileSystem.downloadAsync(imageUrl, tempPath);
 
@@ -113,7 +115,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
     }
 
     const originalSizeMB = (originalInfo.size / (1024 * 1024)).toFixed(2);
-    console.log(`[MealImageService] 📊 Original size: ${originalSizeMB}MB`);
+    console.log(`[MealImageService] Original size: ${originalSizeMB}MB`);
 
     // Step 2: Compress with ImageManipulator
     const manipResult = await ImageManipulator.manipulateAsync(
@@ -127,7 +129,7 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
       }
     );
 
-    console.log(`[MealImageService] ✅ Compressed to: ${manipResult.uri}`);
+    console.log(`[MealImageService] OK: Compressed to: ${manipResult.uri}`);
 
     // Step 3: Read compressed file as base64
     const compressedBase64 = await FileSystem.readAsStringAsync(manipResult.uri, {
@@ -143,21 +145,23 @@ async function compressImage(imageUrl: string): Promise<Uint8Array | null> {
 
     const compressedSizeMB = (bytes.length / (1024 * 1024)).toFixed(2);
     const compressedSizeKB = (bytes.length / 1024).toFixed(0);
-    console.log(`[MealImageService] ✅ Compressed size: ${compressedSizeMB}MB (${compressedSizeKB}KB)`);
-    console.log(`[MealImageService] 📉 Size reduction: ${((1 - bytes.length / originalInfo.size) * 100).toFixed(1)}%`);
+    console.log(`[MealImageService] OK: Compressed size: ${compressedSizeMB}MB (${compressedSizeKB}KB)`);
+    console.log(
+      `[MealImageService] Size reduction: ${((1 - bytes.length / originalInfo.size) * 100).toFixed(1)}%`
+    );
 
     // Step 5: Cleanup temp files
     try {
       await FileSystem.deleteAsync(tempPath, { idempotent: true });
       await FileSystem.deleteAsync(manipResult.uri, { idempotent: true });
-      console.log(`[MealImageService] 🗑️ Cleaned up temp files`);
+      console.log(`[MealImageService] Cleaned up temp files`);
     } catch (cleanupError) {
-      console.warn(`[MealImageService] ⚠️ Cleanup failed:`, cleanupError);
+      console.warn(`[MealImageService] WARN: Cleanup failed:`, cleanupError);
     }
 
     return bytes;
   } catch (error) {
-    console.log(`[MealImageService] ❌ Compression failed:`, error);
+    console.log(`[MealImageService] ERROR: Compression failed:`, error);
     return null;
   }
 }
@@ -188,7 +192,7 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
         .from(BUCKET_NAME)
         .getPublicUrl(jpgFilename);
 
-      console.log(`[MealImageService] ✅ Found existing image: ${jpgFilename}`);
+      console.log(`[MealImageService] OK: Found existing image: ${jpgFilename}`);
       return urlData.publicUrl;
     }
 
@@ -204,7 +208,7 @@ async function checkImageInBucket(filename: string): Promise<string | null> {
         .from(BUCKET_NAME)
         .getPublicUrl(filename);
 
-      console.log(`[MealImageService] ✅ Found existing legacy PNG image: ${filename}`);
+      console.log(`[MealImageService] OK: Found existing legacy PNG image: ${filename}`);
       return urlData.publicUrl;
     }
 
@@ -228,7 +232,7 @@ async function generateMealImage(
     // Create a descriptive prompt for better AI images
     const prompt = `A delicious, appetizing photo of ${mealName}, professional food photography, well-plated, high quality, restaurant-style presentation`;
 
-    console.log(`[MealImageService] 🎨 Generating image for: ${mealName}`);
+    console.log(`[MealImageService] Generating image for: ${mealName}`);
 
     const response = await fetch(`${BASE_URL}/chat/generate-image`, {
       method: "POST",
@@ -260,7 +264,7 @@ async function generateMealImage(
       return null;
     }
 
-    console.log(`[MealImageService] ✅ Image generated successfully`);
+    console.log(`[MealImageService] OK: Image generated successfully`);
     return imageUrl;
   } catch (error) {
     console.log("[MealImageService] Error generating image:", error);
@@ -293,7 +297,9 @@ async function uploadImageToBucket(
         await new Promise(resolve => setTimeout(resolve, delay));
       }
 
-      console.log(`[MealImageService] ⬆️ Uploading image to bucket: ${compressedFilename} (attempt ${attempt}/${retries})`);
+      console.log(
+        `[MealImageService] Uploading image to bucket: ${compressedFilename} (attempt ${attempt}/${retries})`
+      );
 
       // Compress the image (downloads, resizes, compresses to JPEG)
       const compressedBytes = await compressImage(imageUrl);
@@ -308,7 +314,7 @@ async function uploadImageToBucket(
       const sizeKB = (compressedBytes.length / 1024).toFixed(0);
 
       // Upload compressed JPEG to Supabase
-      console.log(`[MealImageService] 📤 Uploading ${sizeMB}MB (${sizeKB}KB) to Supabase...`);
+      console.log(`[MealImageService] Uploading ${sizeMB}MB (${sizeKB}KB) to Supabase...`);
 
       const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
@@ -318,7 +324,7 @@ async function uploadImageToBucket(
         });
 
       if (error) {
-        console.log(`[MealImageService] ❌ Supabase upload error (attempt ${attempt}/${retries}):`, {
+        console.log(`[MealImageService] ERROR: Supabase upload error (attempt ${attempt}/${retries}):`, {
           name: error.name,
           message: error.message,
           statusCode: (error as any).statusCode,
@@ -326,21 +332,21 @@ async function uploadImageToBucket(
         });
 
         // Check if file actually exists despite error (sometimes upload succeeds but returns error)
-        console.log(`[MealImageService] 🔍 Checking if file actually exists despite error...`);
+        console.log(`[MealImageService] Checking if file actually exists despite error...`);
         const { data: fileData, error: listError } = await supabase.storage
           .from(BUCKET_NAME)
           .list('', { search: compressedFilename });
 
         if (!listError && fileData?.some(f => f.name === compressedFilename)) {
-          console.log(`[MealImageService] ✅ File exists in bucket despite error! Using it.`);
+          console.log(`[MealImageService] OK: File exists in bucket despite error. Using it.`);
           // File is there, proceed to get URL
         } else {
-          console.log(`[MealImageService] ❌ File does not exist, error is real`);
+          console.log(`[MealImageService] ERROR: File does not exist. Error is real.`);
           lastError = error;
           continue; // Retry
         }
       } else {
-        console.log(`[MealImageService] ✅ Supabase upload successful:`, data);
+        console.log(`[MealImageService] OK: Supabase upload successful:`, data);
       }
 
       // Get public URL
@@ -356,8 +362,8 @@ async function uploadImageToBucket(
         continue; // Retry
       }
 
-      console.log(`[MealImageService] ✅ Image uploaded successfully on attempt ${attempt}/${retries}`);
-      console.log(`[MealImageService] 🔗 Public URL: ${publicUrl}`);
+      console.log(`[MealImageService] OK: Image uploaded successfully on attempt ${attempt}/${retries}`);
+      console.log(`[MealImageService] Public URL: ${publicUrl}`);
       return publicUrl;
     } catch (error) {
       console.log(`[MealImageService] Error uploading to bucket (attempt ${attempt}/${retries}):`, error);
@@ -367,7 +373,7 @@ async function uploadImageToBucket(
       if (error instanceof Error) {
         const errorMsg = error.message.toLowerCase();
         if (errorMsg.includes('permission') || errorMsg.includes('unauthorized') || errorMsg.includes('forbidden')) {
-          console.log(`[MealImageService] ❌ Permission error - aborting retries`);
+          console.log(`[MealImageService] ERROR: Permission error - aborting retries`);
           break;
         }
       }
@@ -375,7 +381,7 @@ async function uploadImageToBucket(
   }
 
   // All retries failed
-  console.log(`[MealImageService] ❌ Failed to upload after ${retries} attempts:`, lastError);
+  console.log(`[MealImageService] ERROR: Failed to upload after ${retries} attempts:`, lastError);
   return null;
 }
 
@@ -414,7 +420,7 @@ export async function getMealImage(
         const now = Date.now();
         const last = cacheHitLastLog.get(cacheKey) || 0;
         if (now - last > 30000) { // at most once every 30s per cached meal
-          console.log(`[MealImageService] 💾 Cache hit: ${mealName}`);
+          console.log(`[MealImageService] Cache hit: ${mealName}`);
           cacheHitLastLog.set(cacheKey, now);
         }
       }
@@ -422,7 +428,7 @@ export async function getMealImage(
     } else if (cached.failedAt) {
       const now = Date.now();
       if (now - cached.failedAt < COOLDOWN_MS) {
-        console.warn(`[MealImageService] ⏳ Skipping retry for failed meal image: ${mealName}`);
+        console.warn(`[MealImageService] Skipping retry for failed meal image: ${mealName}`);
         return null;
       }
       // else, allow retry (fall through)
@@ -435,7 +441,7 @@ export async function getMealImage(
       const now = Date.now();
       const lastLog = lastLogTimes.get(cacheKey) || 0;
       if (now - lastLog > 10000) { // log at most once every 10s per meal
-        console.log(`[MealImageService] ⏳ Waiting for pending request: ${mealName}`);
+        console.log(`[MealImageService] Waiting for pending request: ${mealName}`);
         lastLogTimes.set(cacheKey, now);
       }
     }
@@ -453,7 +459,7 @@ export async function getMealImage(
       }
 
       // Generate new image (slow, costs money)
-      console.log(`[MealImageService] 🆕 No existing image, generating new one...`);
+      console.log(`[MealImageService] No existing image, generating new one...`);
       const generatedUrl = await generateMealImage(mealName);
       
       if (!generatedUrl) {
@@ -472,7 +478,7 @@ export async function getMealImage(
       } else {
         // CRITICAL: Don't cache temporary generated URLs - they expire!
         // Mark as failed so we retry later, but return temp URL for immediate use
-        console.warn(`[MealImageService] ⚠️ Upload failed for ${mealName}, will retry next time`);
+        console.warn(`[MealImageService] WARN: Upload failed for ${mealName}, will retry next time`);
         imageCache.set(cacheKey, { url: null, failedAt: Date.now() });
         return generatedUrl; // Return temp URL for immediate use only
       }
@@ -504,7 +510,7 @@ export async function getMealImage(
 export async function getMealImagesBatch(
   mealNames: string[]
 ): Promise<Map<string, string | null>> {
-  console.log(`[MealImageService] 📦 Batch fetching ${mealNames.length} images`);
+  console.log(`[MealImageService] Batch fetching ${mealNames.length} images`);
 
   const results = await Promise.allSettled(
     mealNames.map(name => getMealImage(name))
@@ -532,7 +538,7 @@ export async function getMealImagesBatch(
  * @param mealNames - Array of meal names to preload
  */
 export async function preloadMealImages(mealNames: string[]): Promise<void> {
-  console.log(`[MealImageService] 🔄 Preloading ${mealNames.length} images in background`);
+  console.log(`[MealImageService] Preloading ${mealNames.length} images in background`);
   
   // Don't await - let it run in background
   getMealImagesBatch(mealNames).catch(error => {
@@ -544,7 +550,7 @@ export async function preloadMealImages(mealNames: string[]): Promise<void> {
  * Clear in-memory cache (useful for debugging or memory management)
  */
 export function clearImageCache(): void {
-  console.log(`[MealImageService] 🗑️ Clearing cache (${imageCache.size} items)`);
+  console.log(`[MealImageService] Clearing cache (${imageCache.size} items)`);
   imageCache.clear();
 }
 

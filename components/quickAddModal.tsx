@@ -1,13 +1,18 @@
 import ToastBanner from "@/components/generalMessage";
+import AppTextInput from "@/components/ui/AppTextInput";
 import { useUser } from "@/context/usercontext";
-import { upsertPantryItemByName } from "@/src/user/pantry";
+import { listMyPantryItems, upsertPantryItemByName, type PantryItem as ApiPantryItem } from "@/src/user/pantry";
+import { getConfidenceColor } from "@/src/utils/aiApi";
+import { scanImageViaProxy } from "@/src/utils/groceryScanProxy";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
+  FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -20,6 +25,8 @@ import {
   View,
 } from "react-native";
 
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 const { width } = Dimensions.get("window");
 
 // Same options as pantry.tsx
@@ -32,6 +39,15 @@ const UNIT_OPTIONS = [
   "pinch","dash",
 ];
 
+type ScannedItem = {
+  id: string;
+  name: string;
+  quantity: string;
+  unit: string;
+  category: string;
+  confidence?: number;
+};
+
 interface AddProductModalProps {
   visible: boolean;
   onClose: () => void;
@@ -43,10 +59,19 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 }) => {
   const userContext = useUser();
   const activeFamilyId = userContext?.activeFamilyId;
-  const [modalType, setModalType] = useState<"choice" | "single" | null>(null);
+  const loadPantryItems = userContext?.loadPantryItems;
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  const [modalType, setModalType] = useState<"choice" | "single" | "processing" | "confirmation" | "success" | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [productName, setProductName] = useState("");
   const [productQuantity, setProductQuantity] = useState(0);
+
+  // Scanning workflow states
+  const [scannedItems, setScannedItems] = useState<ScannedItem[]>([]);
+  const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // NEW: unit state (same behavior as pantry.tsx)
   const [productUnit, setProductUnit] = useState<string>("");
@@ -133,7 +158,17 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     setProductUnit("");
     setShowUnitDropdown(false);
     setUnitSearch("");
+    // Scanning resets
+    setScannedItems([]);
+    setEditingItem(null);
+    setShowEditModal(false);
+    // Reset toast
+    setToast({ visible: false, type: "info", message: "" });
   };
+
+  // Generate unique ID for scanned items
+  const generateId = () =>
+    Math.random().toString(36).slice(2) + Date.now().toString(36);
 
   // Cooldown timer effect
   useEffect(() => {
@@ -188,7 +223,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
 
     if (status !== "granted") {
-      showToast("error", "Camera permission is required to take photos.", "Permission Denied");
+      showToast("error", "Camera permission is required, Please enable it in settings..", "Permission Denied");
       return;
     }
 
@@ -198,22 +233,131 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
       quality: 0.8,
     });
 
-    if (!result.canceled) {
-      setTimeout(() => {
-        setToast({
-          visible: true,
-          type: "success",
-          title: "Success!",
-          message: "12 items added successfully to your pantry",
-          buttons: [
-            {
-              text: "OK",
-              style: "default",
-              onPress: () => onClose(),
-            },
-          ],
+    if (!result.canceled && result.assets[0]) {
+      const imageUri = result.assets[0].uri;
+      setModalType("processing");
+
+      try {
+        const response = await scanImageViaProxy({
+          uri: imageUri,
+          scanType: "groceries",
         });
-      }, 800);
+
+        if (response.items.length === 0) {
+          showToast("info", "No items detected in the image. Try again with a clearer photo.", "No Items Found");
+          setModalType("choice");
+          return;
+        }
+
+        const items: ScannedItem[] = response.items.map((item) => ({
+          id: generateId(),
+          name: item.name,
+          quantity: item.quantity.split(" ")[0] || "1",
+          unit: item.quantity.split(" ")[1] || "ea",
+          category: item.category.charAt(0).toUpperCase() + item.category.slice(1),
+          confidence: item.confidence,
+        }));
+
+        setScannedItems(items);
+        setModalType("confirmation");
+      } catch (error: any) {
+        console.log("Scan error:", error);
+        let errorMessage = "Failed to scan image. Please try again.";
+
+        if (error.message?.toLowerCase().includes("unauthorized") ||
+            error.message?.toLowerCase().includes("not authenticated")) {
+          errorMessage = "Session expired. Please log in again.";
+        } else if (error.message?.toLowerCase().includes("network")) {
+          errorMessage = "No internet connection. Please check your network.";
+        }
+
+        showToast("error", errorMessage, "Scan Failed");
+        setModalType("choice");
+      }
+    }
+  };
+
+  // Edit scanned item
+  const handleEditItem = (item: ScannedItem) => {
+    setEditingItem({ ...item });
+    setShowEditModal(true);
+  };
+
+  // Save edited item
+  const handleSaveEdit = () => {
+    if (!editingItem) return;
+    setScannedItems((prev) =>
+      prev.map((item) => (item.id === editingItem.id ? editingItem : item))
+    );
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  // Remove scanned item
+  const handleRemoveItem = (itemId: string) => {
+    setScannedItems((prev) => prev.filter((item) => item.id !== itemId));
+  };
+
+  // Add all scanned items to pantry
+  const handleAddAllToPantry = async () => {
+    if (scannedItems.length === 0) return;
+    if (isSubmitting || isButtonDisabled) return;
+
+    setModalType("processing");
+    setIsSubmitting(true);
+
+    try {
+      let snapshot: ApiPantryItem[] | undefined = await listMyPantryItems(
+        activeFamilyId ? { familyId: activeFamilyId } : undefined
+      ).catch((err) => {
+        console.warn("Failed to preload pantry items before merge:", err);
+        return undefined;
+      });
+
+      for (const item of scannedItems) {
+        const parsedQty = parseFloat(item.quantity);
+        const payload = {
+          ingredient_name: item.name.trim(),
+          quantity: Number.isFinite(parsedQty) ? parsedQty : undefined,
+          category: item.category || null,
+          unit: item.unit || null,
+        };
+
+        const result = await upsertPantryItemByName(payload, {
+          existingItems: snapshot,
+          familyId: activeFamilyId ?? null,
+        });
+        snapshot = result.snapshot;
+      }
+
+      if (loadPantryItems) {
+        await loadPantryItems();
+      }
+      setModalType("success");
+    } catch (error: any) {
+      startCooldown(30);
+      console.log("Failed to add items to pantry:", error);
+
+      let errorMessage = "Unable to add items to pantry. ";
+      const errorStr = error.message?.toLowerCase() || "";
+
+      if (errorStr.includes("network") || errorStr.includes("fetch")) {
+        errorMessage = "No internet connection. Please check your network and try again.";
+      } else if (errorStr.includes("timeout")) {
+        errorMessage = "Request timed out. Please try again.";
+      } else if (errorStr.includes("401")) {
+        errorMessage = "Session expired. Please log in again.";
+      } else if (errorStr.includes("429")) {
+        startCooldown(120);
+        errorMessage = "Too many requests. Please wait before trying again.";
+      } else {
+        errorMessage = "Failed to add items. Please try again.";
+      }
+
+      showToast("error", errorMessage, "Failed");
+      setModalType("confirmation");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -299,7 +443,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.optionIconContainer}>
-          <Ionicons name="camera" size={32} color="#10B981" />
+          <Ionicons name="camera" size={32} color={palette.primary} />
         </View>
         <View style={styles.optionTextContainer}>
           <Text style={styles.optionTitle}>Add many products to pantry</Text>
@@ -308,7 +452,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             them to your pantry
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
+        <Ionicons name="chevron-forward" size={20} color={palette.textMuted} />
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -317,7 +461,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         activeOpacity={0.7}
       >
         <View style={styles.optionIconContainer}>
-          <Ionicons name="add-circle" size={32} color="#10B981" />
+          <Ionicons name="add-circle" size={32} color={palette.primary} />
         </View>
         <View style={styles.optionTextContainer}>
           <Text style={styles.optionTitle}>Add 1-2 products to pantry</Text>
@@ -325,7 +469,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             Quickly add a product to your pantry
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color="#B0B0B0" />
+        <Ionicons name="chevron-forward" size={20} color={palette.textMuted} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -353,7 +497,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         style={styles.backButton}
         onPress={() => setModalType("choice")}
       >
-        <Ionicons name="arrow-back" size={24} color="#333" />
+        <Ionicons name="arrow-back" size={24} color={palette.text} />
       </TouchableOpacity>
 
       <Text style={styles.modalTitle}>Add Product</Text>
@@ -407,10 +551,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             style={styles.menuCardIcon}
             resizeMode="contain"
           />
-          <TextInput
+          <AppTextInput
             style={styles.modalTextInput}
             placeholder="Enter product name"
-            placeholderTextColor="#B0B0B0"
+            placeholderTextColor={palette.textMuted}
             value={productName}
             onChangeText={setProductName}
           />
@@ -426,7 +570,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             <TextInput
               style={styles.modalTextInput}
               placeholder="Quantity"
-              placeholderTextColor="#B0B0B0"
+              placeholderTextColor={palette.textMuted}
               keyboardType="numeric"
               value={productQuantity.toString()}
               onChangeText={(text) => setProductQuantity(Number(text))}
@@ -457,10 +601,10 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
             {showUnitDropdown && (
               <View style={styles.unitDropdown}>
                 <View style={styles.unitSearchBar}>
-                  <TextInput
+                  <AppTextInput
                     style={styles.unitSearchInput}
                     placeholder="Search unit…"
-                    placeholderTextColor="#B0B0B0"
+                    placeholderTextColor={palette.textMuted}
                     value={unitSearch}
                     onChangeText={setUnitSearch}
                     autoFocus
@@ -506,7 +650,7 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
 
         <TouchableOpacity style={styles.modalButton} onPress={handleAddSingleProduct}>
           <LinearGradient
-            colors={["#00A86B", "#008F5C"]}
+            colors={[palette.primary, palette.primaryAlt]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.buttonGradient}
@@ -516,6 +660,268 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         </TouchableOpacity>
       </ScrollView>
     </Animated.View>
+  );
+
+  const renderProcessingModal = () => (
+    <Animated.View
+      style={[
+        styles.modalContent,
+        styles.processingModalContent,
+        {
+          opacity: modalAnim,
+          transform: [
+            {
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.modalHandle} />
+      <View style={styles.processingContainer}>
+        <ActivityIndicator size="large" color={palette.primary} />
+        <Text style={styles.processingTitle}>Processing...</Text>
+        <Text style={styles.processingSubtitle}>
+          Identifying your groceries
+        </Text>
+      </View>
+    </Animated.View>
+  );
+
+  const renderConfirmationModal = () => (
+    <Animated.View
+      style={[
+        styles.modalContent,
+        styles.confirmationModalContent,
+        {
+          opacity: modalAnim,
+          transform: [
+            {
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.modalHandle} />
+
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => setModalType("choice")}
+      >
+        <Ionicons name="arrow-back" size={24} color={palette.text} />
+      </TouchableOpacity>
+
+      <Text style={styles.modalTitle}>Confirm Items</Text>
+      <Text style={styles.confirmSubtitle}>
+        Found {scannedItems.length} items. Review before adding to pantry.
+      </Text>
+
+      <FlatList
+        data={scannedItems}
+        keyExtractor={(item) => item.id}
+        style={styles.itemsList}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item, index }) => {
+          const colors = [palette.primary, palette.warning, palette.text];
+          const color = colors[index % 3];
+
+          return (
+            <View style={[styles.itemCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
+              <View style={styles.itemInfo}>
+                <Text style={styles.itemName}>{item.name}</Text>
+                <Text style={styles.itemDetails}>
+                  {item.quantity} {item.unit} • {item.category}
+                </Text>
+                {item.confidence && (
+                  <Text style={[styles.itemConfidence, { color: getConfidenceColor(item.confidence) }]}>
+                    {Math.round(item.confidence * 100)}% confidence
+                  </Text>
+                )}
+              </View>
+              <View style={styles.itemActions}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() => handleEditItem(item)}
+                >
+                  <Ionicons name="pencil" size={18} color={palette.textMuted} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  onPress={() => handleRemoveItem(item.id)}
+                >
+                  <Ionicons name="trash" size={18} color={palette.error} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        }}
+      />
+
+      <TouchableOpacity
+        style={[styles.addAllButton, scannedItems.length === 0 && styles.disabledButton]}
+        onPress={handleAddAllToPantry}
+        disabled={scannedItems.length === 0}
+      >
+        <LinearGradient
+          colors={[palette.primary, palette.primaryAlt]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.buttonGradient}
+        >
+          <Ionicons name="add-circle" size={22} color={palette.white} />
+          <Text style={styles.addAllButtonText}>
+            Add {scannedItems.length} Items to Pantry
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderSuccessModal = () => (
+    <Animated.View
+      style={[
+        styles.modalContent,
+        styles.successModalContent,
+        {
+          opacity: modalAnim,
+          transform: [
+            {
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [50, 0],
+              }),
+            },
+          ],
+        },
+      ]}
+    >
+      <View style={styles.modalHandle} />
+      <View style={styles.successContainer}>
+        <View style={styles.successIconContainer}>
+          <Ionicons name="checkmark-circle" size={70} color={palette.primary} />
+        </View>
+        <Text style={styles.successTitle}>Items Added!</Text>
+        <Text style={styles.successSubtitle}>
+          {scannedItems.length} items have been added to your pantry
+        </Text>
+        <TouchableOpacity
+          style={styles.doneButton}
+          onPress={() => {
+            resetForm();
+            onClose();
+          }}
+        >
+          <LinearGradient
+            colors={[palette.primary, palette.primaryAlt]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.buttonGradient}
+          >
+            <Text style={styles.doneButtonText}>Done</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.scanAgainButton}
+          onPress={() => {
+            setScannedItems([]);
+            setModalType("choice");
+          }}
+        >
+          <Text style={styles.scanAgainButtonText}>Scan More Items</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+
+  const renderEditItemModal = () => (
+    <Modal visible={showEditModal} transparent animationType="slide">
+      <TouchableOpacity
+        style={styles.editModalOverlay}
+        activeOpacity={1}
+        onPress={() => setShowEditModal(false)}
+      >
+        <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.editModalContent}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.editModalTitle}>Edit Item</Text>
+
+            <View style={styles.editField}>
+              <Text style={styles.editLabel}>Name</Text>
+              <AppTextInput
+                style={styles.editInput}
+                value={editingItem?.name || ""}
+                onChangeText={(text) =>
+                  setEditingItem((prev) => (prev ? { ...prev, name: text } : null))
+                }
+                placeholder="Item name"
+              />
+            </View>
+
+            <View style={styles.editRow}>
+              <View style={[styles.editField, { flex: 1 }]}>
+                <Text style={styles.editLabel}>Quantity</Text>
+                <TextInput
+                  style={styles.editInput}
+                  value={editingItem?.quantity || ""}
+                  onChangeText={(text) =>
+                    setEditingItem((prev) => (prev ? { ...prev, quantity: text } : null))
+                  }
+                  placeholder="1"
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={[styles.editField, { flex: 1, marginLeft: 12 }]}>
+                <Text style={styles.editLabel}>Unit</Text>
+                <AppTextInput
+                  style={styles.editInput}
+                  value={editingItem?.unit || ""}
+                  onChangeText={(text) =>
+                    setEditingItem((prev) => (prev ? { ...prev, unit: text } : null))
+                  }
+                  placeholder="ea"
+                />
+              </View>
+            </View>
+
+            <View style={styles.editField}>
+              <Text style={styles.editLabel}>Category</Text>
+              <AppTextInput
+                style={styles.editInput}
+                value={editingItem?.category || ""}
+                onChangeText={(text) =>
+                  setEditingItem((prev) => (prev ? { ...prev, category: text } : null))
+                }
+                placeholder="Category"
+              />
+            </View>
+
+            <View style={styles.editButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveEdit}>
+                <LinearGradient
+                  colors={[palette.primary, palette.primaryAlt]}
+                  style={styles.buttonGradient}
+                >
+                  <Text style={styles.saveButtonText}>Save</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Modal>
   );
 
   return (
@@ -543,30 +949,51 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
           >
             {modalType === "choice" && renderChoiceModal()}
             {modalType === "single" && renderSingleProductModal()}
+            {modalType === "processing" && renderProcessingModal()}
+            {modalType === "confirmation" && renderConfirmationModal()}
+            {modalType === "success" && renderSuccessModal()}
           </TouchableOpacity>
         </TouchableOpacity>
       </KeyboardAvoidingView>
+      {renderEditItemModal()}
     </Modal>
   );
 };
 
-const COLORS = {
-  primary: "#00A86B",
-  white: "#FFFFFF",
-  text: "#0A0A0A",
-  textMuted: "#666666",
-  border: "#E0E0E0",
-  background: "#FAFAFA",
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
 
-const styles = StyleSheet.create({
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  primaryAlt: withAlpha(colors.primary, 0.85),
+  white: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  background: colors.background,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+  successLight: withAlpha(colors.success, 0.12),
+  warningLight: withAlpha(colors.warning, 0.12),
+  errorLight: withAlpha(colors.error, 0.12),
+});
+
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -576,7 +1003,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: COLORS.border,
+    backgroundColor: palette.border,
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 16,
@@ -584,14 +1011,14 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
     marginBottom: 24,
   },
   modalInput: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -599,14 +1026,14 @@ const styles = StyleSheet.create({
   modalTextInput: {
     flex: 1,
     fontSize: 16,
-    color: COLORS.text
+    color: palette.text
   },
   placeholderText: {
-    color: "#B0B0B0"
+    color: palette.textMuted
   },
   dropdownIcon: {
     fontSize: 12,
-    color: COLORS.textMuted
+    color: palette.textMuted
   },
   menuCardIcon: {
     width: 23,
@@ -627,36 +1054,38 @@ const styles = StyleSheet.create({
   modalButton: {
     borderRadius: 12,
     overflow: "hidden",
-    shadowColor: COLORS.primary,
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 6,
   },
   buttonGradient: {
+    flexDirection: "row",
     padding: 18,
     alignItems: "center",
+    justifyContent: "center",
   },
   modalButtonText: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.white
+    color: palette.white
   },
   optionCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: palette.background,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: palette.border,
   },
   optionIconContainer: {
     width: 56,
     height: 56,
     borderRadius: 12,
-    backgroundColor: "#ECFDF5",
+    backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -668,12 +1097,12 @@ const styles = StyleSheet.create({
   optionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1F2937",
+    color: palette.text,
     marginBottom: 4,
   },
   optionDescription: {
     fontSize: 13,
-    color: "#6B7280",
+    color: palette.textMuted,
     lineHeight: 18,
   },
   backButton: {
@@ -686,37 +1115,37 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F9FAFB",
+    backgroundColor: palette.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: palette.border,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    color: "#1F2937",
+    color: palette.text,
     marginLeft: 12,
   },
   inputText: {
     flex: 1,
     fontSize: 15,
-    color: "#1F2937",
+    color: palette.text,
     marginLeft: 12,
   },
   placeholder: {
-    color: "#B0B0B0",
+    color: palette.textMuted,
   },
   dropdown: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     marginTop: -8,
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -733,26 +1162,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   dropdownItemSelected: {
-    backgroundColor: "#E8F8F1"
+    backgroundColor: palette.primaryLight
   },
   dropdownItemText: {
     fontSize: 16,
-    color: COLORS.text
+    color: palette.text
   },
   dropdownItemTextSelected: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "600"
   },
   dropdownCheck: {
     fontSize: 16,
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "700"
   },
   uploadContainer: {
-    backgroundColor: "#F9FAFB",
+    backgroundColor: palette.background,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#E5E7EB",
+    borderColor: palette.border,
     borderStyle: "dashed",
     paddingVertical: 40,
     alignItems: "center",
@@ -761,16 +1190,16 @@ const styles = StyleSheet.create({
   },
   uploadText: {
     fontSize: 14,
-    color: "#9CA3AF",
+    color: palette.textMuted,
     marginTop: 8,
   },
   addButton: {
-    backgroundColor: "#10B981",
+    backgroundColor: palette.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#10B981",
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -779,7 +1208,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 17,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: palette.white,
   },
 
   /* ===== Unit picker styles (matches pantry.tsx) ===== */
@@ -787,22 +1216,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 14,
   },
   unitPickerText: {
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitDropdown: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     marginTop: 6,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -819,15 +1248,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   unitSearchInput: {
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 12,
     fontSize: 15,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitOption: {
     flexDirection: "row",
@@ -837,14 +1266,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   unitOptionSelected: {
-    backgroundColor: "#E8F8F2",
+    backgroundColor: palette.primaryLight,
   },
   unitOptionText: {
     fontSize: 15,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitOptionTextSelected: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "600",
   },
   unitEmpty: {
@@ -853,6 +1282,238 @@ const styles = StyleSheet.create({
   },
   unitEmptyText: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
+  },
+
+  /* ===== Processing Modal Styles ===== */
+  processingModalContent: {
+    minHeight: 280,
+    justifyContent: "center",
+  },
+  processingContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  processingTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: palette.text,
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  processingSubtitle: {
+    fontSize: 15,
+    color: palette.textMuted,
+    textAlign: "center",
+  },
+
+  /* ===== Confirmation Modal Styles ===== */
+  confirmationModalContent: {
+    maxHeight: "80%",
+    minHeight: 400,
+  },
+  confirmSubtitle: {
+    fontSize: 14,
+    color: palette.textMuted,
+    textAlign: "center",
+    marginBottom: 16,
+    marginTop: -16,
+  },
+  itemsList: {
+    maxHeight: 350,
+    marginBottom: 16,
+  },
+  itemCard: {
+    flexDirection: "row",
+    backgroundColor: palette.white,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: palette.border,
+    shadowColor: palette.text,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  itemInfo: {
+    flex: 1,
+  },
+  itemName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: palette.text,
+    marginBottom: 3,
+  },
+  itemDetails: {
+    fontSize: 13,
+    color: palette.textMuted,
+    marginBottom: 2,
+  },
+  itemConfidence: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  itemActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  editButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: palette.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: palette.errorLight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  addAllButton: {
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  addAllButtonText: {
+    color: palette.white,
+    fontSize: 16,
+    fontWeight: "700",
+    marginLeft: 8,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+
+  /* ===== Success Modal Styles ===== */
+  successModalContent: {
+    minHeight: 350,
+  },
+  successContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  successIconContainer: {
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: "700",
+    color: palette.text,
+    marginBottom: 8,
+  },
+  successSubtitle: {
+    fontSize: 15,
+    color: palette.textMuted,
+    textAlign: "center",
+    marginBottom: 28,
+  },
+  doneButton: {
+    width: "100%",
+    borderRadius: 12,
+    overflow: "hidden",
+    shadowColor: palette.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+    marginBottom: 12,
+  },
+  doneButtonText: {
+    color: palette.white,
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  scanAgainButton: {
+    width: "100%",
+    backgroundColor: palette.background,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+  scanAgainButtonText: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  /* ===== Edit Item Modal Styles ===== */
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: withAlpha(palette.text, 0.5),
+    justifyContent: "flex-end",
+  },
+  editModalContent: {
+    backgroundColor: palette.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  editModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: palette.text,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  editField: {
+    marginBottom: 16,
+  },
+  editRow: {
+    flexDirection: "row",
+  },
+  editLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: palette.text,
+    marginBottom: 8,
+  },
+  editInput: {
+    backgroundColor: palette.background,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: palette.text,
+    borderWidth: 1,
+    borderColor: palette.border,
+  },
+  editButtons: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: palette.background,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    color: palette.text,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  saveButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: "hidden",
+  },
+  saveButtonText: {
+    color: palette.white,
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

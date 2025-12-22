@@ -11,16 +11,16 @@ The issue was in `/app/(main)/(home)/main.tsx` where refs were being assigned to
 let itemRef;
 if (item.title === 'Pantry') itemRef = pantryRef;
 else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
-else if (item.title === 'Grocery') itemRef = groceryRef;  // ❌ WRONG!
+else if (item.title === 'Grocery') itemRef = groceryRef;  //  WRONG!
 else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
 ```
 
 The problem: The menu item was actually titled **"Grocery Lists"**, not "Grocery", so the `groceryRef` was never assigned to any element!
 
 ### Tutorial Flow
-1. Step 1 (Pantry) ✅ - Works
-2. Step 2 (Meal Plans) ✅ - Works  
-3. **Step 3 (Grocery) ❌ - BREAKS HERE** - No target measurement available
+1. Step 1 (Pantry)  - Works
+2. Step 2 (Meal Plans)  - Works  
+3. **Step 3 (Grocery)  - BREAKS HERE** - No target measurement available
 4. Steps 4-10 - Never reached
 
 When the tutorial tried to advance to step 3, it looked for the `grocery` target measurement, but since the ref was never assigned, the measurement was `undefined`. The `HomeTutorial` component then returned `null` (lines 304-306), causing the tutorial to disappear completely.
@@ -35,7 +35,7 @@ Changed the condition to match the actual menu item title:
 let itemRef;
 if (item.title === 'Pantry') itemRef = pantryRef;
 else if (item.title === 'Meal Plans') itemRef = mealPlansRef;
-else if (item.title === 'Grocery Lists') itemRef = groceryRef;  // ✅ CORRECT!
+else if (item.title === 'Grocery Lists') itemRef = groceryRef;  //  CORRECT!
 else if (item.title === 'Quick Meals') itemRef = quickMealsRef;
 ```
 

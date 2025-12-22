@@ -325,7 +325,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
         item.canonical_unit === undefined
     );
     if (itemsWithNullCanonical.length > 0) {
-      console.warn("\n[GroceryListContext] ⚠️ WARNING: Items with NULL canonical values:");
+      console.warn("\n[GroceryListContext] WARNING: Items with NULL canonical values:");
       itemsWithNullCanonical.forEach((item: GroceryListItemSummary) => {
         console.warn(`  - ${item.ingredient_name}: canonical_quantity_needed=${item.canonical_quantity_needed}, canonical_unit=${item.canonical_unit}`);
       });
@@ -370,7 +370,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
           item.canonical_unit === undefined
       );
       if (pantryItemsWithNullCanonical.length > 0) {
-        console.warn("\n[GroceryListContext] ⚠️ WARNING: Pantry items with NULL canonical values:");
+        console.warn("\n[GroceryListContext] WARNING: Pantry items with NULL canonical values:");
         pantryItemsWithNullCanonical.forEach((item: PantryItem) => {
           console.warn(`  - ${item.ingredient_name}: canonical_quantity=${item.canonical_quantity}, canonical_unit=${item.canonical_unit}`);
         });
@@ -408,7 +408,9 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
         (item: GroceryListItemSummary) => item.ingredient_id === null || item.ingredient_id === undefined
       );
       if (groceryItemsWithNullIngredientId.length > 0) {
-        console.warn("\n[GroceryListContext] ⚠️ WARNING: Grocery items with NULL ingredient_id (won't match pantry):");
+        console.warn(
+          "\n[GroceryListContext] WARNING: Grocery items with NULL ingredient_id (won't match pantry):"
+        );
         groceryItemsWithNullIngredientId.forEach((item: GroceryListItemSummary) => {
           console.warn(`  - ${item.ingredient_name}`);
         });
@@ -418,7 +420,7 @@ export const GroceryListProvider: React.FC<{ children: React.ReactNode }> = ({ c
         (item: PantryItem) => item.ingredient_id === null || item.ingredient_id === undefined
       );
       if (pantryItemsWithNullIngredientId.length > 0) {
-        console.warn("\n[GroceryListContext] ⚠️ WARNING: Pantry items with NULL ingredient_id:");
+        console.warn("\n[GroceryListContext] WARNING: Pantry items with NULL ingredient_id:");
         pantryItemsWithNullIngredientId.forEach((item: PantryItem) => {
           console.warn(`  - ${item.ingredient_name}`);
         });

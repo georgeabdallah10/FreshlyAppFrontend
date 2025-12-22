@@ -11,7 +11,9 @@ import {
   removeFamilyMember,
 } from "@/src/user/family";
 import { useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 import FamilyMemberFlow from "../../(auth)/familyAuth";
 
@@ -41,6 +43,9 @@ const FamilyManagementScreen = () => {
   const router = useRouter();
   const userContext = useUser();
   const familyContext = useFamilyContext();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   const user = userContext?.user;
   const families = familyContext?.families ?? [];
@@ -223,7 +228,6 @@ const FamilyManagementScreen = () => {
       if (refreshFamilies) {
         await refreshFamilies();
       }
-      router.replace("/(auth)/familyAuth");
     } catch (error) {
       console.log("Error leaving family:", error);
       throw error;
@@ -253,7 +257,7 @@ const FamilyManagementScreen = () => {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#10B981" />
+          <ActivityIndicator size="large" color={palette.primary} />
         </View>
       </View>
     );
@@ -304,17 +308,23 @@ const FamilyManagementScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFBFC",
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  primary: colors.primary,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 40,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+  });
 
 export default FamilyManagementScreen;

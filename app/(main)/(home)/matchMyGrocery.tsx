@@ -1,5 +1,7 @@
 import ToastBanner from "@/components/generalMessage";
 import PantryItemImage from "@/components/pantry/PantryItemImage";
+import AppTextInput from "@/components/ui/AppTextInput";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
 import React, { useState, useRef, useEffect } from "react";
 import {
@@ -31,6 +33,7 @@ type ScreenStep = "list" | "match" | "summary";
 
 export default function MatchMyGroceryScreen() {
   const router = useRouter();
+  const bottomNavInset = useBottomNavInset();
   const [currentStep, setCurrentStep] = useState<ScreenStep>("list");
   const [groceryItems, setGroceryItems] = useState<GroceryItem[]>([]);
 
@@ -296,7 +299,7 @@ export default function MatchMyGroceryScreen() {
     >
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 110 }]}
         showsVerticalScrollIndicator={false}
       >
         {groceryItems.map((item, index) => (
@@ -335,7 +338,7 @@ export default function MatchMyGroceryScreen() {
         ))}
       </ScrollView>
 
-      <View style={styles.bottomButton}>
+      <View style={[styles.bottomButton, { bottom: bottomNavInset }]}>
         <TouchableOpacity style={styles.mainButton} onPress={handleNext}>
           <Text style={styles.mainButtonText}>Match my grocery</Text>
         </TouchableOpacity>
@@ -353,7 +356,7 @@ export default function MatchMyGroceryScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 110 }]}
         showsVerticalScrollIndicator={false}
       >
         {groceryItems.map((item) => (
@@ -421,7 +424,7 @@ export default function MatchMyGroceryScreen() {
         ))}
       </ScrollView>
 
-      <View style={styles.bottomButton}>
+      <View style={[styles.bottomButton, { bottom: bottomNavInset }]}>
         <TouchableOpacity style={styles.mainButton} onPress={handleNext}>
           <Text style={styles.mainButtonText}>Add My Cart</Text>
         </TouchableOpacity>
@@ -448,7 +451,7 @@ export default function MatchMyGroceryScreen() {
     >
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 110 }]}
         showsVerticalScrollIndicator={false}
       >
         {groceryItems.map((item) => {
@@ -508,7 +511,7 @@ export default function MatchMyGroceryScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.bottomButton}>
+      <View style={[styles.bottomButton, { bottom: bottomNavInset }]}>
         <TouchableOpacity
           style={styles.mainButton}
           onPress={() => {
@@ -584,7 +587,7 @@ export default function MatchMyGroceryScreen() {
               <View style={styles.modalBody}>
                 <View style={styles.inputGroup}>
                   <Text style={styles.inputLabel}>Name</Text>
-                  <TextInput
+                  <AppTextInput
                     style={styles.textInput}
                     value={editingItem.name}
                     onChangeText={(text) =>
@@ -610,7 +613,7 @@ export default function MatchMyGroceryScreen() {
 
                   <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
                     <Text style={styles.inputLabel}>Unit</Text>
-                    <TextInput
+                    <AppTextInput
                       style={styles.textInput}
                       value={editingItem.unit}
                       onChangeText={(text) =>
@@ -711,7 +714,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 100,
   },
   itemCard: {
     flexDirection: "row",

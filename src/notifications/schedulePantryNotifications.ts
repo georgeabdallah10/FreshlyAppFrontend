@@ -112,9 +112,8 @@ async function scheduleExpiringSoonNotification(
   try {
     const identifier = `${NOTIFICATION_IDENTIFIER_PREFIX}${item.id}`;
 
-    const title = daysUntilExpiration === 0
-      ? '🍊 Pantry Item Expires Today!'
-      : `🍊 Pantry Item Expiring Soon`;
+    const title =
+      daysUntilExpiration === 0 ? "Pantry Item Expires Today" : "Pantry Item Expiring Soon";
 
     const body = daysUntilExpiration === 0
       ? `${item.name} expires today! Use it before it goes bad.`
@@ -174,7 +173,7 @@ async function scheduleExpiredItemNotification(
   try {
     const identifier = `${NOTIFICATION_IDENTIFIER_PREFIX}expired-${item.id}`;
 
-    const title = '⚠️ Expired Pantry Item';
+    const title = "Expired Pantry Item";
     const body = daysExpired === 0
       ? `${item.name} expired today. Check if it's still safe to use.`
       : `${item.name} expired ${daysExpired} day${daysExpired > 1 ? 's' : ''} ago. Consider removing it.`;

@@ -2,7 +2,7 @@ import { BASE_URL } from "../env/baseUrl";
 import { Storage } from "../utils/storage";
 
 
-export async function getAllmealsforSignelUser(){
+export async function getAllMealsForSingleUser(){
     const token = await Storage.getItem("access_token");
     try {
         const res = await fetch(`${BASE_URL}/meals/me`,
@@ -63,7 +63,7 @@ export type CreateMealInput = {
   family_id?: number; // Optional: if provided, meal belongs to family and can be shared
 };
 
-export async function createMealForSignleUser(input: CreateMealInput) {
+export async function createMealForSingleUser(input: CreateMealInput) {
   const token = await Storage.getItem("access_token");
   const body = toApiMeal(input);
 
@@ -113,10 +113,10 @@ function toApiMeal(meal: CreateMealInput) {
     // Optional: if meal belongs to a family, it can be shared
     ...(meal.family_id && { family_id: meal.family_id }),
 
-    // 👇 map camelCase → snake_case inside items
+    // Map camelCase -> snake_case inside items
     ingredients: (meal.ingredients ?? []).map(it => ({
       name: String(it.name ?? ""),           // ensure string
-      amount: String(it.amount ?? ""),       // 🔧 force to string
+      amount: String(it.amount ?? ""),       // Force to string
       in_pantry: Boolean(it.inPantry),       // camelCase → snake_case + boolean
     })),
 
@@ -130,7 +130,7 @@ function toApiMeal(meal: CreateMealInput) {
   return apiMeal;
 }
 
-export async function updateMealForSignleUser(mealId: number, input: CreateMealInput) {
+export async function updateMealForSingleUser(mealId: number, input: CreateMealInput) {
   const token = await Storage.getItem("access_token");
   const body = toApiMeal(input); // backend expects full payload, not partial
 
@@ -152,7 +152,7 @@ export async function updateMealForSignleUser(mealId: number, input: CreateMealI
   return res.json(); // MealOut
 }
 
-export async function deleteMealForSignleUser(mealId: number) {
+export async function deleteMealForSingleUser(mealId: number) {
   const token = await Storage.getItem("access_token");
 
   const res = await fetch(`${BASE_URL}/meals/me/${mealId}`, {

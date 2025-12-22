@@ -12,6 +12,7 @@ import { type UserSearchResult } from '@/src/services/user.service';
 import { listFamilyMembers } from '@/src/user/family';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
+import AppTextInput from '@/components/ui/AppTextInput';
 import {
   ActivityIndicator,
   Animated,
@@ -22,7 +23,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   UIManager,
   View,
@@ -456,13 +456,11 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
             {/* Search Input */}
             <View style={styles.searchInputWrapper}>
               <Ionicons name="search" size={18} color="#9CA3AF" style={styles.searchIcon} />
-              <TextInput
+              <AppTextInput
                 style={styles.searchInput}
                 placeholder="Search by name or email..."
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                autoCorrect={false}
-                autoCapitalize="none"
                 placeholderTextColor="#9CA3AF"
               />
               {searchQuery.length > 0 && (
@@ -590,7 +588,7 @@ const SendShareRequestModal: React.FC<SendShareRequestModalProps> = ({
                   },
                 ]}
               >
-                <TextInput
+                <AppTextInput
                   style={styles.messageInputCompact}
                   placeholder="e.g., Try this amazing recipe!"
                   value={message}

@@ -3,10 +3,22 @@ import ToastBanner from "@/components/generalMessage";
 import MealDetailScreen from '@/components/meal/mealDetailScreen';
 import MealListScreen from '@/components/meal/mealListScreen';
 import { type Meal } from '@/components/meal/mealsData';
-import { getAllmealsforSignelUser } from '@/src/user/meals';
+import { useThemeContext } from '@/context/ThemeContext';
+import { getAllMealsForSingleUser } from '@/src/user/meals';
+import { ColorTokens } from '@/theme/colors';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StatusBar, StyleSheet } from 'react-native';
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  primary: colors.primary,
+});
+
 type Screen = 'list' | 'detail';
 
 type ToastType = "success" | "error";
@@ -20,6 +32,10 @@ interface ToastState {
 
 const MealsDashboard: React.FC = () => {
   const { scrollToEnd } = useLocalSearchParams<{ scrollToEnd?: string }>();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+
   const [currentScreen, setCurrentScreen] = useState<Screen>('list');
   const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,7 +108,7 @@ const MealsDashboard: React.FC = () => {
       try {
         setIsLoading(true);
         setHasError(false);
-        const res = await getAllmealsforSignelUser();
+        const res = await getAllMealsForSingleUser();
         if (!res?.ok) {
           const errText = await res?.text();
           showToast("error", errText || "Failed to fetch meals.");
@@ -120,7 +136,7 @@ const MealsDashboard: React.FC = () => {
         { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }
       ]}
     >
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       {currentScreen === 'list' ? (
         <MealListScreen 
           onMealSelect={handleMealSelect}
@@ -144,10 +160,10 @@ const MealsDashboard: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F7FA',
+    backgroundColor: palette.background,
   },
 });
 

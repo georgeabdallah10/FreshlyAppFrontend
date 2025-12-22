@@ -13,6 +13,7 @@ import {
   useReceivedShareRequests,
   useSentShareRequests,
 } from '@/hooks/useMealShare';
+import { useScrollContentStyle } from '@/hooks/useBottomNavInset';
 import { MealShareRequest, type BasicUserSummary, type MealShareMealDetail, type ShareRequestStatus } from '@/src/services/mealShare.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -83,6 +84,7 @@ const MealMacros = ({ meal }: { meal?: MealShareMealDetail }) => {
 
 const MealShareRequestsScreen = () => {
   const router = useRouter();
+  const scrollContentStyle = useScrollContentStyle();
   const [activeTab, setActiveTab] = useState<Tab>('received');
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<{
@@ -435,7 +437,7 @@ const MealShareRequestsScreen = () => {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />

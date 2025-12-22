@@ -2713,8 +2713,8 @@ GENERATE MODE Rules:
       />
 
       <View style={[styles.inputContainer, { marginBottom: isKeyboardVisible ? 0 : bottomNavInset }]}>
-        {/* Floating Family Context Button */}
-        {isInFamily && families && families.length > 0 && (
+        {/* Floating Family Context Button (only when composer focused) */}
+        {isInputExpanded && isInFamily && families && families.length > 0 && (
           <TouchableOpacity
             style={styles.familyContextButton}
             onPress={handleFamilyContextPress}
@@ -2935,8 +2935,8 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
+    paddingTop: 6,
+    paddingBottom: 1,
     backgroundColor: palette.card,
     borderBottomWidth: 1,
     borderBottomColor: palette.border,
@@ -2948,11 +2948,12 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
+    elevation: 1,
   },
   backIcon: {
     fontSize: 22,
@@ -2964,6 +2965,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     fontWeight: "600",
     color: palette.text,
     textAlign: "center",
+    marginBottom: 10
   },
   headerLeftActions: {
     position: "absolute",
@@ -2988,6 +2990,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     backgroundColor: palette.primarySoft,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 20,
   },
   headerButton: {
     width: 40,
@@ -2996,6 +2999,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     backgroundColor: palette.primarySoft,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: 20,
   },
   conversationOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -3152,7 +3156,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
   inputContainer: {
     paddingHorizontal: 12,
     paddingTop: 8,
-    paddingBottom: 24,
+    paddingBottom: 12,
     backgroundColor: palette.card,
     borderTopWidth: 1,
     borderTopColor: palette.border,
@@ -3239,6 +3243,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
+    marginBottom: 0,
   },
   modalOverlay: {
     flex: 1,
@@ -3546,7 +3551,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     shadowOffset: { width: 0, height: 2 },
     elevation: 5,
     gap: 6,
-    marginBottom: 12,
+    marginBottom: 6,
     alignSelf: "flex-start",
   },
   familyContextButtonText: {
@@ -3562,7 +3567,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 12,
-    marginBottom: 10,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: withAlpha(palette.primary, 0.2),
     gap: 10,

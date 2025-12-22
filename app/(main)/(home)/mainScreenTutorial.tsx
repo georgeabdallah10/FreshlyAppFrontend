@@ -34,7 +34,7 @@ const TUTORIAL_STEPS = [
   {
     order: 1,
     name: 'welcome',
-    title: 'Welcome to SAVR! 🍊',
+    title: 'Welcome to SAVR!',
     text: "Let's explore your main dashboard and discover how SAVR makes meal planning effortless.",
   },
   {
@@ -70,7 +70,7 @@ const TUTORIAL_STEPS = [
   {
     order: 7,
     name: 'complete',
-    title: "You're All Set! 🎉",
+    title: "You're All Set!",
     text: 'Smarter shopping and healthier eating starts now. Enjoy your SAVR experience!',
   },
 ];
@@ -250,7 +250,7 @@ export const hasSeenTutorial = async (): Promise<boolean> => {
 export const markTutorialComplete = async (): Promise<void> => {
   try {
     await AsyncStorage.setItem(TUTORIAL_KEY, 'true');
-    console.log('✅ Tutorial marked as complete');
+    console.log('Tutorial marked as complete');
   } catch (error) {
     console.log('Error saving tutorial status:', error);
   }
@@ -259,7 +259,7 @@ export const markTutorialComplete = async (): Promise<void> => {
 export const resetTutorial = async (): Promise<void> => {
   try {
     await AsyncStorage.removeItem(TUTORIAL_KEY);
-    console.log('🔄 Tutorial reset - will show on next app launch');
+    console.log('Tutorial reset - will show on next app launch');
   } catch (error) {
     console.log('Error resetting tutorial:', error);
   }
@@ -277,7 +277,7 @@ const MainScreenTutorialBase: React.FC<MainScreenTutorialProps & CopilotProps> =
     const checkTutorial = async () => {
       try {
         if (DEV_MODE) {
-          console.log('🔧 DEV_MODE: Tutorial will be shown');
+          console.log('DEV_MODE: Tutorial will be shown');
           setTutorialReady(true);
           return;
         }
@@ -285,10 +285,10 @@ const MainScreenTutorialBase: React.FC<MainScreenTutorialProps & CopilotProps> =
         const hasSeen = await hasSeenTutorial();
         
         if (!hasSeen) {
-          console.log('📚 First time user - showing tutorial');
+          console.log('First time user - showing tutorial');
           setTutorialReady(true);
         } else {
-          console.log('✅ User has seen tutorial - skipping');
+          console.log('User has seen tutorial - skipping');
         }
       } catch (error) {
         console.log('Error checking tutorial status:', error);

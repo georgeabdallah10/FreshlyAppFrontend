@@ -1,12 +1,12 @@
 import { UserProvider } from "@/context/usercontext";
 import { FamilyProvider } from "@/context/familycontext";
 import { GroceryListProvider } from "@/context/groceryListContext";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { ThemeProvider, useThemeContext } from "@/context/ThemeContext";
 import QueryPersistProvider from "@/providers/QueryPersistProvider";
 import {
   DarkTheme,
   DefaultTheme,
-  ThemeProvider,
+  ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
 import { Slot } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -17,24 +17,32 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <>
       <StatusBar hidden={true} />
-      <QueryPersistProvider>
-        <UserProvider>
-          <FamilyProvider>
-            <GroceryListProvider>
-              <ThemeProvider
-                value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
-              >
-                <Slot />
-              </ThemeProvider>
-            </GroceryListProvider>
-          </FamilyProvider>
-        </UserProvider>
-      </QueryPersistProvider>
+      <ThemeProvider>
+        <RootProviders />
+      </ThemeProvider>
     </>
   );
 }
+
+const RootProviders = () => {
+  const { theme } = useThemeContext();
+
+  return (
+    <QueryPersistProvider>
+      <UserProvider>
+        <FamilyProvider>
+          <GroceryListProvider>
+            <NavigationThemeProvider
+              value={theme.mode === "dark" ? DarkTheme : DefaultTheme}
+            >
+              <Slot />
+            </NavigationThemeProvider>
+          </GroceryListProvider>
+        </FamilyProvider>
+      </UserProvider>
+    </QueryPersistProvider>
+  );
+};

@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -26,6 +26,8 @@ import {
 } from "../../src/auth/auth";
 import { useUser } from "@/context/usercontext";
 import { useFamilyContext } from "@/context/familycontext";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -94,6 +96,9 @@ export default function LoginScreen(): React.JSX.Element {
   const router = useRouter();
   const userContext = useUser();
   const familyContext = useFamilyContext();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -538,9 +543,9 @@ export default function LoginScreen(): React.JSX.Element {
               />
               <Text style={styles.brandName}>SAVR</Text>
               <Text style={styles.welcomeText}>
-                <Text style={{ color: "#00A86B" }}>Smarter Shopping.</Text>
+                <Text style={styles.welcomeAccentPrimary}>Smarter Shopping.</Text>
                 {"\n"}
-                <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+                <Text style={styles.welcomeAccentSecondary}>Healthier Living.</Text>
               </Text>
             </View>
           </Animated.View>
@@ -556,7 +561,7 @@ export default function LoginScreen(): React.JSX.Element {
             ]}
           >
             {/* Header */}
-            <Text style={styles.title}>Welcome Back👋</Text>
+            <Text style={styles.title}>Welcome Back</Text>
             <Text style={styles.subtitle}>
               Login to plan smarter, shop better, {"\n"} and eat healthier.
             </Text>
@@ -573,9 +578,9 @@ export default function LoginScreen(): React.JSX.Element {
               >
                 <View style={styles.oauthButtonContent}>
                   {oauthLoading === "google" ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={palette.card} size="small" />
                   ) : (
-                    <Ionicons name="logo-google" size={18} color="#FFFFFF" />
+                    <Ionicons name="logo-google" size={18} color={palette.card} />
                   )}
                   <Text style={styles.oauthButtonText}>
                     Sign in with Google
@@ -596,9 +601,9 @@ export default function LoginScreen(): React.JSX.Element {
                 >
                   <View style={styles.oauthButtonContent}>
                     {oauthLoading === "apple" ? (
-                      <ActivityIndicator color="#111111" size="small" />
+                      <ActivityIndicator color={palette.text} size="small" />
                     ) : (
-                      <Ionicons name="logo-apple" size={18} color="#111111" />
+                      <Ionicons name="logo-apple" size={18} color={palette.text} />
                     )}
                     <Text
                       style={[
@@ -629,16 +634,12 @@ export default function LoginScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/email.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="mail-outline" size={24} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter email"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setEmailFocused(true)}
@@ -656,16 +657,12 @@ export default function LoginScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/lock.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="lock-closed-outline" size={24} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter password"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 onFocus={() => setPasswordFocused(true)}
@@ -678,14 +675,10 @@ export default function LoginScreen(): React.JSX.Element {
                 onPress={() => setShowPassword(!showPassword)}
                 activeOpacity={0.6}
               >
-                <Image
-                  source={
-                    showPassword
-                      ? require(`../../assets/icons/hidepass.png`)
-                      : require(`../../assets/icons/showpass.png`)
-                  }
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={22}
+                  color={palette.textMuted}
                 />
               </TouchableOpacity>
             </Animated.View>
@@ -761,219 +754,249 @@ export default function LoginScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    paddingTop: 50,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-  },
-  logoContainer: {
-    marginTop: 0,
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  logoImage: {
-    width: 150,
-    height: 150,
-  },
-  card: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: 24,
-    padding: 28,
-    marginBottom: 20,
-    marginTop: -30,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#B0B0B0",
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 28,
-  },
-  oauthSection: {
-    marginBottom: 20,
-  },
-  oauthButton: {
-    backgroundColor: "#4285F4",
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  oauthButtonApple: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  oauthButtonActive: {
-    opacity: 0.8,
-  },
-  oauthButtonAppleActive: {
-    opacity: 0.8,
-  },
-  oauthButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  oauthButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  oauthButtonAppleText: {
-    color: "#111111",
-  },
-  oauthDividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  oauthDivider: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#E5E7EB",
-  },
-  oauthDividerText: {
-    fontSize: 12,
-    color: "#9CA3AF",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginHorizontal: 10,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    transitionDelay: "0.2s",
-    transitionProperty: "ease",
-  },
-  inputContainerFocused: {
-    borderColor: "#00C853",
-    borderWidth: 1.5,
-  },
-  iconContainer: {
-    marginRight: 12,
-  },
-  emailIcon: {
-    fontSize: 20,
-    color: "#00C853",
-  },
-  lockIcon: {
-    fontSize: 20,
-    color: "#00C853",
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#111111",
-    fontFamily: "System",
-  },
-  eyeButton: {
-    padding: 4,
-  },
-  eyeIcon: {
-    fontSize: 20,
-    color: "#B0B0B0",
-  },
-  forgotPassword: {
-    fontSize: 15,
-    color: "#111111",
-    textAlign: "right",
-    marginTop: 6,
-    marginBottom: 24,
-    fontWeight: "500",
-  },
-  loginButtonWrapper: {
-    alignItems: "center",
-  },
-  loginButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#00C853",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  loginButtonDisabled: {
-    backgroundColor: "#B0B0B0",
-    shadowColor: "#B0B0B0",
-    shadowOpacity: 0.2,
-  },
-  loginButtonText: {
-    fontSize: 28,
-    color: "#FFFFFF",
-    fontWeight: "300",
-  },
-  cooldownText: {
-    fontSize: 12,
-    color: "#B0B0B0",
-    textAlign: "center",
-    marginTop: 12,
-  },
-  signUpContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 0,
-  },
-  signUpText: {
-    fontSize: 15,
-    color: "#B0B0B0",
-  },
-  signUpLink: {
-    fontSize: 15,
-    color: "#00C853",
-    fontWeight: "600",
-  },
-  menuCardIcon: {
-    width: 26,
-    height: 26,
-  },
-  welcomeText: {
-    fontSize: 22,
-    fontWeight: "500",
-    textAlign: "center",
-    lineHeight: 32,
-    marginTop: 5,
-  },
-  brandName: {
-    fontSize: 56,
-    fontWeight: "700",
-    color: "#00A86B",
-    fontFamily: "System",
-    letterSpacing: -1,
-    marginTop: -30,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  cardAlt: withAlpha(colors.textSecondary, 0.06),
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  accent: colors.warning,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 50,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 20,
+      paddingBottom: 30,
+    },
+    logoContainer: {
+      marginTop: 0,
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    logoImage: {
+      width: 150,
+      height: 150,
+    },
+    card: {
+      backgroundColor: palette.cardAlt,
+      borderRadius: 24,
+      padding: 28,
+      marginBottom: 20,
+      marginTop: -30,
+    },
+    title: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 10,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: 28,
+    },
+    oauthSection: {
+      marginBottom: 20,
+    },
+    oauthButton: {
+      backgroundColor: palette.primary,
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    oauthButtonApple: {
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    oauthButtonActive: {
+      opacity: 0.8,
+    },
+    oauthButtonAppleActive: {
+      opacity: 0.8,
+    },
+    oauthButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    oauthButtonText: {
+      color: palette.card,
+      fontSize: 15,
+      fontWeight: "600",
+      marginLeft: 8,
+    },
+    oauthButtonAppleText: {
+      color: palette.text,
+    },
+    oauthDividerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    oauthDivider: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: palette.border,
+    },
+    oauthDividerText: {
+      fontSize: 12,
+      color: palette.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginHorizontal: 10,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      marginBottom: 14,
+      borderWidth: 1,
+      borderColor: palette.border,
+      transitionDelay: "0.2s",
+      transitionProperty: "ease",
+    },
+    inputContainerFocused: {
+      borderColor: palette.success,
+      borderWidth: 1.5,
+    },
+    iconContainer: {
+      marginRight: 12,
+    },
+    emailIcon: {
+      fontSize: 20,
+      color: palette.success,
+    },
+    lockIcon: {
+      fontSize: 20,
+      color: palette.success,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: palette.text,
+      fontFamily: "System",
+    },
+    eyeButton: {
+      padding: 4,
+    },
+    eyeIcon: {
+      fontSize: 20,
+      color: palette.textMuted,
+    },
+    forgotPassword: {
+      fontSize: 15,
+      color: palette.text,
+      textAlign: "right",
+      marginTop: 6,
+      marginBottom: 24,
+      fontWeight: "500",
+    },
+    loginButtonWrapper: {
+      alignItems: "center",
+    },
+    loginButton: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: palette.success,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 8,
+    },
+    loginButtonDisabled: {
+      backgroundColor: palette.textMuted,
+      shadowColor: palette.textMuted,
+      shadowOpacity: 0.2,
+    },
+    loginButtonText: {
+      fontSize: 28,
+      color: palette.card,
+      fontWeight: "300",
+    },
+    cooldownText: {
+      fontSize: 12,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginTop: 12,
+    },
+    signUpContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 0,
+    },
+    signUpText: {
+      fontSize: 15,
+      color: palette.textMuted,
+    },
+    signUpLink: {
+      fontSize: 15,
+      color: palette.success,
+      fontWeight: "600",
+    },
+    menuCardIcon: {
+      width: 26,
+      height: 26,
+    },
+    welcomeText: {
+      fontSize: 22,
+      fontWeight: "500",
+      textAlign: "center",
+      lineHeight: 32,
+      marginTop: 5,
+      color: palette.text,
+    },
+    welcomeAccentPrimary: {
+      color: palette.primary,
+    },
+    welcomeAccentSecondary: {
+      color: palette.accent,
+    },
+    brandName: {
+      fontSize: 56,
+      fontWeight: "700",
+      color: palette.primary,
+      fontFamily: "System",
+      letterSpacing: -1,
+      marginTop: -30,
+    },
+  });

@@ -1,13 +1,18 @@
 // ==================== screens/MealDetailScreen.tsx ====================
 import ToastBanner from "@/components/generalMessage";
+import AppTextInput from "@/components/ui/AppTextInput";
 import { useGroceryList } from '@/context/groceryListContext';
+import { useThemeContext } from "@/context/ThemeContext";
 import { useUser } from '@/context/usercontext';
+import { useScrollContentStyle } from '@/hooks/useBottomNavInset';
 import {
-  deleteMealForSignleUser,
+  deleteMealForSingleUser,
   toggleMealFavorite,
-  updateMealForSignleUser,
+  updateMealForSingleUser,
 } from "@/src/user/meals";
-import React, { useEffect, useRef, useState } from "react";
+import { ColorTokens } from "@/theme/colors";
+import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -15,7 +20,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -68,7 +72,33 @@ interface ToastState {
   topOffset?: number;
 }
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  accent: colors.warning,
+  accentLight: withAlpha(colors.warning, 0.12),
+  background: colors.background,
+  card: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  error: colors.error,
+  success: colors.success,
+});
+
 const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedMeal, setEditedMeal] = useState<Meal>({ ...meal });
   const [saving, setSaving] = useState(false);
@@ -78,6 +108,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   const [isFavoriting, setIsFavoriting] = useState(false);
   const [addingToGrocery, setAddingToGrocery] = useState(false);
   const favoriteAnimValue = useRef(new Animated.Value(1)).current;
+  const scrollContentStyle = useScrollContentStyle();
 
   // Animation values for entrance
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -159,7 +190,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
     try {
       setSaving(true);
       const payload = buildUpdateInputFromMeal(editedMeal);
-      await updateMealForSignleUser(meal.id, payload as any);
+      await updateMealForSingleUser(meal.id, payload as any);
       setIsEditing(false);
       showToast("success", "Meal updated successfully!");
     } catch (e: any) {
@@ -188,7 +219,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           onPress: async () => {
             try {
               setDeleting(true);
-              await deleteMealForSignleUser(meal.id);
+              await deleteMealForSingleUser(meal.id);
               showToast("success", "Meal deleted successfully.");
               setTimeout(() => onBack(), 500);
             } catch (e: any) {
@@ -235,7 +266,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       showToast(
         "success",
         newFavoriteStatus
-          ? "Meal added to favorites! ❤️"
+          ? "Meal added to favorites"
           : "Meal removed from favorites",
         2500,
         40
@@ -339,9 +370,11 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 opacity: isFavoriting ? 0.6 : 1,
               }}
             >
-              <Text style={styles.favoriteIcon}>
-                {editedMeal.isFavorite ? "❤️" : "🤍"}
-              </Text>
+              <Ionicons
+                name={editedMeal.isFavorite ? "heart" : "heart-outline"}
+                size={20}
+                color={editedMeal.isFavorite ? "#EF4444" : palette.textMuted}
+              />
             </Animated.View>
           </TouchableOpacity>
           
@@ -399,7 +432,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         </View>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} contentContainerStyle={scrollContentStyle} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <View style={styles.heroSection}>
           <View style={styles.heroImage}>
@@ -410,12 +443,17 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 resizeMode="cover"
               />
             ) : (
-              <Text style={styles.heroEmoji}>{editedMeal.image || "🍽"}</Text>
+              <Ionicons
+                name="restaurant-outline"
+                size={56}
+                color={palette.primary}
+                style={styles.heroPlaceholderIcon}
+              />
             )}
           </View>
 
           {isEditing ? (
-            <TextInput
+            <AppTextInput
               style={styles.heroTitleInput}
               value={editedMeal.name}
               onChangeText={(text) =>
@@ -429,19 +467,19 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
 
           <View style={styles.quickStats}>
             <View style={styles.statItem}>
-              <Text style={styles.statIcon}>🔥</Text>
+              <Ionicons name="flame-outline" size={22} color={palette.text} />
               <Text style={styles.statValue}>{editedMeal.calories}</Text>
               <Text style={styles.statLabel}>kcal</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statIcon}>⏱</Text>
+              <Ionicons name="time-outline" size={22} color={palette.text} />
               <Text style={styles.statValue}>{editedMeal.totalTime}</Text>
               <Text style={styles.statLabel}>min</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={styles.statIcon}>👨‍🍳</Text>
+              <Ionicons name="restaurant-outline" size={22} color={palette.text} />
               <Text style={styles.statValue}>{editedMeal.difficulty}</Text>
               <Text style={styles.statLabel}>level</Text>
             </View>
@@ -492,7 +530,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Type</Text>
               {isEditing ? (
-                <TextInput
+                <AppTextInput
                   style={styles.infoInput}
                   value={editedMeal.mealType}
                   onChangeText={(text) =>
@@ -506,18 +544,22 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 <Text style={styles.infoValue}>{editedMeal.mealType}</Text>
               )}
             </View>
+            { editedMeal.cuisine && 
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Cuisine</Text>
               <Text style={styles.infoValue}>{editedMeal.cuisine}</Text>
             </View>
+            }
+            {editedMeal.servings&&
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Servings</Text>
               <Text style={styles.infoValue}>{editedMeal.servings}</Text>
-            </View>
+            </View>}
+            {editedMeal.prepTime && 
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Prep Time</Text>
-              <Text style={styles.infoValue}>{editedMeal.prepTime}m</Text>
-            </View>
+              <Text style={styles.infoValue}>{editedMeal.prepTime}</Text>
+            </View>}
           </View>
         </View>
 
@@ -579,7 +621,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 key={`${goal}-${index}`}
                 style={[styles.pill, styles.pillOrange]}
               >
-                <Text style={styles.pillText}>🎯 {goal}</Text>
+                <Text style={styles.pillText}>{goal}</Text>
               </View>
             ))}
           </View>
@@ -608,7 +650,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 </View>
                 {isEditing ? (
                   <View style={styles.ingredientEditContainer}>
-                    <TextInput
+                    <AppTextInput
                       style={styles.ingredientNameInput}
                       value={ingredient.name}
                       onChangeText={(text) => {
@@ -623,7 +665,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                         });
                       }}
                     />
-                    <TextInput
+                    <AppTextInput
                       style={styles.ingredientAmountInput}
                       value={ingredient.amount}
                       onChangeText={(text) => {
@@ -648,14 +690,14 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                   </View>
                 )}
               </View>
-              {!ingredient.inPantry && !isEditing && (
+              {/*{!ingredient.inPantry && !isEditing && (
                 <TouchableOpacity
                   style={styles.addToListButton}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.addToListText}>+ List</Text>
                 </TouchableOpacity>
-              )}
+              )}*/}
             </View>
           ))}
         </View>
@@ -679,7 +721,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
-                  <Text style={styles.groceryButtonIcon}>🛒</Text>
+                  <Ionicons name="cart-outline" size={18} color="#fff" />
                   <Text style={styles.groceryButtonText}>Personal List</Text>
                 </>
               )}
@@ -693,10 +735,10 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 activeOpacity={0.8}
               >
                 {addingToGrocery ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <>
-                    <Text style={styles.groceryButtonIcon}>👨‍👩‍👧‍👦</Text>
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <>
+                    <Ionicons name="people-outline" size={18} color="#fff" />
                     <Text style={styles.groceryButtonText}>Family List</Text>
                   </>
                 )}
@@ -713,7 +755,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           <View style={styles.toolsContainer}>
             {editedMeal.cookingTools.map((tool, index) => (
               <View key={`${tool}-${index}`} style={styles.toolItem}>
-                <Text style={styles.toolIcon}>🔧</Text>
+                <Ionicons name="construct-outline" size={18} color="#111827" />
                 {isEditing ? (
                   <TextInput
                     style={styles.toolInput}
@@ -741,7 +783,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
                 <Text style={styles.stepNumberText}>{index + 1}</Text>
               </View>
               {isEditing ? (
-                <TextInput
+                <AppTextInput
                   style={styles.stepInput}
                   value={step}
                   multiline
@@ -764,7 +806,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         {/* Personal Notes */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personal Notes</Text>
-          <TextInput
+          <AppTextInput
             style={styles.notesInput}
             value={editedMeal.notes}
             onChangeText={(text) =>
@@ -796,7 +838,6 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
           </View>
         )}
 
-        <View style={{ height: 40 }} />
       </ScrollView>
 
       {/* Share Request Modal */}
@@ -829,8 +870,8 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F7FA", paddingTop: 90 },
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: palette.background, paddingTop: 90 },
 
   header: {
     flexDirection: "row",
@@ -843,7 +884,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#E8F8F1",
+    backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -852,13 +893,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
   },
-  backIcon: { fontSize: 22, color: "#00A86B", fontWeight: "600" },
+  backIcon: { fontSize: 22, color: palette.primary, fontWeight: "600" },
   headerActions: { flexDirection: "row", gap: 12 },
   iconButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -870,11 +911,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  editButtonText: { fontSize: 14, fontWeight: "600", color: "#fff" },
+  editButtonText: { fontSize: 14, fontWeight: "600", color: palette.card },
 
   content: { flex: 1 },
 
@@ -887,7 +928,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
@@ -902,21 +943,21 @@ const styles = StyleSheet.create({
     height: "100%",
     borderRadius: 60,
   },
-  heroEmoji: { fontSize: 60 },
+  heroPlaceholderIcon: { opacity: 0.7 },
   heroTitle: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: palette.text,
     textAlign: "center",
     marginBottom: 16,
   },
   heroTitleInput: {
     fontSize: 26,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: palette.text,
     textAlign: "center",
     marginBottom: 16,
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 12,
     width: "100%",
@@ -924,7 +965,7 @@ const styles = StyleSheet.create({
   quickStats: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 16,
     padding: 20,
     width: "100%",
@@ -936,15 +977,15 @@ const styles = StyleSheet.create({
   },
   statItem: { flex: 1, alignItems: "center" },
   statIcon: { fontSize: 24, marginBottom: 4 },
-  statValue: { fontSize: 20, fontWeight: "700", color: "#1A1A1A" },
-  statLabel: { fontSize: 12, color: "#666" },
-  statDivider: { width: 1, height: 40, backgroundColor: "#E5E5E5" },
+  statValue: { fontSize: 20, fontWeight: "700", color: palette.text },
+  statLabel: { fontSize: 12, color: palette.textMuted },
+  statDivider: { width: 1, height: 40, backgroundColor: palette.border },
 
   section: { paddingHorizontal: 20, marginBottom: 24 },
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#1A1A1A",
+    color: palette.text,
     marginBottom: 12,
   },
 
@@ -957,26 +998,26 @@ const styles = StyleSheet.create({
     borderWidth: 4,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     marginBottom: 8,
   },
-  macroValueLarge: { fontSize: 20, fontWeight: "700", color: "#1A1A1A" },
-  macroLabelLarge: { fontSize: 13, color: "#666", fontWeight: "500" },
+  macroValueLarge: { fontSize: 20, fontWeight: "700", color: palette.text },
+  macroLabelLarge: { fontSize: 13, color: palette.textMuted, fontWeight: "500" },
 
   infoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   infoItem: {
     width: "48%",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 16,
   },
-  infoLabel: { fontSize: 12, color: "#666", marginBottom: 4 },
-  infoValue: { fontSize: 16, fontWeight: "600", color: "#1A1A1A" },
+  infoLabel: { fontSize: 12, color: palette.textMuted, marginBottom: 4 },
+  infoValue: { fontSize: 16, fontWeight: "600", color: palette.text },
   infoInput: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1A1A1A",
-    backgroundColor: "#F5F7FA",
+    color: palette.text,
+    backgroundColor: palette.background,
     borderRadius: 8,
     padding: 8,
   },
@@ -985,21 +1026,21 @@ const styles = StyleSheet.create({
   tag: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
     gap: 6,
   },
-  tagText: { fontSize: 13, fontWeight: "500", color: "#1A1A1A" },
-  tagRemove: { fontSize: 18, color: "#FF3B30", fontWeight: "600" },
+  tagText: { fontSize: 13, fontWeight: "500", color: palette.text },
+  tagRemove: { fontSize: 18, color: palette.error, fontWeight: "600" },
   tagAdd: {
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  tagAddText: { fontSize: 13, fontWeight: "600", color: "#fff" },
+  tagAddText: { fontSize: 13, fontWeight: "600", color: palette.card },
 
   pillsContainer: {
     flexDirection: "row",
@@ -1008,15 +1049,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pill: { borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
-  pillGreen: { backgroundColor: "#E8F5E9" },
-  pillOrange: { backgroundColor: "#FFF3E0" },
-  pillText: { fontSize: 12, fontWeight: "600", color: "#1A1A1A" },
+  pillGreen: { backgroundColor: palette.primaryLight },
+  pillOrange: { backgroundColor: palette.accentLight },
+  pillText: { fontSize: 12, fontWeight: "600", color: palette.text },
 
   ingredientItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
@@ -1032,62 +1073,62 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: "#E5E5E5",
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  ingredientCheckActive: { backgroundColor: "#00A86B", borderColor: "#00A86B" },
-  checkIcon: { fontSize: 14, color: "#fff", fontWeight: "700" },
+  ingredientCheckActive: { backgroundColor: palette.primary, borderColor: palette.primary },
+  checkIcon: { fontSize: 14, color: palette.card, fontWeight: "700" },
   ingredientEditContainer: { flex: 1, gap: 4 },
-  ingredientName: { fontSize: 15, fontWeight: "500", color: "#1A1A1A" },
-  ingredientAmount: { fontSize: 13, color: "#666" },
+  ingredientName: { fontSize: 15, fontWeight: "500", color: palette.text },
+  ingredientAmount: { fontSize: 13, color: palette.textMuted },
   ingredientNameInput: {
     fontSize: 15,
     fontWeight: "500",
-    color: "#1A1A1A",
-    backgroundColor: "#F5F7FA",
+    color: palette.text,
+    backgroundColor: palette.background,
     borderRadius: 8,
     padding: 6,
   },
   ingredientAmountInput: {
     fontSize: 13,
-    color: "#666",
-    backgroundColor: "#F5F7FA",
+    color: palette.textMuted,
+    backgroundColor: palette.background,
     borderRadius: 8,
     padding: 6,
   },
   addToListButton: {
-    backgroundColor: "#FD8100",
+    backgroundColor: palette.accent,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  addToListText: { fontSize: 12, fontWeight: "600", color: "#fff" },
+  addToListText: { fontSize: 12, fontWeight: "600", color: palette.card },
 
   toolsContainer: { gap: 8 },
   toolItem: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 14,
     gap: 12,
   },
   toolIcon: { fontSize: 20 },
-  toolText: { fontSize: 15, fontWeight: "500", color: "#1A1A1A", flex: 1 },
+  toolText: { fontSize: 15, fontWeight: "500", color: palette.text, flex: 1 },
   toolInput: {
     fontSize: 15,
     fontWeight: "500",
-    color: "#1A1A1A",
+    color: palette.text,
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: palette.background,
     borderRadius: 8,
     padding: 8,
   },
 
   stepItem: {
     flexDirection: "row",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -1097,30 +1138,30 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
   },
-  stepNumberText: { fontSize: 14, fontWeight: "700", color: "#fff" },
-  stepText: { flex: 1, fontSize: 15, lineHeight: 22, color: "#1A1A1A" },
+  stepNumberText: { fontSize: 14, fontWeight: "700", color: palette.card },
+  stepText: { flex: 1, fontSize: 15, lineHeight: 22, color: palette.text },
   stepInput: {
     flex: 1,
     fontSize: 15,
     lineHeight: 22,
-    color: "#1A1A1A",
-    backgroundColor: "#F5F7FA",
+    color: palette.text,
+    backgroundColor: palette.background,
     borderRadius: 8,
     padding: 8,
     minHeight: 60,
   },
 
   notesInput: {
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
     borderRadius: 12,
     padding: 16,
     fontSize: 15,
     lineHeight: 22,
-    color: "#1A1A1A",
+    color: palette.text,
     minHeight: 100,
     textAlignVertical: "top",
   },
@@ -1133,20 +1174,20 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: "#F5F7FA",
+    backgroundColor: palette.background,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
   },
-  cancelButtonText: { fontSize: 16, fontWeight: "600", color: "#666" },
+  cancelButtonText: { fontSize: 16, fontWeight: "600", color: palette.textMuted },
   saveButton: {
     flex: 1,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
   },
-  saveButtonText: { fontSize: 16, fontWeight: "600", color: "#fff" },
+  saveButtonText: { fontSize: 16, fontWeight: "600", color: palette.card },
   menuCardIcon: {
     width: 26,
     height: 26,
@@ -1155,7 +1196,7 @@ const styles = StyleSheet.create({
   // Grocery List Styles
   sectionSubtitle: {
     fontSize: 13,
-    color: '#666',
+    color: palette.textMuted,
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -1174,10 +1215,10 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   groceryButtonPersonal: {
-    backgroundColor: '#00A86B',
+    backgroundColor: palette.primary,
   },
   groceryButtonFamily: {
-    backgroundColor: '#FD8100',
+    backgroundColor: palette.accent,
   },
   groceryButtonIcon: {
     fontSize: 20,
@@ -1185,7 +1226,7 @@ const styles = StyleSheet.create({
   groceryButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fff',
+    color: palette.card,
   },
 });
 

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -100,7 +101,7 @@ export default function ForgotPasswordScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Text style={styles.emailIcon}>✉</Text>
+                <Ionicons name="mail-outline" size={22} color="#00C853" />
               </View>
               <TextInput
                 style={styles.input}

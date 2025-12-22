@@ -2,7 +2,7 @@ import RecipeItem from "@/components/meal/mealPreview";
 import { useUser } from "@/context/usercontext";
 import { askAI } from "@/src/home/chat";
 import { getMealImage } from "@/src/services/mealImageService";
-import { createMealForSignleUser } from "@/src/user/meals";
+import { createMealForSingleUser } from "@/src/user/meals";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -13,6 +13,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import AppTextInput from "@/components/ui/AppTextInput";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import {
   Animated,
   Easing,
@@ -21,10 +23,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 type FormState = {
   ingredientSource: "pantry" | "outside";
@@ -49,20 +52,51 @@ type CurrentMeal = {
   onSave: () => Promise<void>;
 };
 
-const COLORS = {
-  bg: "#FFFFFF",
-  text: "#111214",
-  sub: "#6B7280",
-  grey: "#4C4D59",
-  primary: "#00A86B",
-  accent: "#FD8100",
-  card: "#F8F9FA",
-  border: "#E5E7EB",
-  selectedTint: "#E8F5EF",
-  selectedBorder: "#B8E6D5",
-  dangerTint: "#FFF1F0",
-  dangerBorder: "#FFCCC7",
-  disabled: "#D1D5DB",
+const EMPTY_PANTRY: any[] = [];
+
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens, mode: "light" | "dark") => ({
+  bg: colors.background,
+  text: colors.textPrimary,
+  sub: colors.textSecondary,
+  grey: withAlpha(colors.textPrimary, mode === "dark" ? 0.85 : 0.78),
+  primary: colors.primary,
+  accent: colors.warning,
+  card: colors.card,
+  border: colors.border,
+  selectedTint: withAlpha(colors.primary, 0.12),
+  selectedBorder: withAlpha(colors.primary, 0.35),
+  dangerTint: withAlpha(colors.error, 0.12),
+  dangerBorder: withAlpha(colors.error, 0.35),
+  disabled: withAlpha(colors.textSecondary, 0.55),
+  onPrimary: mode === "dark" ? colors.textPrimary : colors.card,
+  overlay: withAlpha(mode === "dark" ? "#000000" : colors.textPrimary, mode === "dark" ? 0.8 : 0.6),
+  overlaySoft: withAlpha(mode === "dark" ? "#000000" : colors.textPrimary, mode === "dark" ? 0.6 : 0.45),
+  overlayStrong: withAlpha(mode === "dark" ? "#000000" : colors.textPrimary, mode === "dark" ? 0.92 : 0.75),
+  shadow: withAlpha(colors.textPrimary, 0.2),
+  shadowStrong: withAlpha(colors.textPrimary, 0.3),
+  success: colors.success,
+  danger: colors.error,
+  mutedSurface: withAlpha(colors.textSecondary, 0.12),
+});
+
+type Palette = ReturnType<typeof createPalette>;
+const useThemedStyles = () => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(
+    () => createPalette(theme.colors, theme.mode),
+    [theme.colors, theme.mode]
+  );
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  return { palette, styles };
 };
 
 const TOTAL_PHASES = 6;
@@ -77,6 +111,7 @@ const OptionRow: React.FC<{
   mode?: "radio" | "check";
   icon?: keyof typeof Ionicons.glyphMap;
 }> = React.memo(({ label, description, selected, onPress, mode = "radio", icon }) => {
+  const { palette, styles } = useThemedStyles();
   const scale = useRef(new Animated.Value(1)).current;
   const checkmarkScale = useRef(new Animated.Value(selected ? 1 : 0)).current;
 
@@ -131,7 +166,7 @@ const OptionRow: React.FC<{
           <Ionicons 
             name={mode === "check" ? "checkmark-sharp" : "checkmark"} 
             size={mode === "check" ? 18 : 16} 
-            color="#fff" 
+            color={palette.onPrimary} 
           />
         </Animated.View>
       </View>
@@ -139,7 +174,7 @@ const OptionRow: React.FC<{
         <Ionicons 
           name={icon} 
           size={20} 
-          color={selected ? COLORS.primary : COLORS.sub} 
+          color={selected ? palette.primary : palette.sub} 
           style={{ marginLeft: -4 }}
         />
       )}
@@ -190,6 +225,7 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
     addAvoid,
     removeAvoid,
   }) => {
+    const { palette, styles } = useThemedStyles();
     return (
       <>
         <Question animateKey={animateKey} title="Include specific ingredients">
@@ -197,12 +233,12 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
             Add ingredients you want in your meal (optional)
           </Text>
           <View style={styles.inputWithButton}>
-            <TextInput
+            <AppTextInput
               style={[styles.input, { flex: 1 }]}
               value={includeInput}
               onChangeText={onChangeIncludeInput}
               placeholder="e.g., Chicken, garlic, spinach"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={palette.sub}
               returnKeyType="done"
               onSubmitEditing={addInclude}
             />
@@ -211,7 +247,7 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
               style={[styles.addButton, !includeInput.trim() && styles.addButtonDisabled]}
               disabled={!includeInput.trim()}
             >
-              <Ionicons name="add" size={22} color="#fff" />
+              <Ionicons name="add" size={22} color={palette.onPrimary} />
             </TouchableOpacity>
           </View>
           {includeIngredients.length > 0 && (
@@ -233,12 +269,12 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
             List ingredients to exclude from your meal (optional)
           </Text>
           <View style={styles.inputWithButton}>
-            <TextInput
+            <AppTextInput
               style={[styles.input, { flex: 1 }]}
               value={avoidInput}
               onChangeText={onChangeAvoidInput}
               placeholder="e.g., Peanuts, dairy, shellfish"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={palette.sub}
               returnKeyType="done"
               onSubmitEditing={addAvoid}
             />
@@ -247,7 +283,7 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
               style={[styles.addButton, styles.addButtonDanger, !avoidInput.trim() && styles.addButtonDisabled]}
               disabled={!avoidInput.trim()}
             >
-              <Ionicons name="add" size={22} color="#fff" />
+              <Ionicons name="add" size={22} color={palette.onPrimary} />
             </TouchableOpacity>
           </View>
           {avoidIngredients.length > 0 && (
@@ -268,12 +304,12 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
           <Text style={styles.helperText}>
             Any special requests or cooking preferences (optional)
           </Text>
-          <TextInput
+          <AppTextInput
             style={[styles.input, styles.textArea]}
             value={additionalInstructions}
             onChangeText={onChangeAdditionalInstructions}
             placeholder="e.g., Make it spicy, extra crispy, low sodium"
-            placeholderTextColor="#9CA3AF"
+            placeholderTextColor={palette.sub}
             returnKeyType="default"
             multiline
             numberOfLines={4}
@@ -286,12 +322,13 @@ const Phase4Block: React.FC<Phase4Props> = React.memo(
 Phase4Block.displayName = "Phase4Block";
 
 const QuickMealsCreateScreen: React.FC = () => {
+  const { palette, styles } = useThemedStyles();
   const router = useRouter();
   const userContext = useUser();
+  const bottomNavInset = useBottomNavInset();
   
-  const user = userContext?.user;
   const prefrences = userContext?.prefrences;
-  const pantryItems = userContext?.pantryItems ?? [];
+  const pantryItems = userContext?.pantryItems ?? EMPTY_PANTRY;
   
   const [currentMeal, setCurrentMeal] = useState<CurrentMeal>({
     name: "",
@@ -385,10 +422,10 @@ const QuickMealsCreateScreen: React.FC = () => {
     }
   }, [isGenerating]);
 
-  const startCooldown = (seconds: number = 30) => {
+  const startCooldown = useCallback((seconds: number = 30) => {
     setIsButtonDisabled(true);
     setCooldownRemaining(seconds);
-  };
+  }, []);
 
   const JSON_DIRECTIVE = `
 OUTPUT FORMAT (REQUIRED)
@@ -435,7 +472,7 @@ Rules:
   const [includeInput, setIncludeInput] = useState("");
   const [avoidInput, setAvoidInput] = useState("");
   const [additionalInstructions, setAdditionalInstructions] = useState("");
-  const [families, setFamilies] = useState<Array<{ id: number; name: string }>>([]);
+  const [families, setFamilies] = useState<{ id: number; name: string }[]>([]);
   const [form, setForm] = useState<FormState>({
     ingredientSource: "pantry",
     budget: null,
@@ -526,6 +563,122 @@ Rules:
     loadFamilies();
   }, []);
 
+  const handleSaveMeal = useCallback(async (mealInput: any) => {
+    if (isSubmitting || isButtonDisabled) {
+      console.log('Already saving or on cooldown');
+    }
+
+    const normalizeMealType = (mt?: string) => {
+      const s = String(mt || '').toLowerCase();
+      const map: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Dessert'> = {
+        breakfast: 'Breakfast',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        snack: 'Snack',
+        dessert: 'Dessert',
+      };
+      return map[s] || 'Dinner';
+    };
+
+    const normalizeDifficulty = (d?: string) => {
+      const s = String(d || '').toLowerCase();
+      const map: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
+        easy: 'Easy',
+        medium: 'Medium',
+        hard: 'Hard',
+      };
+      return map[s] || 'Easy';
+    };
+
+    const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
+
+    let familyId: number | undefined;
+    if (families.length > 0) {
+      familyId = families[0].id;
+    }
+
+    const meal = {
+      id: Date.now(),
+      name: safeName,
+      image: mealInput?.selectedEmoji ?? 'restaurant-outline',
+      calories: parseInt(String(mealInput?.calories ?? 0)),
+      prepTime: mealInput?.prepTime ? parseInt(String(mealInput.prepTime)) : undefined,
+      cookTime: mealInput?.cookTime ? parseInt(String(mealInput.cookTime)) : undefined,
+      totalTime: mealInput?.totalTime ?? undefined,
+      mealType: normalizeMealType(mealInput?.mealtType ?? mealInput?.mealType),
+      cuisine: typeof mealInput?.cuisine === 'string' ? mealInput.cuisine.trim() : undefined,
+      macros: {
+        protein: mealInput?.protein ? parseInt(String(mealInput.protein)) : 0,
+        fats: mealInput?.fats ? parseInt(String(mealInput.fats)) : 0,
+        carbs: mealInput?.carbs ? parseInt(String(mealInput.carbs)) : 0,
+      },
+      difficulty: normalizeDifficulty(mealInput?.difficulty),
+      servings: mealInput?.servings ? parseInt(String(mealInput.servings)) : undefined,
+      ingredients: Array.isArray(mealInput?.ingredients)
+        ? mealInput.ingredients
+            .map((item: any) => ({
+              name: String(item).trim(),
+              amount: '1',
+              inPantry: false,
+            }))
+            .filter((i: any) => i.name)
+        : [],
+      instructions: Array.isArray(mealInput?.instructions)
+        ? mealInput.instructions.map((i: any) => String(i)).filter(Boolean)
+        : [],
+      notes: typeof mealInput?.notes === 'string' ? mealInput.notes.trim() : undefined,
+      isFavorite: false,
+      family_id: familyId,
+    };
+
+    setIsSubmitting(true);
+    try {
+      console.log('[QuickMeals] Generating image for meal:', meal.name);
+      const imageUrl = await getMealImage(meal.name);
+
+      if (imageUrl) {
+        meal.image = imageUrl;
+        console.log('[QuickMeals] Image URL saved to meal:', imageUrl);
+      } else {
+        console.warn('[QuickMeals] Image generation failed, using icon fallback');
+      }
+
+      const res = await createMealForSingleUser(meal as any);
+      console.log('[QuickMeals] Meal saved successfully:', res);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      startCooldown(30);
+      console.log('[QuickMeals] Failed to save meal:', error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      
+      let errorMessage = 'Unable to save meal. ';
+      const errorStr = error.message?.toLowerCase() || '';
+      
+      if (errorStr.includes('network') || errorStr.includes('fetch')) {
+        errorMessage = 'No internet connection. Please check your network and try again.';
+      } else if (errorStr.includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.';
+      } else if (errorStr.includes('401')) {
+        errorMessage = 'Session expired. Please log in again.';
+      } else if (errorStr.includes('409')) {
+        errorMessage = 'A meal with this name already exists. Please use a different name.';
+      } else if (errorStr.includes('422')) {
+        errorMessage = 'Invalid meal data. Please check all required fields.';
+      } else if (errorStr.includes('429')) {
+        startCooldown(120);
+        errorMessage = 'Too many requests. Please wait before trying again.';
+      } else if (errorStr.includes('500') || errorStr.includes('503')) {
+        errorMessage = 'Server error. Please try again later.';
+      } else {
+        errorMessage = 'Failed to save meal. Please try again.';
+      }
+      
+      alert(errorMessage);
+      throw error;
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [families, isButtonDisabled, isSubmitting, startCooldown]);
   const setSingle = useCallback(
     <K extends keyof FormState>(key: K, value: FormState[K]) => {
       setForm((f) => ({ ...f, [key]: value }));
@@ -637,7 +790,7 @@ ${JSON_DIRECTIVE}`;
       let parsed: any = null;
       try {
         parsed = typeof res === 'string' ? JSON.parse(res) : res;
-      } catch (e) {
+      } catch {
         console.log('[QuickMeals] Non-JSON AI response:', res);
         alert('Sorry, the meal generator returned an unexpected format. Please try again.');
         startCooldown(30);
@@ -769,126 +922,7 @@ ${JSON_DIRECTIVE}`;
         setIsButtonDisabled(false);
       }
     }
-  }, [form, prefrences, pantryItems, JSON_DIRECTIVE, isGenerating, isButtonDisabled, cooldownRemaining]);
-
-  async function handleSaveMeal(mealInput: any) {
-    if (isSubmitting || isButtonDisabled) {
-      console.log('Already saving or on cooldown');
-    }
-
-    const normalizeMealType = (mt?: string) => {
-      const s = String(mt || '').toLowerCase();
-      const map: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack' | 'Dessert'> = {
-        breakfast: 'Breakfast',
-        lunch: 'Lunch',
-        dinner: 'Dinner',
-        snack: 'Snack',
-        dessert: 'Dessert',
-      };
-      return map[s] || 'Dinner';
-    };
-
-    const normalizeDifficulty = (d?: string) => {
-      const s = String(d || '').toLowerCase();
-      const map: Record<string, 'Easy' | 'Medium' | 'Hard'> = {
-        easy: 'Easy',
-        medium: 'Medium',
-        hard: 'Hard',
-      };
-      return map[s] || 'Easy';
-    };
-
-    const safeName = typeof mealInput?.name === 'string' ? mealInput.name.trim() : 'Untitled Meal';
-
-    let familyId: number | undefined;
-    if (families.length > 0) {
-      familyId = families[0].id;
-    }
-
-    const meal = {
-      id: Date.now(),
-      name: safeName,
-      image: mealInput?.selectedEmoji ?? '🍽️',
-      calories: parseInt(String(mealInput?.calories ?? 0)),
-      prepTime: mealInput?.prepTime ? parseInt(String(mealInput.prepTime)) : undefined,
-      cookTime: mealInput?.cookTime ? parseInt(String(mealInput.cookTime)) : undefined,
-      totalTime: mealInput?.totalTime ?? undefined,
-      mealType: normalizeMealType(mealInput?.mealtType ?? mealInput?.mealType),
-      cuisine: typeof mealInput?.cuisine === 'string' ? mealInput.cuisine.trim() : undefined,
-      macros: {
-        protein: mealInput?.protein ? parseInt(String(mealInput.protein)) : 0,
-        fats: mealInput?.fats ? parseInt(String(mealInput.fats)) : 0,
-        carbs: mealInput?.carbs ? parseInt(String(mealInput.carbs)) : 0,
-      },
-      difficulty: normalizeDifficulty(mealInput?.difficulty),
-      servings: mealInput?.servings ? parseInt(String(mealInput.servings)) : undefined,
-      ingredients: Array.isArray(mealInput?.ingredients)
-        ? mealInput.ingredients
-            .map((item: any) => ({
-              name: String(item).trim(),
-              amount: '1',
-              inPantry: false,
-            }))
-            .filter((i: any) => i.name)
-        : [],
-      instructions: Array.isArray(mealInput?.instructions)
-        ? mealInput.instructions.map((i: any) => String(i)).filter(Boolean)
-        : [],
-      notes: typeof mealInput?.notes === 'string' ? mealInput.notes.trim() : undefined,
-      isFavorite: false,
-      family_id: familyId,
-    };
-
-    setIsSubmitting(true);
-    try {
-      // Generate and upload image to Supabase, then save URL to meal
-      console.log('[QuickMeals] Generating image for meal:', meal.name);
-      const imageUrl = await getMealImage(meal.name);
-
-      if (imageUrl) {
-        meal.image = imageUrl;
-        console.log('[QuickMeals] Image URL saved to meal:', imageUrl);
-      } else {
-        console.warn('[QuickMeals] Image generation failed, using emoji fallback');
-        // Keep the emoji fallback already set in meal.image
-      }
-
-      const res = await createMealForSignleUser(meal as any);
-      console.log('[QuickMeals] Meal saved successfully:', res);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (error: any) {
-      startCooldown(30);
-      console.log('[QuickMeals] Failed to save meal:', error);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      
-      let errorMessage = 'Unable to save meal. ';
-      const errorStr = error.message?.toLowerCase() || '';
-      
-      if (errorStr.includes('network') || errorStr.includes('fetch')) {
-        errorMessage = 'No internet connection. Please check your network and try again.';
-      } else if (errorStr.includes('timeout')) {
-        errorMessage = 'Request timed out. Please try again.';
-      } else if (errorStr.includes('401')) {
-        errorMessage = 'Session expired. Please log in again.';
-      } else if (errorStr.includes('409')) {
-        errorMessage = 'A meal with this name already exists. Please use a different name.';
-      } else if (errorStr.includes('422')) {
-        errorMessage = 'Invalid meal data. Please check all required fields.';
-      } else if (errorStr.includes('429')) {
-        startCooldown(120);
-        errorMessage = 'Too many requests. Please wait before trying again.';
-      } else if (errorStr.includes('500') || errorStr.includes('503')) {
-        errorMessage = 'Server error. Please try again later.';
-      } else {
-        errorMessage = 'Failed to save meal. Please try again.';
-      }
-      
-      alert(errorMessage);
-      throw error;
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
+  }, [form, prefrences, pantryItems, JSON_DIRECTIVE, isGenerating, isButtonDisabled, cooldownRemaining, handleSaveMeal, startCooldown]);
 
   // ---- Phase Components with enhanced icons ----
   const Phase0: React.FC<{ animateKey: number }> = useCallback(
@@ -1060,15 +1094,15 @@ ${JSON_DIRECTIVE}`;
 
   const Phase5: React.FC<{ animateKey: number }> = useCallback(
     ({ animateKey }) => {
-      const increment = useCallback(() => {
+      const increment = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setForm((f) => ({ ...f, servings: Math.min(f.servings + 1, 12) }));
-      }, []);
+      };
 
-      const decrement = useCallback(() => {
+      const decrement = () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setForm((f) => ({ ...f, servings: Math.max(f.servings - 1, 1) }));
-      }, []);
+      };
 
       return (
         <>
@@ -1085,7 +1119,7 @@ ${JSON_DIRECTIVE}`;
                 <Ionicons 
                   name="remove" 
                   size={22} 
-                  color={form.servings <= 1 ? COLORS.disabled : COLORS.grey}
+                  color={form.servings <= 1 ? palette.disabled : palette.grey}
                 />
               </TouchableOpacity>
               <View style={styles.servingsDisplay}>
@@ -1105,7 +1139,7 @@ ${JSON_DIRECTIVE}`;
                 <Ionicons 
                   name="add" 
                   size={22} 
-                  color={form.servings >= 12 ? COLORS.disabled : COLORS.grey}
+                  color={form.servings >= 12 ? palette.disabled : palette.grey}
                 />
               </TouchableOpacity>
             </View>
@@ -1157,7 +1191,18 @@ ${JSON_DIRECTIVE}`;
         </>
       );
     },
-    [form]
+    [
+      form,
+      palette.disabled,
+      palette.grey,
+      styles.review,
+      styles.servings,
+      styles.servingsDisplay,
+      styles.servingsLabel,
+      styles.servingsRow,
+      styles.stepper,
+      styles.stepperDisabled,
+    ]
   );
 
   const PhaseComponent = useMemo(() => {
@@ -1196,15 +1241,12 @@ ${JSON_DIRECTIVE}`;
         <View style={styles.headerLeftGroup}>
           <TouchableOpacity
             onPress={back}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
             disabled={isGenerating}
-            style={styles.headerButton}
+            style={styles.backButton}
+            activeOpacity={0.8}
           >
-            <Ionicons 
-              name="arrow-back" 
-              size={24} 
-              color={isGenerating ? COLORS.disabled : COLORS.grey} 
-            />
+            <Text style={[styles.backIcon, isGenerating && styles.backIconDisabled]}>←</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.headerCenter}>
@@ -1223,7 +1265,7 @@ ${JSON_DIRECTIVE}`;
             <Ionicons
               name="home-outline"
               size={22}
-              color={isGenerating ? COLORS.disabled : COLORS.grey}
+              color={isGenerating ? palette.disabled : palette.grey}
             />
           </TouchableOpacity>
         </View>
@@ -1237,7 +1279,10 @@ ${JSON_DIRECTIVE}`;
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollInner}
+        contentContainerStyle={[
+          styles.scrollInner,
+          { paddingBottom: bottomNavInset + 54 },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         scrollEnabled={!isGenerating}
@@ -1279,7 +1324,7 @@ ${JSON_DIRECTIVE}`;
       </ScrollView>
 
       {/* Enhanced Footer Navigation */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: bottomNavInset + 12 }]}>
         <TouchableOpacity
           onPress={back}
           style={[
@@ -1291,7 +1336,7 @@ ${JSON_DIRECTIVE}`;
           <Ionicons
             name="chevron-back"
             size={20}
-            colxor={phase === 0 || isGenerating ? COLORS.disabled : COLORS.primary}
+            color={phase === 0 || isGenerating ? palette.disabled : palette.primary}
           />
           <Text
             style={[
@@ -1320,7 +1365,7 @@ ${JSON_DIRECTIVE}`;
                     : "Generate Meal")
               : "Next"}
           </Text>
-          <Ionicons name="chevron-forward" size={20} color="#fff" />
+          <Ionicons name="chevron-forward" size={20} color={palette.onPrimary} />
         </TouchableOpacity>
       </View>
       
@@ -1380,6 +1425,7 @@ const Question: React.FC<{
   children: React.ReactNode;
   animateKey: number;
 }> = React.memo(({ title, children, animateKey }) => {
+  const { styles } = useThemedStyles();
   const opacity = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const prevAnimateKey = useRef(animateKey);
@@ -1429,6 +1475,7 @@ const Tag: React.FC<{
   onRemove: () => void;
   tone?: "positive" | "danger";
 }> = React.memo(({ label, onRemove, tone = "positive" }) => {
+  const { palette, styles } = useThemedStyles();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
@@ -1466,7 +1513,7 @@ const Tag: React.FC<{
       <Ionicons 
         name="close-circle" 
         size={16} 
-        color={tone === "positive" ? COLORS.primary : "#EF4444"}
+        color={tone === "positive" ? palette.primary : palette.danger}
         style={{ marginLeft: 4 }}
       />
     </AnimatedTouchable>
@@ -1479,23 +1526,27 @@ const ReviewRow: React.FC<{
   icon: keyof typeof Ionicons.glyphMap;
   k: string; 
   v: string;
-}> = React.memo(({ icon, k, v }) => (
-  <View style={styles.row}>
-    <View style={styles.rowLeft}>
-      <Ionicons name={icon} size={18} color={COLORS.sub} />
-      <Text style={styles.rowK}>{k}</Text>
+}> = React.memo(({ icon, k, v }) => {
+  const { palette, styles } = useThemedStyles();
+  return (
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        <Ionicons name={icon} size={18} color={palette.sub} />
+        <Text style={styles.rowK}>{k}</Text>
+      </View>
+      <Text style={styles.rowV}>{v}</Text>
     </View>
-    <Text style={styles.rowV}>{v}</Text>
-  </View>
-));
+  );
+});
 
 ReviewRow.displayName = "ReviewRow";
 
 /* ---------- Enhanced Styles ---------- */
-const styles = StyleSheet.create({
+function createStyles(palette: Palette) {
+  return StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: COLORS.bg 
+    backgroundColor: palette.bg 
   },
   header: {
     paddingTop: Platform.OS === "ios" ? 60 : 48,
@@ -1504,9 +1555,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   headerLeftGroup: {
     flexDirection: "row",
@@ -1519,7 +1570,28 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: palette.selectedTint,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: palette.shadow,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+  backIcon: {
+    fontSize: 22,
+    color: palette.primary,
+    fontWeight: "600",
+  },
+  backIconDisabled: {
+    color: palette.disabled,
   },
   headerCenter: {
     flex: 1,
@@ -1528,13 +1600,13 @@ const styles = StyleSheet.create({
   headerTitle: { 
     fontSize: 17, 
     fontWeight: "700", 
-    color: COLORS.grey,
+    color: palette.grey,
     letterSpacing: -0.3,
   },
   headerSubtitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: COLORS.sub,
+    color: palette.sub,
     marginTop: 2,
   },
   headerRightGroup: {
@@ -1546,19 +1618,19 @@ const styles = StyleSheet.create({
   progressContainer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   track: {
     height: 6,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: 8,
     overflow: "hidden",
   },
   bar: {
     height: 6,
-    backgroundColor: COLORS.accent,
+    backgroundColor: palette.accent,
     borderRadius: 8,
-    shadowColor: COLORS.accent,
+    shadowColor: palette.accent,
     shadowOpacity: 0.4,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 2 },
@@ -1566,18 +1638,18 @@ const styles = StyleSheet.create({
   scrollInner: {
     paddingHorizontal: 20,
     paddingTop: 8,
-    paddingBottom: 120,
+    paddingBottom: 16,
     alignItems: "center",
     gap: 16,
   },
   card: {
     width: "100%",
     borderRadius: 20,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     padding: 20,
-    shadowColor: "#000",
+    shadowColor: palette.shadow,
     shadowOpacity: 0.06,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
@@ -1586,13 +1658,13 @@ const styles = StyleSheet.create({
   question: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
   helperText: {
     fontSize: 14,
-    color: COLORS.sub,
+    color: palette.sub,
     marginBottom: 14,
     lineHeight: 20,
   },
@@ -1603,63 +1675,63 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 12,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
   optionSelected: {
-    backgroundColor: COLORS.selectedTint,
-    borderColor: COLORS.selectedBorder,
+    backgroundColor: palette.selectedTint,
+    borderColor: palette.selectedBorder,
   },
   radio: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#fff",
+    backgroundColor: palette.card,
   },
   checkbox: {
     borderRadius: 8,
   },
   radioSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
   },
   optionText: { 
     flex: 1,
     fontSize: 16, 
     fontWeight: "600", 
-    color: COLORS.text,
+    color: palette.text,
     letterSpacing: -0.2,
   },
   optionTextSelected: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "700",
   },
   optionDescription: {
     flexBasis: "100%",
     marginTop: 4,
     fontSize: 13,
-    color: COLORS.sub,
+    color: palette.sub,
   },
   optionDescriptionSelected: {
-    color: COLORS.primary,
+    color: palette.primary,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 15,
-    backgroundColor: COLORS.bg,
-    color: COLORS.text,
+    backgroundColor: palette.bg,
+    color: palette.text,
   },
   textArea: {
     minHeight: 100,
@@ -1675,19 +1747,19 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 14,
-    backgroundColor: COLORS.primary,
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: COLORS.primary,
+    shadowColor: palette.primary,
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
   addButtonDanger: {
-    backgroundColor: "#EF4444",
+    backgroundColor: palette.danger,
   },
   addButtonDisabled: {
-    backgroundColor: COLORS.disabled,
+    backgroundColor: palette.disabled,
     shadowOpacity: 0,
   },
   tokens: { 
@@ -1705,22 +1777,22 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   tagPositive: {
-    backgroundColor: COLORS.selectedTint,
-    borderColor: COLORS.selectedBorder,
+    backgroundColor: palette.selectedTint,
+    borderColor: palette.selectedBorder,
   },
   tagDanger: {
-    backgroundColor: COLORS.dangerTint,
-    borderColor: COLORS.dangerBorder,
+    backgroundColor: palette.dangerTint,
+    borderColor: palette.dangerBorder,
   },
   tagText: { 
     fontSize: 14, 
     fontWeight: "600",
   },
   tagTextPositive: {
-    color: COLORS.primary,
+    color: palette.primary,
   },
   tagTextDanger: {
-    color: "#EF4444",
+    color: palette.danger,
   },
 
   servingsRow: { 
@@ -1734,15 +1806,15 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 16,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
   },
   stepperDisabled: {
-    backgroundColor: "#F3F4F6",
-    borderColor: "#E5E7EB",
+    backgroundColor: palette.mutedSurface,
+    borderColor: palette.border,
   },
   servingsDisplay: {
     alignItems: "center",
@@ -1751,23 +1823,23 @@ const styles = StyleSheet.create({
   servings: {
     fontSize: 32,
     fontWeight: "800",
-    color: COLORS.primary,
+    color: palette.primary,
     letterSpacing: -1,
   },
   servingsLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.sub,
+    color: palette.sub,
     marginTop: 2,
   },
 
   review: {
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     borderRadius: 16,
     padding: 16,
     gap: 14,
-    backgroundColor: COLORS.card,
+    backgroundColor: palette.card,
   },
   row: { 
     flexDirection: "row", 
@@ -1782,19 +1854,18 @@ const styles = StyleSheet.create({
   rowK: { 
     fontSize: 15, 
     fontWeight: "600",
-    color: COLORS.sub 
+    color: palette.sub 
   },
   rowV: { 
     fontSize: 15, 
     fontWeight: "700", 
-    color: COLORS.primary 
+    color: palette.primary 
   },
 
   footer: {
     position: "absolute",
     left: 20,
     right: 20,
-    bottom: Platform.OS === "ios" ? 36 : 20,
     flexDirection: "row",
     gap: 12,
   },
@@ -1803,24 +1874,24 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 16,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     gap: 6,
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
   },
   btnGhostDisabled: {
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.card,
+    borderColor: palette.border,
+    backgroundColor: palette.card,
   },
   btnGhostText: { 
     fontSize: 16, 
     fontWeight: "700", 
-    color: COLORS.primary 
+    color: palette.primary 
   },
   btnGhostTextDisabled: {
-    color: COLORS.disabled,
+    color: palette.disabled,
   },
 
   btnSolid: {
@@ -1831,8 +1902,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     flexDirection: "row",
     gap: 8,
-    backgroundColor: COLORS.accent,
-    shadowColor: COLORS.accent,
+    backgroundColor: palette.accent,
+    shadowColor: palette.accent,
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -1844,7 +1915,7 @@ const styles = StyleSheet.create({
   btnSolidText: { 
     fontSize: 16, 
     fontWeight: "700", 
-    color: "#fff" 
+    color: palette.onPrimary 
   },
   
   mealComponentContainer: {
@@ -1859,19 +1930,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(17, 18, 20, 0.92)",
+    backgroundColor: palette.overlayStrong,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 9999,
   },
   loadingCard: {
-    backgroundColor: COLORS.bg,
+    backgroundColor: palette.bg,
     borderRadius: 28,
     padding: 36,
     alignItems: "center",
     width: "88%",
     maxWidth: 380,
-    shadowColor: "#000",
+    shadowColor: palette.shadowStrong,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.4,
     shadowRadius: 24,
@@ -1886,8 +1957,8 @@ const styles = StyleSheet.create({
     height: 72,
     borderRadius: 36,
     borderWidth: 5,
-    borderColor: "#E8F5EF",
-    borderTopColor: COLORS.primary,
+    borderColor: palette.selectedTint,
+    borderTopColor: palette.primary,
   },
   spinnerCore: {
     position: "absolute",
@@ -1896,20 +1967,20 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.selectedTint,
+    backgroundColor: palette.selectedTint,
     transform: [{ translateX: -24 }, { translateY: -24 }],
   },
   loadingTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
     marginBottom: 10,
     letterSpacing: -0.5,
   },
   loadingSubtitle: {
     fontSize: 15,
-    color: COLORS.sub,
+    color: palette.sub,
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 28,
@@ -1923,19 +1994,19 @@ const styles = StyleSheet.create({
   progressBarTrack: {
     width: "100%",
     height: 10,
-    backgroundColor: "#E8F5EF",
+    backgroundColor: palette.selectedTint,
     borderRadius: 6,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    backgroundColor: COLORS.primary,
+    backgroundColor: palette.primary,
     borderRadius: 6,
   },
   progressText: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: palette.primary,
   },
   loadingFooter: {
     flexDirection: "row",
@@ -1944,15 +2015,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingTop: 20,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: palette.border,
     width: "100%",
     justifyContent: "center",
   },
   loadingHint: {
     fontSize: 13,
-    color: COLORS.sub,
+    color: palette.sub,
     fontWeight: "500",
   },
 });
+}
 
 export default QuickMealsCreateScreen;

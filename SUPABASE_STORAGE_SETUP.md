@@ -102,7 +102,7 @@ If you prefer using the UI instead of SQL:
 After setup, you can verify the configuration:
 
 1. **Test bucket access**: The app will automatically check bucket accessibility on first image upload
-2. **Check console logs**: Look for `[MealImageService] ✅ Bucket "Meals" is accessible`
+2. **Check console logs**: Look for `[MealImageService]  Bucket "Meals" is accessible`
 3. **Test upload**: Generate an image for a meal - it should upload successfully
 
 ## Troubleshooting

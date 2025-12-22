@@ -8,10 +8,13 @@ import {
     useNotifications,
     useUnreadNotifications,
 } from '@/hooks/useNotifications';
+import { useScrollContentStyle } from '@/hooks/useBottomNavInset';
+import { useThemeContext } from '@/context/ThemeContext';
+import { ColorTokens } from '@/theme/colors';
 import { type NotificationOut as Notification, type NotificationType } from '@/src/services/notification.service';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     ActivityIndicator,
     LayoutAnimation,
@@ -36,8 +39,35 @@ if (
   (UIManager as any).setLayoutAnimationEnabledExperimental(true);
 }
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace('#', '');
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  chipBg: withAlpha(colors.textSecondary, 0.08),
+  shadow: withAlpha(colors.textPrimary, 0.12),
+});
+
 const NotificationsScreen = () => {
   const router = useRouter();
+  const scrollContentStyle = useScrollContentStyle();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
   const [category, setCategory] = useState<CategoryFilter>('all');
   const [toast, setToast] = useState<{
@@ -213,18 +243,18 @@ const NotificationsScreen = () => {
   const getIcon = (type: NotificationType): { name: any; color: string } => {
     switch (type) {
       case 'meal_share_request':
-        return { name: 'restaurant-outline' as const, color: '#00A86B' };
+        return { name: 'restaurant-outline' as const, color: palette.primary };
       case 'meal_share_accepted':
-        return { name: 'checkmark-circle-outline' as const, color: '#10B981' };
+        return { name: 'checkmark-circle-outline' as const, color: palette.success };
       case 'meal_share_declined':
-        return { name: 'close-circle-outline' as const, color: '#EF4444' };
+        return { name: 'close-circle-outline' as const, color: palette.error };
       case 'family_member_joined':
       case 'family_invite':
-        return { name: 'people-outline' as const, color: '#6B7280' };
+        return { name: 'people-outline' as const, color: palette.textMuted };
       case 'system':
-        return { name: 'information-circle-outline' as const, color: '#3B82F6' };
+        return { name: 'information-circle-outline' as const, color: palette.warning };
       default:
-        return { name: 'notifications-outline' as const, color: '#6B7280' };
+        return { name: 'notifications-outline' as const, color: palette.textMuted };
     }
   };
 
@@ -258,9 +288,10 @@ const NotificationsScreen = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          activeOpacity={0.6}
+          activeOpacity={0.8}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Ionicons name="arrow-back" size={24} color="#111" />
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
         <TouchableOpacity
@@ -379,30 +410,30 @@ const NotificationsScreen = () => {
           onPress={handleDeleteAllRead}
           activeOpacity={0.7}
         >
-          <Ionicons name="trash-outline" size={18} color="#6B7280" />
+          <Ionicons name="trash-outline" size={18} color={palette.textMuted} />
           <Text style={styles.clearButtonText}>Clear Read</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching}
             onRefresh={refetch}
-            tintColor="#00A86B"
+            tintColor={palette.primary}
           />
         }
       >
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00A86B" />
+            <ActivityIndicator size="large" color={palette.primary} />
           </View>
         ) : notifications.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={64} color="#D1D5DB" />
+            <Ionicons name="notifications-off-outline" size={64} color={withAlpha(palette.textMuted, 0.4)} />
             <Text style={styles.emptyText}>No notifications</Text>
             <Text style={styles.emptySubtext}>
               {filter === 'unread' ? 'No unread notifications' : "You're all caught up!"}
@@ -418,6 +449,8 @@ const NotificationsScreen = () => {
               onDelete={() => handleDelete(notif.id)}
               getIcon={getIcon}
               formatTime={formatTime}
+              palette={palette}
+              styles={styles}
             />
           ))
         )}
@@ -433,7 +466,9 @@ const NotificationItem: React.FC<{
   onDelete: () => void;
   getIcon: (type: NotificationType) => { name: any; color: string };
   formatTime: (dateString: string) => string;
-}> = ({ notification, onPress, onMarkAsRead, onDelete, getIcon, formatTime }) => {
+  palette: ReturnType<typeof createPalette>;
+  styles: ReturnType<typeof createStyles>;
+}> = ({ notification, onPress, onMarkAsRead, onDelete, getIcon, formatTime, palette, styles }) => {
   const icon = getIcon(notification.type);
 
   const handlePress = () => {
@@ -451,7 +486,7 @@ const NotificationItem: React.FC<{
       onPress={handlePress}
       activeOpacity={0.7}
     >
-      <View style={[styles.iconContainer, { backgroundColor: icon.color + '20' }]}>
+      <View style={[styles.iconContainer, { backgroundColor: withAlpha(icon.color, 0.12) }]}>
         <Ionicons name={icon.name} size={24} color={icon.color} />
       </View>
 
@@ -471,256 +506,273 @@ const NotificationItem: React.FC<{
         onPress={handleDelete}
         activeOpacity={0.6}
       >
-        <Ionicons name="close" size={20} color="#9CA3AF" />
+        <Ionicons name="close" size={20} color={palette.textMuted} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: 50,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111',
-  },
-  markAllButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  markAllText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#00A86B',
-  },
-  markAllTextDisabled: {
-    color: '#9CA3AF',
-  },
-  placeholder: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  filterButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#F7F8FA',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterButtonActive: {
-    backgroundColor: '#E8F5E9',
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  filterTextActive: {
-    color: '#00A86B',
-  },
-  actionBar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  clearButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F7F8FA',
-  },
-  clearButtonText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 8,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E7EBEF',
-  },
-  notificationItemUnread: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#00A86B',
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  notificationContent: {
-    flex: 1,
-  },
-  notificationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  notificationTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111',
-    flex: 1,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#00A86B',
-    marginLeft: 8,
-  },
-  notificationMessage: {
-    fontSize: 14,
-    color: '#6B7280',
-    lineHeight: 20,
-    marginBottom: 6,
-  },
-  notificationTime: {
-    fontSize: 12,
-    color: '#9CA3AF',
-  },
-  deleteButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  categoryScroll: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    maxHeight: 60,
-    flexGrow: 0,
-  },
-  categoryContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 10,
-  },
-  categoryTab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 22,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E9ECF2',
-    marginRight: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  categoryTabActive: {
-    backgroundColor: '#00A86B',
-    borderColor: '#00A86B',
-    shadowColor: '#00A86B',
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 4,
-  },
-  categoryTabPressed: {
-    transform: [{ scale: 0.97 }],
-    opacity: 0.92,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#6B7280',
-  },
-  categoryTextActive: {
-    color: '#FFFFFF',
-  },
-  categoryBadge: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 4,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  categoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#00A86B',
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 50,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+      backgroundColor: palette.card,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: palette.chipBg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    backIcon: {
+      fontSize: 22,
+      fontWeight: '600',
+      color: palette.primary,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    markAllButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    markAllText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: palette.primary,
+    },
+    markAllTextDisabled: {
+      color: palette.textMuted,
+      opacity: 0.5,
+    },
+    placeholder: {
+      width: 40,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+      backgroundColor: palette.card,
+    },
+    filterButton: {
+      flex: 1,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: palette.chipBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    filterButtonActive: {
+      backgroundColor: withAlpha(palette.primary, 0.12),
+    },
+    filterText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: palette.textMuted,
+    },
+    filterTextActive: {
+      color: palette.primary,
+    },
+    actionBar: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+      backgroundColor: palette.card,
+    },
+    clearButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: palette.chipBg,
+    },
+    clearButtonText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: palette.textMuted,
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 80,
+    },
+    emptyText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: palette.text,
+      marginTop: 16,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginTop: 8,
+    },
+    notificationItem: {
+      flexDirection: 'row',
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    notificationItemUnread: {
+      backgroundColor: withAlpha(palette.primary, 0.08),
+      borderColor: palette.primary,
+    },
+    iconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    notificationContent: {
+      flex: 1,
+    },
+    notificationHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    notificationTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: palette.text,
+      flex: 1,
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.primary,
+      marginLeft: 8,
+    },
+    notificationMessage: {
+      fontSize: 14,
+      color: palette.textMuted,
+      lineHeight: 20,
+      marginBottom: 6,
+    },
+    notificationTime: {
+      fontSize: 12,
+      color: palette.textMuted,
+    },
+    deleteButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    categoryScroll: {
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+      maxHeight: 60,
+      flexGrow: 0,
+      backgroundColor: palette.card,
+    },
+    categoryContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      gap: 10,
+    },
+    categoryTab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 22,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginRight: 6,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    categoryTabActive: {
+      backgroundColor: palette.primary,
+      borderColor: palette.primary,
+      shadowColor: palette.primary,
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    categoryTabPressed: {
+      transform: [{ scale: 0.97 }],
+      opacity: 0.92,
+    },
+    categoryText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: palette.textMuted,
+    },
+    categoryTextActive: {
+      color: palette.card,
+    },
+    categoryBadge: {
+      backgroundColor: palette.card,
+      borderRadius: 10,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      marginLeft: 4,
+      minWidth: 20,
+      alignItems: 'center',
+    },
+    categoryBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: palette.primary,
+    },
+  });
 
 export default NotificationsScreen;

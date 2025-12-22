@@ -25,7 +25,7 @@ async function getAuthHeader() {
   };
 }
 
-// 🏠 Create a new family
+// Create a new family
 export async function createFamily(display_name: string) {
   const headers = await getAuthHeader();
   
@@ -71,7 +71,7 @@ export async function createFamily(display_name: string) {
   }
 }
 
-// 👨‍👩‍👧‍👦 Get all families the user is part of
+// Get all families the user is part of
 export async function listMyFamilies() {
   const headers = await getAuthHeader();
 
@@ -123,7 +123,7 @@ export async function listMyFamilies() {
   }
 }
 
-// 📨 Join a family via invite code
+// Join a family via invite code
 export async function joinFamilyByCode(invite_code: string) {
   const headers = await getAuthHeader();
   
@@ -173,7 +173,7 @@ export async function joinFamilyByCode(invite_code: string) {
   }
 }
 
-// 🚫 Kick a member (admin/owner only)
+// Kick a member (admin/owner only)
 export async function removeFamilyMember(familyId: number, userId: number) {
   const headers = await getAuthHeader();
   
@@ -221,13 +221,13 @@ export async function removeFamilyMember(familyId: number, userId: number) {
   }
 }
 
-// ↩️ Leave the family (just remove yourself)
+// Leave the family (just remove yourself)
 export async function leaveFamily(familyId: number, userId: number) {
   // Reuse same endpoint as remove — the backend will check permissions
   return await removeFamilyMember(familyId, userId);
 }
 
-// 🔁 Update a member's role
+// Update a member's role
 export async function updateFamilyMemberRole(
   familyId: number,
   userId: number,
@@ -282,7 +282,7 @@ export async function updateFamilyMemberRole(
   }
 }
 
-// 🔁 Regenerate family invite code (admin/owner)
+// Regenerate family invite code (admin/owner)
 export async function regenerateInviteCode(familyId: number) {
   const headers = await getAuthHeader();
   
@@ -327,7 +327,7 @@ export async function regenerateInviteCode(familyId: number) {
   }
 }
 
-// 🗑️ Delete a family (owner only)
+// Delete a family (owner only)
 export async function deleteFamily(familyId: number): Promise<string> {
   const headers = await getAuthHeader();
 
@@ -374,7 +374,7 @@ export async function deleteFamily(familyId: number): Promise<string> {
   }
 }
 
-// 👀 List members in a family
+// List members in a family
 export async function listFamilyMembers(familyId: number) {
   const headers = await getAuthHeader();
   

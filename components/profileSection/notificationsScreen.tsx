@@ -1,5 +1,6 @@
 // ==================== screens/NotificationsScreen.tsx ====================
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import {
   View,
   Text,
@@ -22,10 +23,10 @@ type NotificationItem = {
 
 const NotificationsScreen: React.FC<Props> = ({ onBack }) => {
   const notifications: NotificationItem[] = [
-    { id: 1, icon: '📦', title: 'Your order has arrived', time: '30m', color: '#00A86B' },
-    { id: 2, icon: '💳', title: 'Payment verified', time: '1d', color: '#00A86B' },
-    { id: 3, icon: '🎁', title: 'New promo just for you!', time: '2d', color: '#FD8100' },
-    { id: 4, icon: '📊', title: "It's time for survey", time: '2d', color: '#007AFF' },
+    { id: 1, icon: 'receipt', title: 'Your order has arrived', time: '30m', color: '#00A86B' },
+    { id: 2, icon: 'checkmark-circle', title: 'Payment verified', time: '1d', color: '#00A86B' },
+    { id: 3, icon: 'gift-outline', title: 'New promo just for you!', time: '2d', color: '#FD8100' },
+    { id: 4, icon: 'information', title: "It's time for survey", time: '2d', color: '#007AFF' },
   ];
 
   return (
@@ -42,7 +43,7 @@ const NotificationsScreen: React.FC<Props> = ({ onBack }) => {
         {notifications.map((notif) => (
           <TouchableOpacity key={notif.id} style={styles.notificationItem} activeOpacity={0.8}>
             <View style={[styles.notifIcon, { backgroundColor: notif.color + '20' }]}>
-              <Text style={styles.notifEmoji}>{notif.icon}</Text>
+              <Ionicons name={notif.icon as any} size={24} color={notif.color} />
             </View>
             <View style={styles.notifContent}>
               <View style={styles.notifHeader}>
@@ -107,9 +108,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-  },
-  notifEmoji: {
-    fontSize: 24,
   },
   notifContent: {
     flex: 1,

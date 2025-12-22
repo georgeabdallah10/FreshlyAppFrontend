@@ -1,12 +1,18 @@
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
-import { Platform, Alert } from "react-native";
+import { Platform } from "react-native";
 import { supabase } from "../supabase/client";
 
-export async function registerForPushNotifications(userId: number) {
+export type PushNotificationResult = {
+  success: boolean;
+  token: string | null;
+  error?: string;
+};
+
+export async function registerForPushNotifications(userId: number): Promise<PushNotificationResult> {
   if (!Device.isDevice) {
     console.log("Must use physical device for Push Notifications");
-    return null;
+    return { success: false, token: null, error: "Must use physical device for Push Notifications" };
   }
 
   // Request permissions
@@ -19,8 +25,8 @@ export async function registerForPushNotifications(userId: number) {
   }
 
   if (finalStatus !== "granted") {
-    Alert.alert("Notifications Disabled", "Please enable notifications.");
-    return null;
+    // Return error info instead of showing Alert - let caller handle UI
+    return { success: false, token: null, error: "Notifications disabled. Please enable notifications in settings." };
   }
 
   // Expo push token (tolerate missing/invalid projectId while developing)
@@ -33,7 +39,7 @@ export async function registerForPushNotifications(userId: number) {
   } catch (error) {
     // Swallow validation errors so they don't crash the app during setup
     console.warn("[Notifications] Unable to fetch Expo push token:", error);
-    return null;
+    return { success: false, token: null, error: "Unable to get push notification token" };
   }
 
   // Android channel
@@ -51,7 +57,7 @@ export async function registerForPushNotifications(userId: number) {
     platform: Platform.OS,
   });
 
-  return expoPushToken;
+  return { success: true, token: expoPushToken };
 }
 
 export async function isPushNotificationEnabled(): Promise<boolean> {

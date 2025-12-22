@@ -1,5 +1,6 @@
-// ==================== screens/MainMenuScreen.tsx ====================
 import { useUser } from "@/context/usercontext";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef } from "react";
 import {
@@ -11,20 +12,6 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
-
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  charcoal: "#4C4D59",
-  charcoalLight: "#F0F0F2",
-  white: "#FFFFFF",
-  background: "#F7F8FB",
-  text: "#0A0A0A",
-  textMuted: "#6B7280",
-  border: "#E9ECF2",
-};
 
 type Props = {
   onNavigate: (
@@ -39,10 +26,40 @@ type MenuItem = {
   screen: "myProfile" | "settings" | "notifications" | "aboutApp";
 };
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => {
+  const primary = colors.primary;
+  const accent = colors.warning || colors.primary;
+  return {
+    background: colors.background,
+    card: colors.card,
+    primary,
+    primaryTint: withAlpha(primary, 0.12),
+    accent,
+    accentTint: withAlpha(accent, 0.12),
+    text: colors.textPrimary,
+    textMuted: colors.textSecondary,
+    border: colors.border,
+    shadow: withAlpha(colors.textPrimary, 0.12),
+    avatarBg: withAlpha(colors.textSecondary, 0.08),
+  };
+};
+
 const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
   const router = useRouter(); 
   const userContext = useUser();
   const user = userContext?.user;
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -188,13 +205,13 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
               <View style={styles.menuItemLeft}>
                 <View style={[
                   styles.iconContainer,
-                  { backgroundColor: index === 0 ? COLORS.primaryLight : COLORS.accentLight }
+                  { backgroundColor: index === 0 ? palette.primaryTint : palette.accentTint }
                 ]}>
                   <Image
                     source={item.icon}
                     style={[
                       styles.menuCardIcon,
-                      { tintColor: index === 0 ? COLORS.primary : COLORS.accent }
+                      { tintColor: index === 0 ? palette.primary : palette.accent }
                     ]}
                     resizeMode="contain"
                   />
@@ -210,164 +227,170 @@ const MainMenuScreen: React.FC<Props> = ({ onNavigate }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  screen: { 
-    flex: 1, 
-    backgroundColor: COLORS.background,
-    paddingTop: 50,
-  },
-  mainMenu: {
-    backgroundColor: "transparent",
-  },
-  headerBar: {
-    height: 56,
-    paddingHorizontal: 16,
-    backgroundColor: COLORS.white,
-    borderBottomColor: COLORS.border,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  headerBackBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryLight,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
-  scrollContent: {
-    paddingTop: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-    textAlign: "center",
-  },
-  profileCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.primary,
-  },
-  avatarContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.charcoalLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    position: "relative",
-    overflow: "hidden",
-    borderWidth: 3,
-    borderColor: COLORS.primaryLight,
-  },
-  avatarImage: {
-    width: "100%",
-    height: "100%",
-  },
-  avatarInitials: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: COLORS.primary,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    marginBottom: 12,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  menuList: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    paddingVertical: 8,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  menuItemFirst: {
-    borderTopWidth: 0,
-  },
-  menuItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  menuItemText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: COLORS.text,
-  },
-  chevron: {
-    fontSize: 24,
-    color: COLORS.textMuted,
-    fontWeight: "300",
-  },
-  headerIcon: {
-    fontSize: 20,
-    color: COLORS.primary,
-    fontWeight: "600",
-  },
-  menuCardIcon: {
-    width: 26,
-    height: 26,
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    screen: { 
+      flex: 1, 
+      backgroundColor: palette.background,
+      paddingTop: 50,
+    },
+    mainMenu: {
+      backgroundColor: "transparent",
+    },
+    headerBar: {
+      height: 56,
+      paddingHorizontal: 16,
+      backgroundColor: palette.card,
+      borderBottomColor: palette.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    headerBackBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: palette.primaryTint,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    headerSpacer: {
+      width: 40,
+      height: 40,
+    },
+    scrollContent: {
+      paddingTop: 12,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+    },
+    profileCard: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      padding: 24,
+      marginHorizontal: 20,
+      alignItems: "center",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      marginBottom: 20,
+      borderLeftWidth: 4,
+      borderLeftColor: palette.primary,
+    },
+    avatarContainer: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: palette.avatarBg,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+      position: "relative",
+      overflow: "hidden",
+      borderWidth: 3,
+      borderColor: palette.primaryTint,
+    },
+    avatarImage: {
+      width: "100%",
+      height: "100%",
+    },
+    avatarInitials: {
+      fontSize: 28,
+      fontWeight: "700",
+      color: palette.primary,
+    },
+    userName: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 4,
+    },
+    userEmail: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginBottom: 12,
+    },
+    statusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.primaryTint,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      gap: 4,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    menuList: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      marginHorizontal: 20,
+      marginBottom: 20,
+      paddingVertical: 8,
+      overflow: "hidden",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    menuItemFirst: {
+      borderTopWidth: 0,
+    },
+    menuItemLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    iconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: palette.primaryTint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    menuItemText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.text,
+    },
+    chevron: {
+      fontSize: 24,
+      color: palette.textMuted,
+      fontWeight: "300",
+    },
+    headerIcon: {
+      fontSize: 20,
+      color: palette.primary,
+      fontWeight: "600",
+    },
+    menuCardIcon: {
+      width: 26,
+      height: 26,
+    },
+  });
 
 export default MainMenuScreen;

@@ -1,5 +1,6 @@
 import ToastBanner from "@/components/generalMessage";
 import type { GroceryListOut, SyncRemainingItem, SyncWithPantryResponse } from "@/src/services/grocery.service";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -207,7 +208,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
           <ActivityIndicator color={COLORS.white} size="small" />
         ) : (
           <>
-            <Text style={styles.syncButtonIcon}>🔄</Text>
+            <Ionicons name="refresh" size={18} color={COLORS.white} />
             <Text style={styles.syncButtonText}>Sync with Pantry</Text>
           </>
         )}
@@ -235,7 +236,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
               )}
               {(lastResult.itemsUpdated ?? 0) > 0 && (
                 <Text style={styles.syncStatText}>
-                  ✎ {lastResult.itemsUpdated} updated (partial coverage)
+                  {lastResult.itemsUpdated} updated (partial coverage)
                 </Text>
               )}
             </View>
@@ -245,7 +246,7 @@ export const SyncPantryButton: React.FC<SyncPantryButtonProps> = ({
           {lastResult.remainingItems && lastResult.remainingItems.length > 0 && (
             <View style={styles.remainingSection}>
               <Text style={styles.remainingTitle}>
-                🛒 {lastResult.remainingItems.length} item{lastResult.remainingItems.length !== 1 ? 's' : ''} still needed:
+                {lastResult.remainingItems.length} item{lastResult.remainingItems.length !== 1 ? 's' : ''} still needed:
               </Text>
               <ScrollView 
                 style={styles.remainingList} 

@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 
+import { useThemeContext } from '@/context/ThemeContext';
+
 interface IconButtonProps {
   // Icon properties
   iconName: keyof typeof Ionicons.glyphMap;
@@ -42,18 +44,18 @@ export const IconButton: React.FC<IconButtonProps> = ({
   // Icon properties
   iconName,
   iconSize = 24,
-  iconColor = '#1F2937',
+  iconColor,
   
   // Badge properties
   showBadge = false,
   badgeCount = 0,
-  badgeColor = '#FF3B30',
-  badgeTextColor = '#FFFFFF',
+  badgeColor,
+  badgeTextColor,
   badgeMaxCount = 99,
   badgePosition = 'top-right',
   
   // Container properties
-  backgroundColor = 'transparent',
+  backgroundColor,
   containerSize = 40,
   borderRadius = 20,
   
@@ -66,6 +68,13 @@ export const IconButton: React.FC<IconButtonProps> = ({
   style,
   iconContainerStyle,
 }) => {
+  const { theme } = useThemeContext();
+  const { colors } = theme;
+  const resolvedIconColor = iconColor ?? colors.textPrimary;
+  const resolvedBadgeColor = badgeColor ?? colors.error;
+  const resolvedBadgeTextColor = badgeTextColor ?? colors.card;
+  const resolvedBackgroundColor = backgroundColor ?? colors.card;
+
   // Format badge count with max limit
   const formatBadgeCount = (count: number): string => {
     if (count > badgeMaxCount) {
@@ -105,22 +114,22 @@ export const IconButton: React.FC<IconButtonProps> = ({
             width: containerSize,
             height: containerSize,
             borderRadius: borderRadius,
-            backgroundColor: backgroundColor,
+            backgroundColor: resolvedBackgroundColor,
           },
           iconContainerStyle,
         ]}
       >
-        <Ionicons name={iconName} size={iconSize} color={iconColor} />
+        <Ionicons name={iconName} size={iconSize} color={resolvedIconColor} />
         
         {shouldShowBadge && (
           <View
             style={[
               styles.badge,
-              { backgroundColor: badgeColor },
+              { backgroundColor: resolvedBadgeColor, borderColor: colors.card },
               getBadgePositionStyle(),
             ]}
           >
-            <Text style={[styles.badgeText, { color: badgeTextColor }]}>
+            <Text style={[styles.badgeText, { color: resolvedBadgeTextColor }]}>
               {formatBadgeCount(badgeCount)}
             </Text>
           </View>
@@ -148,7 +157,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
   badgeText: {
     fontSize: 10,

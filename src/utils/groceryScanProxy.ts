@@ -75,9 +75,10 @@ export async function scanImageViaProxy({
     
     console.log(errorData.message || errorData.detail || `Scan failed with status ${res.status}`);
   }
-
+  
   const result = await res.json();
-  console.log('[scanImageViaProxy] Scan successful:', result.total_items, 'items found');
+  const { items = [], total_items = 0, analysis_notes } = result;
+  console.log('[scanImageViaProxy] Scan successful:', total_items, 'items found');
 
-  return result as GroceryScanResponse;
+  return { items, total_items, analysis_notes };
 }

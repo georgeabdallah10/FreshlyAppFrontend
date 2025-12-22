@@ -142,9 +142,10 @@ export async function scanGroceryImage(
   }
 
   const data = await response.json();
-  console.log('[AI API] Scan successful:', data.total_items, 'items found');
+  const { items = [], total_items = 0, analysis_notes } = data;
+  console.log('[AI API] Scan successful:', total_items, 'items found');
   
-  return data;
+  return { items, total_items, analysis_notes };
 }
 
 /**

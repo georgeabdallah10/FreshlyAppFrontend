@@ -4,6 +4,7 @@ import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
 import { useFamilyContext } from "@/context/familycontext";
 import { useUser } from "@/context/usercontext";
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
 import {
     leaveFamily,
@@ -24,6 +25,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import type { FamilyData, FamilyMember } from "../../app/(main)/(home)/MyFamily";
 
 interface MemberViewProps {
@@ -48,6 +51,10 @@ const MemberView: React.FC<MemberViewProps> = ({
   const user = userContext?.user;
   const familyContext = useFamilyContext();
   const selectedFamily = familyContext?.selectedFamily;
+  const scrollContentStyle = useScrollContentStyle();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const resolvedFamilyData = useMemo(() => {
     if (familyData) return familyData;
@@ -342,15 +349,18 @@ const MemberView: React.FC<MemberViewProps> = ({
   }, [showLeaveModal]);
 
   const confirmLeaveFamily = async () => {
+    const familyName = resolvedFamilyData?.name || "family";
     try {
       if (onLeaveFamily) {
         await onLeaveFamily();
       } else {
         await leaveFamily(Number(resolvedFamilyData?.id), Number(user?.id));
       }
-      showToast("success", "You have successfully left the family");
       setShowLeaveModal(false);
-      onBack();
+      showToast("success", `You left the family ${familyName} successfully`);
+      setTimeout(() => {
+        router.replace("/(main)/(home)/main");
+      }, 1100);
     } catch (error) {
       showToast("error", "Failed to leave family. Please try again.");
     }
@@ -364,7 +374,7 @@ const MemberView: React.FC<MemberViewProps> = ({
     <>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <Ionicons name="arrow-back" size={24} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Family</Text>
         <View style={styles.placeholder} />
@@ -379,11 +389,11 @@ const MemberView: React.FC<MemberViewProps> = ({
           }
         ]}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
       >
         <View style={styles.familyCard}>
           <View style={styles.familyIconContainer}>
-            <Ionicons name="home" size={32} color="#10B981" />
+            <Ionicons name="home" size={32} color={palette.success} />
           </View>
           <Text style={styles.familyName}>{resolvedFamilyData.name}</Text>
           <Text style={styles.familyMemberCount}>
@@ -393,7 +403,7 @@ const MemberView: React.FC<MemberViewProps> = ({
           {inviteCode ? (
             <View style={styles.inviteCodeContainer}>
               <View style={styles.inviteCodeRow}>
-                <Ionicons name="key-outline" size={14} color="#10B981" />
+                <Ionicons name="key-outline" size={14} color={palette.success} />
                 <Text style={styles.inviteCodeLabel}>Invite Code</Text>
               </View>
               <View style={styles.inviteCodeValueRow}>
@@ -410,7 +420,7 @@ const MemberView: React.FC<MemberViewProps> = ({
                   }}
                   activeOpacity={0.7}
                 >
-                  <Ionicons name="copy-outline" size={18} color="#10B981" />
+                  <Ionicons name="copy-outline" size={18} color={palette.success} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -421,7 +431,7 @@ const MemberView: React.FC<MemberViewProps> = ({
           <Text style={styles.sectionTitle}>Members</Text>
           
           {loading ? (
-            <Text style={{ color: "#6B7280", marginBottom: 8 }}>Loading members...</Text>
+            <Text style={styles.loadingText}>Loading members...</Text>
           ) : null}
           {localMembers.map((member) => {
             const isCurrentUser = String(member.id) === String(currentUserId);
@@ -432,11 +442,10 @@ const MemberView: React.FC<MemberViewProps> = ({
                 key={member.id}
                 style={[
                   styles.memberCard,
-                  // Role-based styling takes priority over current user styling
                   isOwner && styles.ownerCardHighlight,
                   isAdmin && styles.adminCardHighlight,
-                  // Current user styling only if not owner or admin
-                  isCurrentUser && !isOwner && !isAdmin && styles.currentUserCard,
+                  // Always highlight the current user
+                  isCurrentUser && styles.currentUserCard,
                 ]}
               >
                 <View style={styles.memberLeft}>
@@ -457,23 +466,23 @@ const MemberView: React.FC<MemberViewProps> = ({
                       <Text style={styles.memberName}>{member.name}</Text>
                       {member.role === "owner" && (
                         <View style={styles.ownerBadge}>
-                          <Ionicons name="star" size={12} color="#F59E0B" />
+                          <Ionicons name="star" size={12} color={palette.warning} />
                           <Text style={styles.ownerBadgeText}>Owner</Text>
                         </View>
                       )}
                       {member.role === "admin" && (
                         <View style={styles.adminBadge}>
-                          <Ionicons name="shield-checkmark" size={12} color="#2563EB" />
+                          <Ionicons name="shield-checkmark" size={12} color={palette.primary} />
                           <Text style={styles.adminBadgeText}>Admin</Text>
                         </View>
                       )}
                     </View>
                     <View style={styles.memberDetail}>
-                      <Ionicons name="mail-outline" size={14} color="#9CA3AF" />
+                      <Ionicons name="mail-outline" size={14} color={palette.textMuted} />
                       <Text style={styles.detailText}>{member.email || "No email"}</Text>
                     </View>
                     <View style={styles.memberDetail}>
-                      <Ionicons name="call-outline" size={14} color="#9CA3AF" />
+                      <Ionicons name="call-outline" size={14} color={palette.textMuted} />
                       <Text style={styles.detailText}>{member.phone}</Text>
                     </View>
                   </View>
@@ -484,10 +493,10 @@ const MemberView: React.FC<MemberViewProps> = ({
                 {canManageMember(member) && (
                   <IconButton
                     iconName="settings-outline"
-                    iconColor="#6B7280"
+                    iconColor={palette.textMuted}
                     iconSize={20}
                     containerSize={36}
-                    backgroundColor="#F3F4F6"
+                    backgroundColor={withAlpha(palette.textMuted, 0.12)}
                     borderRadius={18}
                     onPress={() => openActionModal(member)}
                     style={styles.actionTrigger}
@@ -503,7 +512,7 @@ const MemberView: React.FC<MemberViewProps> = ({
           onPress={() => setShowLeaveModal(true)}
           activeOpacity={0.8}
         >
-          <Ionicons name="exit-outline" size={20} color="#EF4444" />
+          <Ionicons name="exit-outline" size={20} color={palette.error} />
           <Text style={styles.leaveButtonText}>Leave Family</Text>
         </TouchableOpacity>
       </Animated.ScrollView>
@@ -549,7 +558,7 @@ const MemberView: React.FC<MemberViewProps> = ({
 
               <View style={styles.modalIconContainer}>
                 <View style={[styles.modalIcon, styles.modalIconDanger]}>
-                  <Ionicons name="warning" size={32} color="#EF4444" />
+                  <Ionicons name="warning" size={32} color={palette.error} />
                 </View>
               </View>
 
@@ -632,455 +641,482 @@ const MemberView: React.FC<MemberViewProps> = ({
 };
 
 // ==================== SHARED STYLES ====================
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-  },
-  placeholder: {
-    width: 32,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  familyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 24,
-    alignItems: "center",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  familyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#ECFDF5",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  familyName: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 4,
-  },
-  familyMemberCount: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    marginBottom: 16,
-  },
-  inviteCodeContainer: {
-    backgroundColor: "#ECFDF5",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: "#D1FAE5",
-  },
-  inviteCodeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
-  inviteCodeLabel: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: "#059669",
-  },
-  inviteCodeValueRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  inviteCodeValue: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#10B981",
-    letterSpacing: 2,
-  },
-  copyButton: {
-    padding: 8,
-    backgroundColor: "#D1FAE5",
-    borderRadius: 8,
-  },
-  inviteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: "#ECFDF5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#10B981",
-  },
-  inviteButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#10B981",
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#1F2937",
-    marginBottom: 16,
-  },
-  memberCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  actionTrigger: {
-    padding: 8,
-    marginLeft: 8,
-  },
-  currentUserCard: {
-    borderColor: "#FD8100",
-    shadowColor: "#FD8100",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  memberLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  memberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#10B981",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-    overflow: "hidden",
-  },
-  memberImage: {
-    width: "100%",
-    height: "100%",
-  },
-  memberInitial: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  memberInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  memberNameRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 2,
-  },
-  memberName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#1F2937",
-  },
-  ownerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: "#FEF3C7",
-    borderRadius: 8,
-  },
-  ownerBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#F59E0B",
-  },
-  memberDetail: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  detailText: {
-    fontSize: 13,
-    color: "#6B7280",
-  },
-  ownerCardHighlight: {
-    borderColor: "#F59E0B",
-    shadowColor: "#F59E0B",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  adminCardHighlight: {
-    borderColor: "#2563EB",
-    shadowColor: "#2563EB",
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  adminBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    backgroundColor: "#DBEAFE",
-    borderRadius: 8,
-  },
-  adminBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#2563EB",
-  },
-  kickButton: {
-    padding: 8,
-  },
-  leaveButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: "#EF4444",
-  },
-  leaveButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#EF4444",
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 12,
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 24,
-  },
-  modalIconContainer: {
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  modalIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#ECFDF5",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalIconDanger: {
-    backgroundColor: "#FEE2E2",
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#1F2937",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: "#9CA3AF",
-    textAlign: "center",
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  codeContainer: {
-    backgroundColor: "#F9FAFB",
-    borderRadius: 12,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    marginBottom: 20,
-  },
-  codeText: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#10B981",
-    textAlign: "center",
-    letterSpacing: 2,
-  },
-  modalButtonsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 16,
-  },
-  modalButtonSecondary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#ECFDF5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#10B981",
-  },
-  modalButtonSecondaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#10B981",
-  },
-  modalButtonPrimary: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#10B981",
-    borderRadius: 12,
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  modalButtonPrimaryText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  regenerateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-  },
-  regenerateButtonText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#6B7280",
-  },
-  modalButtonsColumn: {
-    gap: 12,
-  },
-  modalButtonDanger: {
-    paddingVertical: 14,
-    backgroundColor: "#EF4444",
-    borderRadius: 12,
-    alignItems: "center",
-    shadowColor: "#EF4444",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  modalButtonDangerText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  modalButtonCancel: {
-    paddingVertical: 14,
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  modalButtonCancelText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#6B7280",
-  },
-  requestsButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    backgroundColor: "#EFF6FF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-    marginTop: 16,
-    position: "relative",
-  },
-  requestsButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#007AFF",
-  },
-  badge: {
-    position: "absolute",
-    top: -6,
-    right: -6,
-    backgroundColor: "#FF3B30",
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: "#FFFFFF",
-  },
-  badgeText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontWeight: "700",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    placeholder: {
+      width: 32,
+    },
+    scrollView: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    scrollContent: {
+      padding: 20,
+    },
+    familyCard: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      padding: 24,
+      alignItems: "center",
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    familyIconContainer: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    familyName: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 4,
+    },
+    familyMemberCount: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginBottom: 16,
+    },
+    inviteCodeContainer: {
+      backgroundColor: withAlpha(palette.success, 0.12),
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      width: "100%",
+      borderWidth: 1,
+      borderColor: withAlpha(palette.success, 0.3),
+    },
+    inviteCodeRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginBottom: 6,
+    },
+    inviteCodeLabel: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: palette.success,
+    },
+    inviteCodeValueRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    inviteCodeValue: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.success,
+      letterSpacing: 2,
+    },
+    copyButton: {
+      padding: 8,
+      backgroundColor: withAlpha(palette.success, 0.2),
+      borderRadius: 8,
+    },
+    inviteButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.success,
+    },
+    inviteButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.success,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 16,
+    },
+    loadingText: {
+      color: palette.textMuted,
+      marginBottom: 8,
+    },
+    memberCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    actionTrigger: {
+      padding: 8,
+      marginLeft: 8,
+    },
+    currentUserCard: {
+      borderColor: palette.success,
+      shadowColor: palette.success,
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    memberLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    memberAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: palette.success,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      overflow: "hidden",
+    },
+    memberImage: {
+      width: "100%",
+      height: "100%",
+    },
+    memberInitial: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.card,
+    },
+    memberInfo: {
+      flex: 1,
+      gap: 6,
+    },
+    memberNameRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 2,
+    },
+    memberName: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    ownerBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      backgroundColor: withAlpha(palette.warning, 0.2),
+      borderRadius: 8,
+    },
+    ownerBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: palette.warning,
+    },
+    memberDetail: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    detailText: {
+      fontSize: 13,
+      color: palette.textMuted,
+    },
+    ownerCardHighlight: {
+      borderColor: palette.warning,
+      shadowColor: palette.warning,
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    adminCardHighlight: {
+      borderColor: palette.primary,
+      shadowColor: palette.primary,
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    adminBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      backgroundColor: withAlpha(palette.primary, 0.15),
+      borderRadius: 8,
+    },
+    adminBadgeText: {
+      fontSize: 11,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    kickButton: {
+      padding: 8,
+    },
+    leaveButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1.5,
+      borderColor: palette.error,
+    },
+    leaveButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.error,
+    },
+    modalOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withAlpha(palette.text, 0.5),
+    },
+    modalContent: {
+      backgroundColor: palette.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 24,
+      paddingBottom: 40,
+      paddingTop: 12,
+    },
+    modalHandle: {
+      width: 40,
+      height: 4,
+      backgroundColor: palette.border,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginBottom: 24,
+    },
+    modalIconContainer: {
+      alignItems: "center",
+      marginBottom: 16,
+    },
+    modalIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalIconDanger: {
+      backgroundColor: withAlpha(palette.error, 0.12),
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginBottom: 24,
+      lineHeight: 20,
+    },
+    codeContainer: {
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 20,
+    },
+    codeText: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.success,
+      textAlign: "center",
+      letterSpacing: 2,
+    },
+    modalButtonsRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 16,
+    },
+    modalButtonSecondary: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.success,
+    },
+    modalButtonSecondaryText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.success,
+    },
+    modalButtonPrimary: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: palette.success,
+      borderRadius: 12,
+      shadowColor: palette.success,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    modalButtonPrimaryText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    regenerateButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 12,
+    },
+    regenerateButtonText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: palette.textMuted,
+    },
+    modalButtonsColumn: {
+      gap: 12,
+    },
+    modalButtonDanger: {
+      paddingVertical: 14,
+      backgroundColor: palette.error,
+      borderRadius: 12,
+      alignItems: "center",
+      shadowColor: palette.error,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    modalButtonDangerText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    modalButtonCancel: {
+      paddingVertical: 14,
+      backgroundColor: withAlpha(palette.textMuted, 0.1),
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    modalButtonCancelText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    requestsButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      paddingVertical: 14,
+      backgroundColor: withAlpha(palette.primary, 0.12),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.primary, 0.35),
+      marginTop: 16,
+      position: "relative",
+    },
+    requestsButtonText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    badge: {
+      position: "absolute",
+      top: -6,
+      right: -6,
+      backgroundColor: palette.error,
+      borderRadius: 10,
+      minWidth: 20,
+      height: 20,
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 5,
+      borderWidth: 2,
+      borderColor: palette.card,
+    },
+    badgeText: {
+      color: palette.card,
+      fontSize: 11,
+      fontWeight: "700",
+    },
+  });
 
 export default MemberView;

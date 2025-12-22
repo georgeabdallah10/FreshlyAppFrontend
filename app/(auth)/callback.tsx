@@ -1,5 +1,6 @@
 import { supabase } from "@/src/supabase/client";
 import { Storage } from "@/src/utils/storage";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
@@ -94,7 +95,12 @@ export default function AuthCallbackScreen() {
       <View style={styles.content}>
         {error ? (
           <>
-            <Text style={styles.errorIcon}>⚠️</Text>
+            <Ionicons
+              name="alert-circle-outline"
+              size={48}
+              color="#DC2626"
+              style={styles.errorIcon}
+            />
             <Text style={styles.errorTitle}>Authentication Error</Text>
             <Text style={styles.errorMessage}>{error}</Text>
             <Text style={styles.redirectText}>Redirecting to login...</Text>
@@ -137,7 +143,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   errorIcon: {
-    fontSize: 48,
     marginBottom: 16,
   },
   errorTitle: {

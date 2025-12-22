@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
@@ -20,41 +22,7 @@ const CALORIES_PER_GRAM = {
 } as const;
 
 // Step size for macro adjustments (in grams)
-const MACRO_STEP_GRAMS = 5;
-
-// ============================================================================
-// MACRO RANGE LIMITS (percentage of total calories)
-// These define the healthy min/max for each macro
-// ============================================================================
-const MACRO_PERCENTAGE_LIMITS = {
-  protein: { min: 0.15, max: 0.40 }, // 15-40% of calories
-  carbs: { min: 0.20, max: 0.60 },   // 20-60% of calories
-  fat: { min: 0.15, max: 0.40 },     // 15-40% of calories
-} as const;
-
-/**
- * Calculates the min/max gram limits for each macro based on total calories.
- */
-function calculateMacroLimits(totalCalories: number): {
-  protein: { min: number; max: number };
-  carbs: { min: number; max: number };
-  fat: { min: number; max: number };
-} {
-  return {
-    protein: {
-      min: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.protein.min) / CALORIES_PER_GRAM.protein),
-      max: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.protein.max) / CALORIES_PER_GRAM.protein),
-    },
-    carbs: {
-      min: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.carbs.min) / CALORIES_PER_GRAM.carbs),
-      max: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.carbs.max) / CALORIES_PER_GRAM.carbs),
-    },
-    fat: {
-      min: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.fat.min) / CALORIES_PER_GRAM.fat),
-      max: Math.round((totalCalories * MACRO_PERCENTAGE_LIMITS.fat.max) / CALORIES_PER_GRAM.fat),
-    },
-  };
-}
+const MACRO_STEP_GRAMS = 50;
 
 // ============================================================================
 // MacroCard Component - Displays macro with +/- controls
@@ -62,8 +30,6 @@ function calculateMacroLimits(totalCalories: number): {
 type MacroCardProps = {
   label: string;
   grams: number;
-  minGrams: number;
-  maxGrams: number;
   accentColor: string;
   animatedScale: Animated.Value | Animated.AnimatedMultiplication<number>;
   animatedOpacity: Animated.Value;
@@ -76,8 +42,6 @@ type MacroCardProps = {
 const MacroCard: React.FC<MacroCardProps> = ({
   label,
   grams,
-  minGrams,
-  maxGrams,
   accentColor,
   animatedScale,
   animatedOpacity,
@@ -102,7 +66,6 @@ const MacroCard: React.FC<MacroCardProps> = ({
         <Text style={styles.macroValue}>{grams}</Text>
         <Text style={styles.macroUnit}>g</Text>
       </View>
-      <Text style={styles.macroRange}>{minGrams}-{maxGrams}g</Text>
       <View style={styles.macroButtonRow}>
         <TouchableOpacity
           style={[
@@ -502,6 +465,13 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
   onCalorieRangeChange,
   onMacrosChange,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  const accentProtein = useMemo(() => withAlpha(palette.success, 0.14), [palette.success]);
+  const accentCarbs = useMemo(() => withAlpha(palette.warning, 0.14), [palette.warning]);
+  const accentFat = useMemo(() => withAlpha(palette.textMuted, 0.12), [palette.textMuted]);
+
   // ============================================================================
   // ANIMATION REFS
   // ============================================================================
@@ -614,20 +584,6 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
   const actualCaloriesFromMacros = useMemo(() => {
     return calculateCaloriesFromMacros(proteinGrams, carbGrams, fatGrams);
   }, [proteinGrams, carbGrams, fatGrams]);
-
-  // Calculate macro limits based on recommended calories (not current calories)
-  // This ensures limits stay stable as user adjusts macros
-  const macroLimits = useMemo(() => {
-    const baseCalories = recommendedCalories ?? dailyCalories;
-    if (baseCalories <= 0) {
-      return {
-        protein: { min: 0, max: 999 },
-        carbs: { min: 0, max: 999 },
-        fat: { min: 0, max: 999 },
-      };
-    }
-    return calculateMacroLimits(baseCalories);
-  }, [recommendedCalories, dailyCalories]);
 
   // ============================================================================
   // INITIALIZATION - Set initial macro values from daily calories
@@ -811,28 +767,27 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
    * Adjusts a macro by the step amount.
    * Only the adjusted macro changes - others stay the same.
    * Total calories are recalculated from the new macro values.
-   * Respects min/max limits for each macro.
+   * Only prevents going below 0 - no upper limit.
    * @param macro - Which macro to adjust
    * @param direction - "increment" or "decrement"
    */
   const handleMacroAdjust = useCallback(
     (macro: "protein" | "carbs" | "fat", direction: "increment" | "decrement") => {
       const delta = direction === "increment" ? MACRO_STEP_GRAMS : -MACRO_STEP_GRAMS;
-      const limits = macroLimits[macro];
 
       let newProtein = proteinGrams;
       let newCarbs = carbGrams;
       let newFat = fatGrams;
 
-      // Update only the adjusted macro, respecting min/max limits
+      // Update only the adjusted macro, preventing negative values
       if (macro === "protein") {
-        newProtein = Math.max(limits.min, Math.min(limits.max, proteinGrams + delta));
+        newProtein = Math.max(0, proteinGrams + delta);
         if (newProtein === proteinGrams) return; // No change possible
       } else if (macro === "carbs") {
-        newCarbs = Math.max(limits.min, Math.min(limits.max, carbGrams + delta));
+        newCarbs = Math.max(0, carbGrams + delta);
         if (newCarbs === carbGrams) return; // No change possible
       } else {
-        newFat = Math.max(limits.min, Math.min(limits.max, fatGrams + delta));
+        newFat = Math.max(0, fatGrams + delta);
         if (newFat === fatGrams) return; // No change possible
       }
 
@@ -847,7 +802,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
       // Update the calorie target to reflect the new total
       onCalorieTargetChange(newTotalCalories);
     },
-    [proteinGrams, carbGrams, fatGrams, macroLimits, onCalorieTargetChange]
+    [proteinGrams, carbGrams, fatGrams, onCalorieTargetChange]
   );
 
   // Individual handlers for each macro
@@ -878,34 +833,18 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
 
   // ============================================================================
   // CAN INCREMENT/DECREMENT CHECKS
-  // Based on macro limits (min/max for each macro)
+  // No upper limit - only prevent going below 0
   // ============================================================================
 
-  // Check if we can increment a macro (won't exceed macro max limit)
-  const canIncrementProtein = useMemo(() => {
-    return proteinGrams + MACRO_STEP_GRAMS <= macroLimits.protein.max;
-  }, [proteinGrams, macroLimits.protein.max]);
+  // Increment is always allowed (no upper limit)
+  const canIncrementProtein = true;
+  const canIncrementCarbs = true;
+  const canIncrementFat = true;
 
-  const canIncrementCarbs = useMemo(() => {
-    return carbGrams + MACRO_STEP_GRAMS <= macroLimits.carbs.max;
-  }, [carbGrams, macroLimits.carbs.max]);
-
-  const canIncrementFat = useMemo(() => {
-    return fatGrams + MACRO_STEP_GRAMS <= macroLimits.fat.max;
-  }, [fatGrams, macroLimits.fat.max]);
-
-  // Check if we can decrement (won't go below macro min limit)
-  const canDecrementProtein = useMemo(() => {
-    return proteinGrams - MACRO_STEP_GRAMS >= macroLimits.protein.min;
-  }, [proteinGrams, macroLimits.protein.min]);
-
-  const canDecrementCarbs = useMemo(() => {
-    return carbGrams - MACRO_STEP_GRAMS >= macroLimits.carbs.min;
-  }, [carbGrams, macroLimits.carbs.min]);
-
-  const canDecrementFat = useMemo(() => {
-    return fatGrams - MACRO_STEP_GRAMS >= macroLimits.fat.min;
-  }, [fatGrams, macroLimits.fat.min]);
+  // Check if we can decrement (won't go below 0)
+  const canDecrementProtein = proteinGrams >= MACRO_STEP_GRAMS;
+  const canDecrementCarbs = carbGrams >= MACRO_STEP_GRAMS;
+  const canDecrementFat = fatGrams >= MACRO_STEP_GRAMS;
 
   // ============================================================================
   // CALORIE ADJUSTMENT HANDLERS
@@ -1029,9 +968,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
         <MacroCard
           label="Protein"
           grams={proteinGrams}
-          minGrams={macroLimits.protein.min}
-          maxGrams={macroLimits.protein.max}
-          accentColor="#E8F5E9"
+          accentColor={accentProtein}
           animatedScale={macroScaleCombined1}
           animatedOpacity={macroOpacity1}
           onIncrement={incrementProtein}
@@ -1042,9 +979,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
         <MacroCard
           label="Carbs"
           grams={carbGrams}
-          minGrams={macroLimits.carbs.min}
-          maxGrams={macroLimits.carbs.max}
-          accentColor="#FFF3E0"
+          accentColor={accentCarbs}
           animatedScale={macroScaleCombined2}
           animatedOpacity={macroOpacity2}
           onIncrement={incrementCarbs}
@@ -1055,9 +990,7 @@ const RecommendedCaloriesScreen: React.FC<RecommendedCaloriesScreenProps> = ({
         <MacroCard
           label="Fat"
           grams={fatGrams}
-          minGrams={macroLimits.fat.min}
-          maxGrams={macroLimits.fat.max}
-          accentColor="#F5F5F5"
+          accentColor={accentFat}
           animatedScale={macroScaleCombined3}
           animatedOpacity={macroOpacity3}
           onIncrement={incrementFat}
@@ -1125,195 +1058,211 @@ const clampCalorieValue = (
   return Math.min(Math.max(value, min), max);
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    marginBottom: 24,
-    alignItems: "center",
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#111111",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: "#666666",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  pulseCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 2,
-    borderColor: "#EEEFF3",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-    shadowColor: "#000000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  pulseValue: {
-    fontSize: 36,
-    fontWeight: "700",
-    color: "#00C853",
-  },
-  pulseUnit: {
-    fontSize: 14,
-    color: "#666666",
-    marginTop: 4,
-  },
-  // Calorie stepper row styles
-  stepperRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    width: "100%",
-  },
-  stepperButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    shadowColor: "#000000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  stepperButtonDisabled: {
-    backgroundColor: "#F5F5F5",
-    borderColor: "#E5E5E5",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  stepperLabel: {
-    fontSize: 28,
-    color: "#111111",
-    fontWeight: "700",
-  },
-  stepperLabelDisabled: {
-    color: "#CCCCCC",
-  },
-  stepperInfo: {
-    flex: 1,
-    alignItems: "center",
-  },
-  rangeLabel: {
-    fontSize: 12,
-    color: "#666666",
-    marginBottom: 4,
-  },
-  rangeValue: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  // Macro card styles with +/- buttons
-  macrosContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: SCREEN_WIDTH < 380 ? 8 : 12,
-    marginBottom: 20,
-    width: "100%",
-  },
-  macroCard: {
-    flex: 1,
-    minWidth: SCREEN_WIDTH < 380 ? 90 : 100,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    alignItems: "center",
-    shadowColor: "#000000",
-    shadowOpacity: 0.04,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 6,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "rgba(0, 0, 0, 0.04)",
-  },
-  macroLabel: {
-    fontSize: SCREEN_WIDTH < 380 ? 10 : 11,
-    color: "#888888",
-    fontWeight: "500",
-    marginBottom: 4,
-  },
-  macroValueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    marginBottom: 2,
-  },
-  macroValue: {
-    fontSize: SCREEN_WIDTH < 380 ? 20 : 24,
-    fontWeight: "700",
-    color: "#222222",
-  },
-  macroUnit: {
-    fontSize: SCREEN_WIDTH < 380 ? 11 : 12,
-    fontWeight: "500",
-    color: "#999999",
-    marginLeft: 2,
-  },
-  macroRange: {
-    fontSize: SCREEN_WIDTH < 380 ? 9 : 10,
-    fontWeight: "500",
-    color: "#AAAAAA",
-    marginBottom: 6,
-  },
-  // +/- button styles for macro cards
-  macroButtonRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-  },
-  macroButton: {
-    width: SCREEN_WIDTH < 380 ? 28 : 32,
-    height: SCREEN_WIDTH < 380 ? 28 : 32,
-    borderRadius: SCREEN_WIDTH < 380 ? 14 : 16,
-    backgroundColor: "#FFFFFF",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#DDDDDD",
-    shadowColor: "#000000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  macroButtonDisabled: {
-    backgroundColor: "#F0F0F0",
-    borderColor: "#E5E5E5",
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  macroButtonText: {
-    fontSize: SCREEN_WIDTH < 380 ? 18 : 20,
-    fontWeight: "600",
-    color: "#333333",
-    lineHeight: SCREEN_WIDTH < 380 ? 20 : 22,
-  },
-  macroButtonTextDisabled: {
-    color: "#CCCCCC",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 24,
+      alignItems: "center",
+    },
+    cardTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    cardSubtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 24,
+    },
+    pulseCircle: {
+      width: 160,
+      height: 160,
+      borderRadius: 80,
+      backgroundColor: palette.card,
+      borderWidth: 2,
+      borderColor: palette.border,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 20,
+      shadowColor: palette.text,
+      shadowOpacity: 0.08,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    pulseValue: {
+      fontSize: 36,
+      fontWeight: "700",
+      color: palette.success,
+    },
+    pulseUnit: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginTop: 4,
+    },
+    // Calorie stepper row styles
+    stepperRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      width: "100%",
+    },
+    stepperButton: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: palette.card,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOpacity: 0.06,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    stepperButtonDisabled: {
+      backgroundColor: withAlpha(palette.textMuted, 0.08),
+      borderColor: withAlpha(palette.border, 0.8),
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    stepperLabel: {
+      fontSize: 28,
+      color: palette.text,
+      fontWeight: "700",
+    },
+    stepperLabelDisabled: {
+      color: withAlpha(palette.textMuted, 0.6),
+    },
+    stepperInfo: {
+      flex: 1,
+      alignItems: "center",
+    },
+    rangeLabel: {
+      fontSize: 12,
+      color: palette.textMuted,
+      marginBottom: 4,
+    },
+    rangeValue: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    // Macro card styles with +/- buttons
+    macrosContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: SCREEN_WIDTH < 380 ? 8 : 12,
+      marginBottom: 20,
+      width: "100%",
+    },
+    macroCard: {
+      flex: 1,
+      minWidth: SCREEN_WIDTH < 380 ? 90 : 100,
+      paddingVertical: 12,
+      paddingHorizontal: 8,
+      borderRadius: 16,
+      alignItems: "center",
+      shadowColor: palette.text,
+      shadowOpacity: 0.06,
+      shadowOffset: { width: 0, height: 3 },
+      shadowRadius: 6,
+      elevation: 2,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.textMuted, 0.12),
+    },
+    macroLabel: {
+      fontSize: SCREEN_WIDTH < 380 ? 10 : 11,
+      color: palette.textMuted,
+      fontWeight: "500",
+      marginBottom: 4,
+    },
+    macroValueRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      marginBottom: 2,
+    },
+    macroValue: {
+      fontSize: SCREEN_WIDTH < 380 ? 20 : 24,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    macroUnit: {
+      fontSize: SCREEN_WIDTH < 380 ? 11 : 12,
+      fontWeight: "500",
+      color: palette.textMuted,
+      marginLeft: 2,
+      marginBottom: 6,
+    },
+    // +/- button styles for macro cards
+    macroButtonRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 8,
+    },
+    macroButton: {
+      width: SCREEN_WIDTH < 380 ? 28 : 32,
+      height: SCREEN_WIDTH < 380 ? 28 : 32,
+      borderRadius: SCREEN_WIDTH < 380 ? 14 : 16,
+      backgroundColor: palette.card,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.text,
+      shadowOpacity: 0.05,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    macroButtonDisabled: {
+      backgroundColor: withAlpha(palette.textMuted, 0.08),
+      borderColor: withAlpha(palette.border, 0.8),
+      shadowOpacity: 0,
+      elevation: 0,
+    },
+    macroButtonText: {
+      fontSize: SCREEN_WIDTH < 380 ? 18 : 20,
+      fontWeight: "600",
+      color: palette.text,
+      lineHeight: SCREEN_WIDTH < 380 ? 20 : 22,
+    },
+    macroButtonTextDisabled: {
+      color: withAlpha(palette.textMuted, 0.6),
+    },
+  });
 
 export default RecommendedCaloriesScreen;

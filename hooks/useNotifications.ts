@@ -213,9 +213,9 @@ export function useNotificationSystem(userId?: number) {
   // Register for push notifications mutation
   const registerPushMutation = useMutation({
     mutationFn: (id: number) => registerForPushNotifications(id),
-    onSuccess: (token) => {
-      if (token) {
-        setExpoPushToken(token);
+    onSuccess: (result) => {
+      if (result.success && result.token) {
+        setExpoPushToken(result.token);
         setPermissionsGranted(true);
         console.log('[useNotificationSystem] Push notifications registered');
       }

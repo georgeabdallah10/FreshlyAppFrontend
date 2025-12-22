@@ -1,5 +1,7 @@
 // app/components/ScanConfirmModal.tsx
-import React, { useEffect, useRef } from "react";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
+import React, { useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -34,6 +36,9 @@ const ScanConfirmModal: React.FC<Props> = ({
   onApprove,
   onCancel,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   // stable animated values
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.95)).current;
@@ -102,7 +107,7 @@ const ScanConfirmModal: React.FC<Props> = ({
       <BlurView
         style={StyleSheet.absoluteFill}
         intensity={30}
-        tint={Platform.OS === "ios" ? "systemThinMaterialDark" : "dark"}
+        tint={Platform.OS === "ios" ? "systemMaterial" : "dark"}
       />
 
       {/* Subtle dark overlay on top of blur for contrast */}
@@ -150,80 +155,102 @@ const ScanConfirmModal: React.FC<Props> = ({
 
 export default ScanConfirmModal;
 
-const styles = StyleSheet.create({
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
-  card: {
-    position: "absolute",
-    left: "8%",
-    right: "8%",
-    top: "22%",
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 18,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 12,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#222",
-    marginBottom: 10,
-  },
-  image: {
-    width: 128,
-    height: 128,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  imagePlaceholder: {
-    width: 128,
-    height: 128,
-    borderRadius: 12,
-    backgroundColor: "#F2F2F2",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  placeholderText: {
-    color: "#888",
-    fontSize: 12,
-  },
-  name: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  row: {
-    width: "100%",
-    flexDirection: "row",
-    gap: 10,
-  },
-  btn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  rescanBtn: {
-    backgroundColor: "#F3F4F6",
-  },
-  approveBtn: {
-    backgroundColor: "#00A86B", // your green
-  },
-  btnText: {
-    color: "#fff",
-    fontWeight: "700",
-  },
-  rescanText: {
-    color: "#111827",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  primary: colors.primary,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  shadow: withAlpha(colors.textPrimary, 0.2),
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withAlpha(palette.text, 0.25),
+    },
+    card: {
+      position: "absolute",
+      left: "8%",
+      right: "8%",
+      top: "22%",
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 18,
+      alignItems: "center",
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.2,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    title: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: palette.text,
+      marginBottom: 10,
+    },
+    image: {
+      width: 128,
+      height: 128,
+      borderRadius: 12,
+      marginBottom: 12,
+    },
+    imagePlaceholder: {
+      width: 128,
+      height: 128,
+      borderRadius: 12,
+      backgroundColor: withAlpha(palette.textMuted, 0.1),
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    placeholderText: {
+      color: palette.textMuted,
+      fontSize: 12,
+    },
+    name: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    row: {
+      width: "100%",
+      flexDirection: "row",
+      gap: 10,
+    },
+    btn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      alignItems: "center",
+    },
+    rescanBtn: {
+      backgroundColor: withAlpha(palette.textMuted, 0.08),
+    },
+    approveBtn: {
+      backgroundColor: palette.primary,
+    },
+    btnText: {
+      color: palette.card,
+      fontWeight: "700",
+    },
+    rescanText: {
+      color: palette.text,
+    },
+  });

@@ -10,13 +10,13 @@ The Home Screen Tutorial is a first-time onboarding experience that guides new u
 This is the main tutorial component with all the logic and UI.
 
 **Key Features:**
-- ✅ Spotlight overlay with smooth animations
-- ✅ Step-by-step walkthrough (5 steps total)
-- ✅ Progress indicators
-- ✅ "Skip Tutorial" button
-- ✅ Persistent storage using `Storage` utility
-- ✅ Responsive positioning (card appears above/below spotlight based on available space)
-- ✅ Clean separation of concerns
+-  Spotlight overlay with smooth animations
+-  Step-by-step walkthrough (5 steps total)
+-  Progress indicators
+-  "Skip Tutorial" button
+-  Persistent storage using `Storage` utility
+-  Responsive positioning (card appears above/below spotlight based on available space)
+-  Clean separation of concerns
 
 **Key Functions:**
 - `checkTutorialCompleted()` - Checks if user has seen the tutorial

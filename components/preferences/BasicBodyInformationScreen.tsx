@@ -255,22 +255,29 @@ const BasicBodyInformationScreen: React.FC<
           ].map((option) => {
             const isSelected = gender === option.id;
             const isMale = option.id === "male";
-            const bgColor = genderAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: isMale
-                ? ["rgba(0, 200, 83, 0.15)", "#FFFFFF"]
-                : ["#FFFFFF", "rgba(253, 129, 0, 0.15)"],
-            });
-            const borderColor = genderAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: isMale
-                ? ["rgba(0, 200, 83, 0.35)", "#EEEFF3"]
-                : ["#EEEFF3", "rgba(253, 129, 0, 0.35)"],
-            });
-            const textColor = genderAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: isMale ? ["#00C853", "#111111"] : ["#111111", "#FD8100"],
-            });
+            const hasSelection = gender !== null;
+            const bgColor = hasSelection
+              ? genderAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: isMale
+                    ? ["rgba(0, 200, 83, 0.15)", "#FFFFFF"]
+                    : ["#FFFFFF", "rgba(253, 129, 0, 0.15)"],
+                })
+              : "#FFFFFF";
+            const borderColor = hasSelection
+              ? genderAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: isMale
+                    ? ["rgba(0, 200, 83, 0.35)", "#EEEFF3"]
+                    : ["#EEEFF3", "rgba(253, 129, 0, 0.35)"],
+                })
+              : "#EEEFF3";
+            const textColor = hasSelection
+              ? genderAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: isMale ? ["#00C853", "#111111"] : ["#111111", "#FD8100"],
+                })
+              : "#111111";
             return (
               <TouchableOpacity
                 key={option.id}

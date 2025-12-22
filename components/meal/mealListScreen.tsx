@@ -1,6 +1,12 @@
 // ==================== screens/MealListScreen.tsx ====================
+import ToastBanner from "@/components/generalMessage";
+import AppTextInput from "@/components/ui/AppTextInput";
+import { useThemeContext } from "@/context/ThemeContext";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import { preloadMealImages } from "@/src/services/mealImageService";
-import { createMealForSignleUser, getAllmealsforSignelUser } from "@/src/user/meals";
+import { createMealForSingleUser, getAllMealsForSingleUser } from "@/src/user/meals";
+import { ColorTokens } from "@/theme/colors";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +19,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   UIManager,
   View,
@@ -21,6 +26,13 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { AddMealModal } from "./addMealModal";
 import { MealImage } from "./MealImage";
+
+type ToastType = "success" | "error";
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+}
 
 interface MealListScreenProps {
   onMealSelect: (meal: any) => void;
@@ -30,18 +42,39 @@ interface MealListScreenProps {
   scrollToEnd?: boolean;
 }
 
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  charcoal: "#4C4D59",
-  charcoalLight: "#F0F0F2",
-  white: "#FFFFFF",
-  background: "#F7F8FB",
-  text: "#0A0A0A",
-  textMuted: "#6B7280",
-  border: "#E9ECF2",
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens, mode: "light" | "dark") => {
+  const overlayBase = mode === "dark" ? colors.card : colors.textPrimary;
+
+  return {
+    primary: colors.primary,
+    primaryLight: withAlpha(colors.primary, 0.12),
+    primaryDeep: withAlpha(colors.primary, 0.85),
+    accent: colors.warning,
+    accentLight: withAlpha(colors.warning, 0.12),
+    accentDeep: withAlpha(colors.warning, 0.85),
+    charcoal: colors.textPrimary,
+    charcoalLight: withAlpha(colors.textSecondary, 0.08),
+    charcoalDeep: withAlpha(colors.textPrimary, 0.85),
+    card: colors.card,
+    background: colors.background,
+    text: colors.textPrimary,
+    textMuted: colors.textSecondary,
+    border: colors.border,
+    onPrimary: mode === "dark" ? colors.textPrimary : colors.background,
+    overlay: withAlpha(overlayBase, mode === "dark" ? 0.7 : 0.45),
+    overlaySoft: withAlpha(overlayBase, 0.3),
+    shadow: withAlpha(colors.textPrimary, 0.25),
+    shadowSoft: withAlpha(colors.textPrimary, 0.15),
+  };
 };
 
 const CATEGORIES = [
@@ -56,20 +89,41 @@ const CATEGORIES = [
 
 type Category = (typeof CATEGORIES)[number];
 
-const MealListScreen: React.FC<MealListScreenProps> = ({ 
+const MealListScreen: React.FC<MealListScreenProps> = ({
   onMealSelect,
   isLoading: parentLoading = false,
   hasError: parentError = false,
   onImageError,
   scrollToEnd = false,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(
+    () => createPalette(theme.colors, theme.mode),
+    [theme.colors, theme.mode]
+  );
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  const chipColors = useMemo(
+    () => [palette.primary, palette.accent, palette.charcoal],
+    [palette]
+  );
+
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [meals, setMeals] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [toast, setToast] = useState<ToastState>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
   const router = useRouter();
+  const bottomNavInset = useBottomNavInset();
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const showToast = (type: ToastType, message: string) => {
+    setToast({ visible: true, type, message });
+  };
 
   // Animation values
   const headerFadeAnim = useRef(new Animated.Value(0)).current;
@@ -91,7 +145,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const normalizeMeal = (m: any) => ({
     id: m.id,
     name: m.name ?? "Untitled Meal",
-    image: m.image ?? "🍽️",
+    image: m.image ?? "restaurant-outline",
     calories: Number(m.calories ?? 0),
     prepTime: Number(m.prep_time ?? m.prepTime ?? 0),
     cookTime: Number(m.cook_time ?? m.cookTime ?? 0),
@@ -127,7 +181,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
 
   const reloadMeals = async () => {
     try {
-      const res = await getAllmealsforSignelUser();
+      const res = await getAllMealsForSingleUser();
       const data = await res?.json();
       const list = Array.isArray(data) ? data.map(normalizeMeal) : [];
       setMeals(list);
@@ -211,13 +265,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   const handleMealSubmit = async (meal: any) => {
     try {
       setIsSubmitting(true);
-      const response = await createMealForSignleUser(meal);
+      const response = await createMealForSingleUser(meal);
       setMeals([...meals, normalizeMeal(response || meal)]);
       setShowAddMealModal(false);
-      alert("Meal added successfully!");
+      showToast("success", "Meal added successfully!");
     } catch (error) {
       console.log("Error creating meal:", error);
-      alert("Failed to add meal. Please try again.");
+      showToast("error", "Failed to add meal. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -245,7 +299,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   }, [meals, selectedCategory, searchQuery]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <AddMealModal
         visible={showAddMealModal}
         onClose={() => setShowAddMealModal(false)}
@@ -253,7 +307,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       />
       {isSubmitting && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={palette.primary} />
         </View>
       )}
       
@@ -284,10 +338,10 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           { opacity: searchFadeAnim }
         ]}
       >
-        <TextInput
+        <AppTextInput
           style={styles.searchInput}
           placeholder="Search meals..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={palette.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
           returnKeyType="search"
@@ -315,8 +369,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             <Text style={styles.addCategoryPlus}>+</Text>
           </TouchableOpacity>
           {CATEGORIES.map((category, index) => {
-            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
-            const color = colors[index % 3];
+            const color = chipColors[index % chipColors.length];
             const isActive = selectedCategory === category;
             
             return (
@@ -346,14 +399,19 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       {/* Loading State */}
       {parentLoading ? (
         <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={palette.primary} />
           <Text style={styles.emptyStateTitle}>Loading your meals...</Text>
           <Text style={styles.emptyStateSubtitle}>Just a moment</Text>
         </Animated.View>
       ) : parentError ? (
         /* Error State */
         <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
-          <Text style={styles.emptyStateEmoji}>😕</Text>
+          <Ionicons
+            name="alert-circle-outline"
+            size={56}
+            color={palette.textMuted}
+            style={styles.emptyStateIcon}
+          />
           <Text style={styles.emptyStateTitle}>Couldn't Load Meals</Text>
           <Text style={styles.emptyStateSubtitle}>
             We had trouble loading your meals. Please check your connection and try again.
@@ -364,7 +422,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[COLORS.primary, "#008F5C"]}
+              colors={[palette.primary, palette.primaryDeep]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}
@@ -376,7 +434,12 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       ) : filteredMeals.length === 0 ? (
         /* Empty State */
         <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
-          <Text style={styles.emptyStateEmoji}>🍽️</Text>
+          <Ionicons
+            name="restaurant-outline"
+            size={56}
+            color={palette.textMuted}
+            style={styles.emptyStateIcon}
+          />
           <Text style={styles.emptyStateTitle}>No Meals Yet</Text>
           <Text style={styles.emptyStateSubtitle}>
             Start by adding your first meal plan or use Quick Meals to generate one!
@@ -387,7 +450,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[COLORS.accent, COLORS.primary]}
+              colors={[palette.accent, palette.primary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}
@@ -401,13 +464,15 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
         <Animated.ScrollView
           ref={scrollViewRef}
           style={[styles.mealsContainer, { opacity: contentFadeAnim }]}
-          contentContainerStyle={styles.mealsContent}
+          contentContainerStyle={[
+            styles.mealsContent,
+            { paddingBottom: bottomNavInset + 24 },
+          ]}
           showsVerticalScrollIndicator={false}
           bounces={true}
         >
           {filteredMeals.map((meal: any, index: any) => {
-            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
-            const accentColor = colors[index % 3];
+            const accentColor = chipColors[index % chipColors.length];
             
             return (
               <TouchableOpacity
@@ -433,18 +498,18 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                   <View>
                     <Text style={styles.mealName}>{meal.name}</Text>
 
-                    <View style={styles.mealMetaRow}>
-                      <View style={styles.metaItem}>
-                        <Text style={styles.metaIcon}>🔥</Text>
-                        <Text style={styles.metaText}>{meal.calories}kcal</Text>
-                      </View>
-                      {meal.totalTime !== 0 ? (
-                        <View style={styles.metaItem}>
-                          <Text style={styles.metaIcon}>⏱</Text>
-                          <Text style={styles.metaText}>{meal.totalTime}min</Text>
-                        </View>
-                      ) : null}
+                  <View style={styles.mealMetaRow}>
+                    <View style={styles.metaItem}>
+                      <Ionicons name="flame-outline" size={16} color={palette.onPrimary} />
+                      <Text style={styles.metaText}>{meal.calories}kcal</Text>
                     </View>
+                    {meal.totalTime !== 0 ? (
+                      <View style={styles.metaItem}>
+                        <Ionicons name="time-outline" size={16} color={palette.onPrimary} />
+                        <Text style={styles.metaText}>{meal.totalTime}min</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   </View>
 
                   <View style={styles.macrosRow}>
@@ -452,7 +517,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                       <View style={styles.macroItem}>
                         <View style={styles.macroCircle}>
                           <LinearGradient
-                            colors={[COLORS.primary, "#008F5C"]}
+                            colors={[palette.primary, palette.primaryDeep]}
                             style={styles.macroGradient}
                           />
                         </View>
@@ -468,7 +533,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                       <View style={styles.macroItem}>
                         <View style={styles.macroCircle}>
                           <LinearGradient
-                            colors={[COLORS.accent, "#E67700"]}
+                            colors={[palette.accent, palette.accentDeep]}
                             style={styles.macroGradient}
                           />
                         </View>
@@ -482,7 +547,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
                       <View style={styles.macroItem}>
                         <View style={styles.macroCircle}>
                           <LinearGradient
-                            colors={[COLORS.charcoal, "#3A3B44"]}
+                            colors={[palette.charcoal, palette.charcoalDeep]}
                             style={styles.macroGradient}
                           />
                         </View>
@@ -499,18 +564,17 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
               </TouchableOpacity>
             );
           })}
-          <View style={{ height: 100 }} />
         </Animated.ScrollView>
       )}
 
       {/* Add Meal Floating Button */}
       <TouchableOpacity
-        style={styles.addMealButton}
+        style={[styles.addMealButton, { bottom: bottomNavInset + 16 }]}
         onPress={onAddMeal}
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={[COLORS.accent, COLORS.primary]}
+          colors={[palette.accent, palette.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.fabGradient}
@@ -518,14 +582,20 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           <Text style={styles.addMealButtonText}>+ Add Meal</Text>
         </LinearGradient>
       </TouchableOpacity>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        onHide={() => setToast((prev) => ({ ...prev, visible: false }))}
+      />
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.background,
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: palette.background,
   },
 
   /* Header */
@@ -534,9 +604,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
     justifyContent: "center",
   },
   backButton: {
@@ -545,32 +615,32 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
+    shadowColor: palette.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
     elevation: 2,
     zIndex: 1,
   },
-  backIcon: { fontSize: 22, color: COLORS.primary, fontWeight: "600" },
+  backIcon: { fontSize: 22, color: palette.primary, fontWeight: "600" },
   headerTitle: {
     fontSize: 28,
     fontWeight: "800",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
   },
   groceryButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 16,
-    shadowColor: "#000",
+    shadowColor: palette.shadow,
     shadowOpacity: 0.08,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 3 },
@@ -585,10 +655,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginVertical: 16,
     borderRadius: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.card,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: "#000",
+    borderColor: palette.border,
+    shadowColor: palette.shadowSoft,
     shadowOpacity: 0.05,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
@@ -598,7 +668,7 @@ const styles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
   },
 
   /* Categories */
@@ -608,9 +678,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 20,
   },
-  categoriesContainer: { 
-    maxHeight: 50, 
-    flexGrow: 0 
+  categoriesContainer: {
+    maxHeight: 50,
+    flexGrow: 0
   },
   categoriesContent: { gap: 10 },
 
@@ -618,11 +688,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 24,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.card,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     marginRight: 6,
-    shadowColor: "#000",
+    shadowColor: palette.shadowSoft,
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -632,25 +702,25 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.97 }],
     opacity: 0.92,
   },
-  categoryText: { 
-    fontSize: 15, 
-    fontWeight: "700", 
-    color: COLORS.textMuted 
+  categoryText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: palette.textMuted
   },
-  categoryTextActive: { color: COLORS.white },
+  categoryTextActive: { color: palette.onPrimary },
 
   addCategoryChip: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.card,
     marginRight: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: palette.primary,
     borderStyle: "dashed",
-    shadowColor: "#000",
+    shadowColor: palette.shadowSoft,
     shadowOpacity: 0.06,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -659,12 +729,12 @@ const styles = StyleSheet.create({
   addCategoryPlus: {
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.primary,
+    color: palette.primary,
     lineHeight: 24,
   },
 
   /* List */
-  mealsContainer: { 
+  mealsContainer: {
     flex: 1,
   },
   mealsContent: {
@@ -677,9 +747,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 18,
     overflow: "hidden",
-    backgroundColor: COLORS.charcoalLight,
+    backgroundColor: palette.charcoalLight,
     position: "relative",
-    shadowColor: "#000",
+    shadowColor: palette.shadow,
     shadowOpacity: 0.15,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -701,7 +771,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: palette.overlay,
     padding: 20,
     justifyContent: "space-between",
   },
@@ -710,10 +780,10 @@ const styles = StyleSheet.create({
   mealName: {
     fontSize: 26,
     fontWeight: "800",
-    color: COLORS.white,
+    color: palette.onPrimary,
     marginBottom: 12,
     letterSpacing: 0.3,
-    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowColor: withAlpha(palette.text, 0.3),
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
@@ -727,12 +797,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: palette.overlay,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
+    borderColor: withAlpha(palette.onPrimary, 0.2),
   },
-  metaIcon: { fontSize: 16, color: COLORS.white },
-  metaText: { fontSize: 14, fontWeight: "700", color: COLORS.white },
+  metaIcon: { fontSize: 16, color: palette.onPrimary },
+  metaText: { fontSize: 14, fontWeight: "700", color: palette.onPrimary },
 
   /* Macros row */
   macrosRow: {
@@ -740,10 +810,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingTop: 8,
   },
-  macroItem: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    gap: 10 
+  macroItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10
   },
 
   /* Gradient ring */
@@ -753,7 +823,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     backgroundColor: "transparent",
     borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: withAlpha(palette.onPrimary, 0.3),
     overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
@@ -764,17 +834,17 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
 
-  macroValue: { 
-    fontSize: 17, 
-    fontWeight: "800", 
-    color: COLORS.white,
-    textShadowColor: "rgba(0,0,0,0.3)",
+  macroValue: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: palette.onPrimary,
+    textShadowColor: withAlpha(palette.text, 0.3),
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  macroLabel: { 
-    fontSize: 12, 
-    color: "rgba(255,255,255,0.9)",
+  macroLabel: {
+    fontSize: 12,
+    color: withAlpha(palette.onPrimary, 0.9),
     fontWeight: "600",
   },
 
@@ -784,7 +854,7 @@ const styles = StyleSheet.create({
     bottom: 30,
     right: 30,
     borderRadius: 30,
-    shadowColor: COLORS.accent,
+    shadowColor: palette.accent,
     shadowOpacity: 0.4,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
@@ -799,14 +869,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addMealButtonText: {
-    color: COLORS.white,
+    color: palette.onPrimary,
     fontWeight: "700",
     fontSize: 16,
   },
-  
+
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    backgroundColor: palette.overlaySoft,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 1000,
@@ -819,20 +889,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 20,
   },
-  emptyStateEmoji: { 
-    fontSize: 80, 
-    marginBottom: 24 
+  emptyStateIcon: {
+    marginBottom: 24,
   },
   emptyStateTitle: {
     fontSize: 26,
     fontWeight: "800",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 12,
     textAlign: "center",
   },
   emptyStateSubtitle: {
-    fontSize: 16, 
-    color: COLORS.textMuted,
+    fontSize: 16,
+    color: palette.textMuted,
     textAlign: "center",
     marginBottom: 30,
     lineHeight: 24,
@@ -840,7 +909,7 @@ const styles = StyleSheet.create({
   retryButton: {
     borderRadius: 30,
     overflow: "hidden",
-    shadowColor: COLORS.primary,
+    shadowColor: palette.primary,
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -853,21 +922,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   retryButtonText: {
-    color: COLORS.white,
+    color: palette.onPrimary,
     fontWeight: "700",
     fontSize: 16,
   },
   addFirstMealButton: {
     borderRadius: 30,
     overflow: "hidden",
-    shadowColor: COLORS.accent,
+    shadowColor: palette.accent,
     shadowOpacity: 0.3,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
   addFirstMealButtonText: {
-    color: COLORS.white,
+    color: palette.onPrimary,
     fontWeight: "700",
     fontSize: 16,
   },

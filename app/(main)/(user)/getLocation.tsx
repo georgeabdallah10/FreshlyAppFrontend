@@ -1,10 +1,12 @@
 import { GooglePlacesAutocomplete } from "@/components/GooglePlacesAutocomplete";
+import ToastBanner from "@/components/generalMessage";
 import { useUser } from "@/context/usercontext";
 import type { ParsedAddress } from "@/hooks/useGooglePlaces";
 import type { LocationObject } from "expo-location";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Animated,
   StyleSheet,
@@ -12,6 +14,22 @@ import {
   TouchableOpacity,
   View
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
+
+type ToastType = "success" | "error" | "confirm";
+type ToastButton = {
+  text: string;
+  onPress: () => void;
+  style?: "default" | "destructive" | "cancel";
+};
+interface ToastState {
+  visible: boolean;
+  type: ToastType;
+  message: string;
+  title?: string;
+  buttons?: ToastButton[];
+}
 
 type LocationResult = {
   id: string;
@@ -28,6 +46,9 @@ const LocationScreens = () => {
   const user = userContext?.user;
   const refreshUser = userContext?.refreshUser;
   const updateUserInfo = userContext?.updateUserInfo;
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   const [currentScreen, setCurrentScreen] = useState<"permission" | "search">(
     "permission"
@@ -44,6 +65,52 @@ const LocationScreens = () => {
   const [hasLocationPermission, setHasLocationPermission] = useState<
     boolean | null
   >(null);
+
+  const [toast, setToast] = useState<ToastState>({
+    visible: false,
+    type: "success",
+    message: "",
+  });
+
+  const showToast = (
+    type: ToastType,
+    message: string,
+    title?: string,
+    buttons?: ToastButton[]
+  ) => {
+    setToast({ visible: true, type, message, title, buttons });
+  };
+
+  const hideToast = () => {
+    setToast((prev) => ({ ...prev, visible: false }));
+  };
+
+  const handleSkip = () => {
+    showToast(
+      "confirm",
+      "Without a location, features like grocery matching, local store recommendations, and delivery options won't be available.",
+      "Skip Location Setup?",
+      [
+        {
+          text: "Go Back",
+          onPress: hideToast,
+          style: "cancel",
+        },
+        {
+          text: "Skip Anyway",
+          onPress: () => {
+            hideToast();
+            if (isOnboarding) {
+              router.replace("/(auth)/familyAuth");
+            } else {
+              router.replace("/(main)/(home)/main");
+            }
+          },
+          style: "destructive",
+        },
+      ]
+    );
+  };
 
   // Mock search results
   const mockResults: LocationResult[] = [];
@@ -135,7 +202,7 @@ const LocationScreens = () => {
     });
     setLocation(currentLocation);
 
-    // 🗺️ Reverse geocode: convert coords → readable address
+    // Reverse geocode: convert coords -> readable address
     const [address] = await Location.reverseGeocodeAsync({
       latitude: currentLocation.coords.latitude,
       longitude: currentLocation.coords.longitude,
@@ -156,12 +223,14 @@ const LocationScreens = () => {
     if (refreshUser) {
       await refreshUser();
     }
-    alert("Locatoin was succesfully set");
-    if (isOnboarding) {
-      router.replace("/(auth)/familyAuth");
-    } else {
-      router.replace("/(main)/(home)/main");
-    }
+    showToast("success", "Location was successfully set");
+    setTimeout(() => {
+      if (isOnboarding) {
+        router.replace("/(auth)/familyAuth");
+      } else {
+        router.replace("/(main)/(home)/main");
+      }
+    }, 1500);
   };
 
   const handleClearSearch = () => {
@@ -196,15 +265,17 @@ const LocationScreens = () => {
       if (refreshUser) {
         await refreshUser();
       }
-      alert("Location was successfully set");
-      if (isOnboarding) {
-        router.replace("/(auth)/familyAuth");
-      } else {
-        router.replace("/(main)/(home)/main");
-      }
+      showToast("success", "Location was successfully set");
+      setTimeout(() => {
+        if (isOnboarding) {
+          router.replace("/(auth)/familyAuth");
+        } else {
+          router.replace("/(main)/(home)/main");
+        }
+      }, 1500);
     } catch (error) {
       console.log("Error updating location:", error);
-      alert("Failed to update location. Please try again.");
+      showToast("error", "Failed to update location. Please try again.");
     }
   };
 
@@ -247,7 +318,24 @@ const LocationScreens = () => {
           <TouchableOpacity onPress={handleManualEntry} activeOpacity={0.6}>
             <Text style={styles.manualEntryText}>Enter Location Manually</Text>
           </TouchableOpacity>
+
+          {/* Skip Button */}
+          <TouchableOpacity
+            onPress={handleSkip}
+            activeOpacity={0.6}
+            style={styles.skipButton}
+          >
+            <Text style={styles.skipButtonText}>Skip for now</Text>
+          </TouchableOpacity>
         </Animated.View>
+        <ToastBanner
+          visible={toast.visible}
+          type={toast.type}
+          message={toast.message}
+          title={toast.title}
+          buttons={toast.buttons}
+          onHide={hideToast}
+        />
       </View>
     );
   }
@@ -283,238 +371,299 @@ const LocationScreens = () => {
           activeOpacity={0.6}
         >
           <View style={styles.currentLocationIcon}>
-            <Text style={styles.currentLocationIconText}>📍</Text>
+            <Ionicons name="location-outline" size={18} color={palette.card} />
           </View>
           <Text style={styles.currentLocationText}>
             Use my current location
           </Text>
         </TouchableOpacity>
 
+        {/* Skip Button */}
+        <TouchableOpacity
+          onPress={handleSkip}
+          activeOpacity={0.6}
+          style={styles.skipButtonSearch}
+        >
+          <Text style={styles.skipButtonText}>Skip for now</Text>
+        </TouchableOpacity>
 
       </Animated.View>
+      <ToastBanner
+        visible={toast.visible}
+        type={toast.type}
+        message={toast.message}
+        title={toast.title}
+        buttons={toast.buttons}
+        onHide={hideToast}
+      />
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  permissionContent: {
-    flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 120,
-    alignItems: "center",
-  },
-  iconContainer: {
-    marginBottom: 50,
-  },
-  iconCircle: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: "#E8F8F2",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  locationPin: {
-    width: 80,
-    height: 80,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pinOuter: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 4,
-    borderColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  pinInner: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: "#00C853",
-  },
-  permissionTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  permissionSubtitle: {
-    fontSize: 16,
-    color: "#B0B0B0",
-    textAlign: "center",
-    lineHeight: 24,
-    marginBottom: 60,
-  },
-  allowButton: {
-    width: "100%",
-    backgroundColor: "#00C853",
-    borderRadius: 12,
-    paddingVertical: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 7,
-    marginBottom: 24,
-    shadowColor: "#00C853",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  allowButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  manualEntryText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#00C853",
-  },
-  searchContent: {
-    flex: 1,
-    paddingTop: 60,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 30,
-  },
-  autocompleteWrapper: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  backIcon: {
-    fontSize: 24,
-    color: "#111111",
-  },
-  searchTitle: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-    marginRight: 40,
-  },
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F7F8FA",
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginHorizontal: 20,
-    marginBottom: 20,
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchIconText: {
-    fontSize: 20,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: "#111111",
-  },
-  clearButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  clearIcon: {
-    fontSize: 14,
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  currentLocationButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    marginBottom: 20,
-  },
-  currentLocationIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "#E8F8F2",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  currentLocationIconText: {
-    fontSize: 16,
-  },
-  currentLocationText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#111111",
-  },
-  resultsContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  resultsHeader: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#B0B0B0",
-    marginBottom: 16,
-    letterSpacing: 1,
-  },
-  resultItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  resultIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F7F8FA",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  resultIcon: {
-    fontSize: 18,
-  },
-  resultTextContainer: {
-    flex: 1,
-  },
-  resultName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111111",
-    marginBottom: 4,
-  },
-  resultAddress: {
-    fontSize: 14,
-    color: "#B0B0B0",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  success: colors.success,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+    },
+    permissionContent: {
+      flex: 1,
+      paddingHorizontal: 30,
+      paddingTop: 120,
+      alignItems: "center",
+    },
+    iconContainer: {
+      marginBottom: 50,
+    },
+    iconCircle: {
+      width: 200,
+      height: 200,
+      borderRadius: 100,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    locationPin: {
+      width: 80,
+      height: 80,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pinOuter: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      borderWidth: 4,
+      borderColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    pinInner: {
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: palette.success,
+    },
+    permissionTitle: {
+      fontSize: 28,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 12,
+    },
+    permissionSubtitle: {
+      fontSize: 16,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 24,
+      marginBottom: 60,
+    },
+    allowButton: {
+      width: "100%",
+      backgroundColor: palette.success,
+      borderRadius: 12,
+      paddingVertical: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 7,
+      marginBottom: 24,
+      shadowColor: palette.success,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 8,
+    },
+    allowButtonText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    manualEntryText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.success,
+    },
+    skipButton: {
+      marginTop: 40,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+    },
+    skipButtonSearch: {
+      alignSelf: "center",
+      marginTop: 20,
+      paddingVertical: 12,
+      paddingHorizontal: 24,
+    },
+    skipButtonText: {
+      fontSize: 14,
+      fontWeight: "500",
+      color: palette.textMuted,
+      textDecorationLine: "underline",
+    },
+    searchContent: {
+      flex: 1,
+      paddingTop: 60,
+      backgroundColor: palette.background,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      marginBottom: 30,
+    },
+    autocompleteWrapper: {
+      paddingHorizontal: 20,
+      marginBottom: 20,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    backIcon: {
+      fontSize: 24,
+      color: palette.text,
+    },
+    searchTitle: {
+      flex: 1,
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginRight: 40,
+    },
+    searchContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      marginHorizontal: 20,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    searchIcon: {
+      marginRight: 10,
+    },
+    searchIconText: {
+      fontSize: 20,
+      color: palette.text,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 16,
+      color: palette.text,
+    },
+    clearButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    clearIcon: {
+      fontSize: 14,
+      color: palette.card,
+      fontWeight: "600",
+    },
+    currentLocationButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      marginBottom: 20,
+    },
+    currentLocationIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: withAlpha(palette.success, 0.12),
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    currentLocationIconText: {
+      fontSize: 16,
+      color: palette.text,
+    },
+    currentLocationText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.text,
+    },
+    resultsContainer: {
+      flex: 1,
+      paddingHorizontal: 20,
+    },
+    resultsHeader: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: palette.textMuted,
+      marginBottom: 16,
+      letterSpacing: 1,
+    },
+    resultItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    resultIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: palette.card,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    resultIcon: {
+      fontSize: 18,
+      color: palette.text,
+    },
+    resultTextContainer: {
+      flex: 1,
+    },
+    resultName: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+      marginBottom: 4,
+    },
+    resultAddress: {
+      fontSize: 14,
+      color: palette.textMuted,
+    },
+  });
 
 export default LocationScreens;

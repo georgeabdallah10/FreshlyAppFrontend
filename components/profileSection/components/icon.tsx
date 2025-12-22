@@ -1,26 +1,28 @@
-
 import React from 'react';
-import { Text, TextStyle } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import type { TextStyle } from 'react-native';
 
 const ICONS = {
-  user: '👤',
-  settings: '⚙️',
-  bell: '🔔',
-  history: '📄',
-  help: '❓',
-  info: 'ℹ️',
-  logout: '🚪',
-  back: '←',
-  edit: '✏️',
-  check: '✓',
-  card: '💳',
-  crown: '👑',
-  lock: '🔒',
-  phone: '📱',
-  email: '✉️',
-  location: '📍',
-  camera: '📷',
-  trash: '🗑️',
+  user: 'person-outline',
+  settings: 'construct-outline',
+  bell: 'notifications-outline',
+  history: 'time-outline',
+  help: 'chatbubble-outline',
+  info: 'information',
+  logout: 'exit-outline',
+  back: 'arrow-back',
+  edit: 'create-outline',
+  check: 'checkmark',
+  card: 'receipt',
+  crown: 'star',
+  lock: 'key-outline',
+  phone: 'call-outline',
+  email: 'mail-outline',
+  location: 'location-outline',
+  camera: 'camera-outline',
+  trash: 'trash-outline',
+  refresh: 'refresh',
+  gallery: 'image-outline',
 } as const;
 
 export type IconName = keyof typeof ICONS;
@@ -33,8 +35,15 @@ type Props = {
 };
 
 const Icon: React.FC<Props> = ({ name, size = 24, color = '#666', style }) => {
-  const glyph = (ICONS as Record<string, string>)[name] ?? '•';
-  return <Text style={[{ fontSize: size, color }, style]}>{glyph}</Text>;
+  const iconName = (ICONS as Record<string, string>)[name] ?? 'ellipse';
+  return (
+    <Ionicons
+      name={iconName as any}
+      size={size}
+      color={color}
+      style={style as any}
+    />
+  );
 };
 
 export default Icon;

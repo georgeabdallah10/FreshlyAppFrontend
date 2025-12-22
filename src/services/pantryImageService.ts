@@ -61,7 +61,7 @@ async function checkSupabaseImage(itemName: string): Promise<string | null> {
         .download(filename);
 
       if (!error && fileData) {
-        console.log(`✅ Found existing pantry image in Supabase: ${itemName}`);
+        console.log(`OK: Found existing pantry image in Supabase: ${itemName}`);
         return data.publicUrl;
       }
     }
@@ -84,7 +84,7 @@ async function generateAndUploadImage(
   itemName: string
 ): Promise<string | null> {
   try {
-    console.log(`🎨 Generating AI image for pantry item: ${itemName}`);
+    console.log(`Generating AI image for pantry item: ${itemName}`);
 
     // Get auth token
     const token = await Storage.getItem("access_token");
@@ -109,7 +109,7 @@ async function generateAndUploadImage(
     });
 
     if (!response.ok) {
-      console.log(`❌ Image generation failed: ${response.status}`);
+      console.log(`ERROR: Image generation failed: ${response.status}`);
       return null;
     }
 
@@ -117,7 +117,7 @@ async function generateAndUploadImage(
     // Backend now returns only { image_url, prompt }
     const imageUrl = result.image_url;
     if (!imageUrl) {
-      console.log(`❌ No image_url in response:`, result);
+      console.log(`ERROR: No image_url in response:`, result);
       return null;
     }
 
@@ -129,7 +129,7 @@ async function generateAndUploadImage(
         const arrayBuffer = await imageResponse.arrayBuffer();
         imageBlob = new Uint8Array(arrayBuffer);
       } else {
-        console.warn("⚠️ arrayBuffer() not supported in this environment, using base64 fallback.");
+        console.warn("WARN: arrayBuffer() not supported in this environment, using base64 fallback.");
         const base64Data = await imageResponse.text();
         const binary = atob(base64Data);
         imageBlob = new Uint8Array(binary.length);
@@ -138,7 +138,7 @@ async function generateAndUploadImage(
         }
       }
     } catch (e) {
-      console.log("⚠️ Failed to read image response data; using safe fallback.", e);
+      console.log("WARN: Failed to read image response data; using safe fallback.", e);
       const base64Data = await imageResponse.text();
       const binary = atob(base64Data);
       imageBlob = new Uint8Array(binary.length);
@@ -169,7 +169,7 @@ async function generateAndUploadImage(
     const publicUrl = urlData?.publicUrl;
 
     if (publicUrl) {
-      console.log(`✅ Generated and uploaded pantry image: ${itemName}`);
+      console.log(`OK: Generated and uploaded pantry image: ${itemName}`);
       return publicUrl;
     }
 
@@ -201,7 +201,7 @@ export async function getPantryItemImage(
     const cached = imageCache.get(cacheKey)!;
     if (cached.url) {
       if (!cached.lastWarnedAt) {
-        console.log(`💾 Cache hit for pantry item: ${itemName}`);
+        console.log(`Cache hit for pantry item: ${itemName}`);
         imageCache.set(cacheKey, { ...cached, lastWarnedAt: Date.now() });
       }
       return cached.url;
@@ -215,7 +215,7 @@ export async function getPantryItemImage(
           now - cached.lastWarnedAt > COOLDOWN_MS / 2
         ) {
           console.warn(
-            `⏳ Skipping retry for failed pantry image: ${itemName}`
+            `Skipping retry for failed pantry image: ${itemName}`
           );
           imageCache.set(cacheKey, { ...cached, lastWarnedAt: now });
         }
@@ -228,7 +228,7 @@ export async function getPantryItemImage(
   // 2. Check if request is already pending (avoid duplicates)
   if (pendingRequests.has(cacheKey)) {
     if (!pendingRequestLogged.has(cacheKey)) {
-      console.log(`⏳ Waiting for pending request: ${itemName}`);
+      console.log(`Waiting for pending request: ${itemName}`);
       pendingRequestLogged.add(cacheKey);
     }
     return pendingRequests.get(cacheKey)!;
@@ -270,7 +270,7 @@ export async function getPantryItemImage(
  */
 export async function preloadPantryImages(itemNames: string[]): Promise<void> {
   const uniqueNames = [...new Set(itemNames.filter(Boolean))];
-  console.log(`🔄 Preloading ${uniqueNames.length} pantry item images...`);
+  console.log(`Preloading ${uniqueNames.length} pantry item images...`);
 
   // Only call getPantryItemImage if not already pending
   const promises = uniqueNames
@@ -289,13 +289,13 @@ export async function preloadPantryImages(itemNames: string[]): Promise<void> {
 
   // Fire and forget (don't block UI)
   Promise.all(promises).then(() => {
-    console.log(`✅ Preloaded pantry item images`);
+    console.log(`OK: Preloaded pantry item images`);
   });
 }
 
 export function clearPantryImageCache(): void {
   imageCache.clear();
-  console.log("🗑️ Cleared pantry image cache");
+  console.log("Cleared pantry image cache");
 }
 
 /**

@@ -1,6 +1,6 @@
-# ⚡ Quick Start Guide - Caching Architecture
+#  Quick Start Guide - Caching Architecture
 
-## 🎯 TL;DR
+##  TL;DR
 
 Your app now has **production-grade caching** with:
 - MMKV (30x faster storage)
@@ -11,7 +11,7 @@ Your app now has **production-grade caching** with:
 
 ---
 
-## 🚀 Immediate Usage
+##  Immediate Usage
 
 ### 1. User Profile (Zustand Store)
 
@@ -93,10 +93,10 @@ const handleLogout = async () => {
 ### 4. Cached Data with React Query
 
 **Already Works** - No changes needed! Your existing hooks automatically get:
-- ✅ MMKV persistence (survives app restart)
-- ✅ Offline support (shows cached data)
-- ✅ Auto-refresh on app foreground
-- ✅ Background refetching
+-  MMKV persistence (survives app restart)
+-  Offline support (shows cached data)
+-  Auto-refresh on app foreground
+-  Background refetching
 
 ```typescript
 // Example: usePantryItems() - Already works with persistence!
@@ -119,7 +119,7 @@ function PantryScreen() {
 
 ---
 
-## 📋 Common Patterns
+##  Common Patterns
 
 ### Pattern 1: User Onboarding Flow
 
@@ -239,7 +239,7 @@ const MacroCalculator = () => {
 
 ---
 
-## 🎨 UI Integration Examples
+##  UI Integration Examples
 
 ### Show Cached Data Indicator
 
@@ -307,7 +307,7 @@ function Header() {
     <View>
       {!isOnline && (
         <Banner>
-          📴 Offline - Showing cached data
+           Offline - Showing cached data
         </Banner>
       )}
     </View>
@@ -317,7 +317,7 @@ function Header() {
 
 ---
 
-## 🔧 Utility Functions
+##  Utility Functions
 
 ### Clear All Cache (For Testing)
 
@@ -346,7 +346,7 @@ const clearAllData = async () => {
   // Clear React Query cache
   queryClient.clear();
 
-  console.log('✅ All data cleared!');
+  console.log(' All data cleared!');
 };
 ```
 
@@ -364,7 +364,7 @@ const checkStorageSize = () => {
 
 ---
 
-## 🐛 Debugging
+##  Debugging
 
 ### View User Store State
 
@@ -398,7 +398,7 @@ const viewCache = () => {
 
 ---
 
-## 📚 Full Documentation
+##  Full Documentation
 
 For complete documentation, see:
 - **`CACHING_ARCHITECTURE.md`** - Full architecture guide
@@ -406,14 +406,14 @@ For complete documentation, see:
 
 ---
 
-## ⚡ Performance Tips
+##  Performance Tips
 
 1. **Use Selectors**: Only subscribe to data you need
    ```typescript
-   // ❌ Bad - Rerenders on any store change
+   //  Bad - Rerenders on any store change
    const store = useUserStore();
 
-   // ✅ Good - Only rerenders when age changes
+   //  Good - Only rerenders when age changes
    const age = useUserStore(state => state.profile.age);
    ```
 
@@ -441,7 +441,7 @@ For complete documentation, see:
 
 ---
 
-## ✅ Checklist for New Features
+##  Checklist for New Features
 
 When adding new features:
 
@@ -455,4 +455,4 @@ When adding new features:
 
 ---
 
-**You're all set! Start building with confidence.** 🎉
+**You're all set! Start building with confidence.** 

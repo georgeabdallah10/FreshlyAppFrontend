@@ -97,7 +97,7 @@ export async function updateUserPreferences(
   preferences: UserPreferencesUpdateInput
 ): Promise<UserPreferencesOut> {
   const res = await updateUserPreferencesApi(preferences);
-  if (!res.ok || !res.data) {
+  if (!res.ok) {
     throw { message: res.message, status: res.status };
   }
   return res.data;

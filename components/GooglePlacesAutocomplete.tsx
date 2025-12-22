@@ -1,12 +1,13 @@
 
 import { ParsedAddress, useGooglePlaces } from '@/hooks/useGooglePlaces';
+import { Ionicons } from '@expo/vector-icons';
 import React, { useCallback, useState } from 'react';
+import AppTextInput from '@/components/ui/AppTextInput';
 import {
   ActivityIndicator,
   FlatList,
   StyleSheet,
   Text,
-  TextInput,
   TextStyle,
   TouchableOpacity,
   View,
@@ -101,17 +102,15 @@ export const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> =
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <View style={styles.searchIcon}>
-          <Text style={styles.searchIconText}>🔍</Text>
+          <Ionicons name="search-outline" size={20} color="#6B7280" />
         </View>
-        <TextInput
+        <AppTextInput
           style={[styles.searchInput, inputStyle]}
           placeholder={placeholder}
           placeholderTextColor="#888888"
           value={searchQuery}
           onChangeText={handleInputChange}
           autoFocus={autoFocus}
-          autoCorrect={false}
-          autoCapitalize="words"
           editable={!isSelecting}
         />
         {searchQuery.length > 0 && (
@@ -137,7 +136,10 @@ export const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> =
       {/* Error Message */}
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>⚠️ {error}</Text>
+          <View style={styles.errorRow}>
+            <Ionicons name="warning" size={16} color="#D32F2F" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         </View>
       )}
 
@@ -156,7 +158,7 @@ export const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> =
                 activeOpacity={0.6}
               >
                 <View style={styles.resultIconContainer}>
-                  <Text style={styles.resultIcon}>📍</Text>
+                  <Ionicons name="location-outline" size={18} color="#00C853" />
                 </View>
                 <View style={styles.resultTextContainer}>
                   <Text style={styles.resultName}>
@@ -183,7 +185,10 @@ export const GooglePlacesAutocomplete: React.FC<GooglePlacesAutocompleteProps> =
       {/* API Key Warning */}
       {error?.includes('API key') && (
         <View style={styles.warningContainer}>
-          <Text style={styles.warningTitle}>⚙️ Setup Required</Text>
+          <View style={styles.warningTitleRow}>
+            <Ionicons name="construct-outline" size={18} color="#F57C00" />
+            <Text style={styles.warningTitle}>Setup Required</Text>
+          </View>
           <Text style={styles.warningText}>
             To use address autocomplete, add your Google Places API key to app.json:
           </Text>
@@ -212,8 +217,10 @@ const styles = StyleSheet.create({
   searchIcon: {
     marginRight: 10,
   },
-  searchIconText: {
-    fontSize: 20,
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   searchInput: {
     flex: 1,
@@ -285,8 +292,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  resultIcon: {
-    fontSize: 18,
+  warningTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
   },
   resultTextContainer: {
     flex: 1,
@@ -319,7 +329,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#F57C00',
-    marginBottom: 8,
   },
   warningText: {
     fontSize: 14,

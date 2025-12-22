@@ -1,6 +1,9 @@
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
 import { Ionicons } from "@expo/vector-icons";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   LayoutAnimation,
   Platform,
@@ -28,7 +31,6 @@ type FAQItem = {
 type FAQCategory = {
   title: string;
   icon: keyof typeof Ionicons.glyphMap;
-  color: string;
   items: FAQItem[];
 };
 
@@ -36,7 +38,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Basics of SAVR",
     icon: "information-circle",
-    color: "#00A86B",
     items: [
       {
         question: "What is this app, and how does it work?",
@@ -58,7 +59,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Meal Planning & Recipes",
     icon: "restaurant",
-    color: "#FD8100",
     items: [
       {
         question:
@@ -82,7 +82,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Grocery Lists & Shopping",
     icon: "cart",
-    color: "#2196F3",
     items: [
       {
         question: "How does the automatic grocery list feature work?",
@@ -105,7 +104,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Inventory & Waste Reduction",
     icon: "leaf",
-    color: "#4CAF50",
     items: [
       {
         question: "How does the smart inventory management work?",
@@ -127,7 +125,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Budgeting & Price Comparison",
     icon: "cash",
-    color: "#FF9800",
     items: [
       {
         question: "How does the app help me save money?",
@@ -149,7 +146,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Grocery Delivery & Pickup",
     icon: "bicycle",
-    color: "#9C27B0",
     items: [
       {
         question: "Can I order groceries directly through the app?",
@@ -171,7 +167,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Social & Family Features",
     icon: "people",
-    color: "#E91E63",
     items: [
       {
         question: "Can I share my grocery list with family members?",
@@ -188,7 +183,6 @@ const FAQ_DATA: FAQCategory[] = [
   {
     title: "Sustainability & Health",
     icon: "fitness",
-    color: "#00BCD4",
     items: [
       {
         question: "Does the app promote sustainable grocery shopping?",
@@ -204,8 +198,35 @@ const FAQ_DATA: FAQCategory[] = [
   },
 ];
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  primary: colors.primary,
+  accent: colors.warning,
+  success: colors.success,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  chipBg: withAlpha(colors.textSecondary, 0.08),
+  chipBorder: withAlpha(colors.textSecondary, 0.2),
+  shadow: withAlpha(colors.textPrimary, 0.12),
+});
+
 const FAQScreen = () => {
+  const { theme } = useThemeContext();
+  const palette = createPalette(theme.colors);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const router = useRouter();
+  const scrollContentStyle = useScrollContentStyle();
   const [expandedCategory, setExpandedCategory] = useState<number | null>(null);
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
@@ -221,15 +242,21 @@ const FAQScreen = () => {
     setExpandedItem(expandedItem === itemKey ? null : itemKey);
   };
 
+  const getCategoryColor = (index: number) => {
+    const paletteCycle = [palette.primary, palette.accent, palette.success];
+    return paletteCycle[index % paletteCycle.length];
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          activeOpacity={0.6}
+          activeOpacity={0.8}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Ionicons name="arrow-back" size={24} color="#111" />
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>FAQ</Text>
         <View style={{ width: 40 }} />
@@ -237,7 +264,7 @@ const FAQScreen = () => {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, scrollContentStyle]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heroSection}>
@@ -256,11 +283,14 @@ const FAQScreen = () => {
             expandedItem={expandedItem}
             onToggleCategory={() => toggleCategory(categoryIndex)}
             onToggleItem={(itemIndex) => toggleItem(categoryIndex, itemIndex)}
+            palette={palette}
+            styles={styles}
+            getCategoryColor={getCategoryColor}
           />
         ))}
 
         <View style={styles.contactSection}>
-          <Ionicons name="chatbubble-ellipses" size={32} color="#00A86B" />
+          <Ionicons name="chatbubble-ellipses" size={32} color={palette.primary} />
           <Text style={styles.contactTitle}>Still have questions?</Text>
           <Text style={styles.contactText}>
             We're here to help! Reach out to our support team.
@@ -270,7 +300,7 @@ const FAQScreen = () => {
             activeOpacity={0.8}
             onPress={() => console.log("Email sent")}
           >
-            <Ionicons name="mail" size={18} color="#FFF" />
+            <Ionicons name="mail" size={18} color={palette.card} />
             <Text style={styles.contactButtonText}>support@joinsavr.com</Text>
           </TouchableOpacity>
         </View>
@@ -286,6 +316,9 @@ const CategoryComponent: React.FC<{
   expandedItem: string | null;
   onToggleCategory: () => void;
   onToggleItem: (itemIndex: number) => void;
+  palette: ReturnType<typeof createPalette>;
+  styles: ReturnType<typeof createStyles>;
+  getCategoryColor: (index: number) => string;
 }> = ({
   category,
   categoryIndex,
@@ -293,13 +326,17 @@ const CategoryComponent: React.FC<{
   expandedItem,
   onToggleCategory,
   onToggleItem,
+  palette,
+  styles,
+  getCategoryColor,
 }) => {
+  const categoryColor = getCategoryColor(categoryIndex);
   return (
     <View style={styles.categoryContainer}>
       <TouchableOpacity
         style={[
           styles.categoryHeader,
-          { borderLeftColor: category.color },
+          { borderLeftColor: categoryColor },
           isExpanded && styles.categoryHeaderExpanded,
         ]}
         onPress={onToggleCategory}
@@ -308,10 +345,10 @@ const CategoryComponent: React.FC<{
         <View
           style={[
             styles.categoryIcon,
-            { backgroundColor: `${category.color}15` },
+            { backgroundColor: withAlpha(categoryColor, 0.08) },
           ]}
         >
-          <Ionicons name={category.icon} size={22} color={category.color} />
+          <Ionicons name={category.icon} size={22} color={categoryColor} />
         </View>
         <View style={styles.categoryTitleContainer}>
           <Text style={styles.categoryTitle}>{category.title}</Text>
@@ -319,7 +356,7 @@ const CategoryComponent: React.FC<{
         <Ionicons
           name={isExpanded ? "chevron-up" : "chevron-down"}
           size={22}
-          color="#999"
+          color={palette.textMuted}
         />
       </TouchableOpacity>
 
@@ -348,7 +385,7 @@ const CategoryComponent: React.FC<{
                   <Ionicons
                     name={isItemExpanded ? "remove-circle" : "add-circle"}
                     size={20}
-                    color={category.color}
+                    color={categoryColor}
                   />
                 </View>
                 {isItemExpanded && (
@@ -356,7 +393,7 @@ const CategoryComponent: React.FC<{
                     <View
                       style={[
                         styles.answerLine,
-                        { backgroundColor: category.color },
+                        { backgroundColor: categoryColor },
                       ]}
                     />
                     <Text style={styles.answer}>{item.answer}</Text>
@@ -371,213 +408,224 @@ const CategoryComponent: React.FC<{
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F8F9FA",
-    paddingTop: 50,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  heroSection: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "800",
-    color: "#111",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 15,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 22,
-  },
-  categoryContainer: {
-    marginBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  categoryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-    borderLeftWidth: 4,
-  },
-  categoryHeaderExpanded: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#F0F0F0",
-  },
-  categoryIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  categoryTitleContainer: {
-    flex: 1,
-  },
-  categoryTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#111",
-    marginBottom: 2,
-  },
-  categoryCount: {
-    fontSize: 13,
-    color: "#999",
-    fontWeight: "500",
-  },
-  categoryItems: {
-    paddingBottom: 8,
-  },
-  faqItem: {
-    padding: 16,
-    marginHorizontal: 12,
-    marginBottom: 8,
-    backgroundColor: "#F8F9FA",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E7EBEF",
-  },
-  faqItemExpanded: {
-    backgroundColor: "#FFFFFF",
-    borderColor: "#00A86B20",
-  },
-  questionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  questionNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "#00A86B10",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  questionNumberText: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#00A86B",
-  },
-  question: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: "#111",
-    flex: 1,
-    lineHeight: 20,
-  },
-  answerContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    flexDirection: "row",
-    gap: 12,
-  },
-  answerLine: {
-    width: 3,
-    borderRadius: 2,
-    marginLeft: 10,
-  },
-  answer: {
-    flex: 1,
-    fontSize: 14,
-    color: "#666",
-    lineHeight: 22,
-  },
-  contactSection: {
-    marginTop: 16,
-    padding: 28,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  contactTitle: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: "#111",
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  contactText: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  contactButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#00A86B",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    shadowColor: "#00A86B",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  contactButtonText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#FFF",
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 50,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingVertical: 16,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: palette.chipBg,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    backIcon: {
+      fontSize: 22,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+    heroSection: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 24,
+      marginBottom: 20,
+      alignItems: "center",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: palette.text,
+      marginBottom: 8,
+      textAlign: "center",
+    },
+    subtitle: {
+      fontSize: 15,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 22,
+    },
+    categoryContainer: {
+      marginBottom: 16,
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      overflow: "hidden",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    categoryHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 16,
+      borderLeftWidth: 4,
+    },
+    categoryHeaderExpanded: {
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    categoryIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    categoryTitleContainer: {
+      flex: 1,
+    },
+    categoryTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 2,
+    },
+    categoryCount: {
+      fontSize: 13,
+      color: palette.textMuted,
+      fontWeight: "500",
+    },
+    categoryItems: {
+      paddingBottom: 8,
+    },
+    faqItem: {
+      padding: 16,
+      marginHorizontal: 12,
+      marginBottom: 8,
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    faqItemExpanded: {
+      backgroundColor: palette.card,
+      borderColor: withAlpha(palette.primary, 0.25),
+    },
+    questionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    questionNumber: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: withAlpha(palette.primary, 0.1),
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    questionNumberText: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: palette.primary,
+    },
+    question: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.text,
+      flex: 1,
+      lineHeight: 20,
+    },
+    answerContainer: {
+      marginTop: 12,
+      paddingTop: 12,
+      flexDirection: "row",
+      gap: 12,
+    },
+    answerLine: {
+      width: 3,
+      borderRadius: 2,
+      marginLeft: 10,
+    },
+    answer: {
+      flex: 1,
+      fontSize: 14,
+      color: palette.textMuted,
+      lineHeight: 22,
+    },
+    contactSection: {
+      marginTop: 16,
+      padding: 28,
+      backgroundColor: palette.card,
+      borderRadius: 20,
+      alignItems: "center",
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    contactTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: palette.text,
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    contactText: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: 20,
+      marginBottom: 16,
+    },
+    contactButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: palette.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 12,
+      shadowColor: palette.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    contactButtonText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.card,
+    },
+  });
 
 export default FAQScreen;

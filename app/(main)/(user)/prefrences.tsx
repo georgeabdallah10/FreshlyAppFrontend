@@ -1,6 +1,8 @@
 import BasicBodyInformationScreen from "@/components/preferences/BasicBodyInformationScreen";
 import RecommendedCaloriesScreen from "@/components/preferences/RecommendedCaloriesScreen";
 import { useUser } from "@/context/usercontext";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import {
   saveUserPreferences,
   setPrefrences,
@@ -16,6 +18,8 @@ import React, {
   useRef,
   useState,
 } from "react";
+import AppTextInput from "@/components/ui/AppTextInput";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Animated,
   Image,
@@ -80,18 +84,6 @@ type OnboardingPreferenceState = {
   calorieTarget: number | null;
 };
 
-const COLORS = {
-  background: "#FFFFFF",
-  lightGray: "#F7F8FA",
-  border: "#EEEFF3",
-  orange: "#FD8100",
-  green: "#00C853",
-  dark: "#111111",
-  muted: "#666666",
-  chipText: "#4C4C4C",
-  grayButton: "#D6D6D6",
-};
-
 const COMMON_ALLERGIES = [
   "Peanuts",
   "Tree Nuts",
@@ -126,6 +118,9 @@ const OnboardingPreferences = () => {
   const router = useRouter();
   const { fromProfile } = useLocalSearchParams();
   const userContext = useUser();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   const user = userContext?.user;
   const prefrences = userContext?.prefrences;
@@ -150,8 +145,8 @@ const OnboardingPreferences = () => {
     }
   );
   const [bodyUnits, setBodyUnits] = useState<BodyUnits>({
-    heightUnit: "cm",
-    weightUnit: "kg",
+    heightUnit: "ft",
+    weightUnit: "lbs",
   });
   const [calorieTarget, setCalorieTarget] = useState<number | null>(null);
   const [calorieMin, setCalorieMin] = useState<number | null>(null);
@@ -325,6 +320,13 @@ const OnboardingPreferences = () => {
     () => stageSequence.filter((stage) => stage !== "welcome"),
     [stageSequence]
   );
+  const progressColors = useMemo(
+    () => ({
+      inactive: withAlpha(palette.textMuted, 0.3),
+      active: palette.warning,
+    }),
+    [palette]
+  );
 
   const currentStageKey = useMemo(() => {
     return (
@@ -402,7 +404,11 @@ const OnboardingPreferences = () => {
     // Pre-fill from saved preferences/user profile when available
     if (prefilledFromSaved) return;
     const dietCodes = prefrences?.diet_codes ?? [];
-
+    const hasSavedBodyInfo =
+      ((user?.age ?? 0) > 0 ||
+        (user?.height ?? 0) > 0 ||
+        (user?.weight ?? 0) > 0 ||
+        !!user?.gender);
     const savedLifestyle = dietCodes
       .filter((code) => lifestyleOptionIds.includes(code ?? ""))
       .filter(Boolean) as DietaryPreference[];
@@ -419,13 +425,22 @@ const OnboardingPreferences = () => {
           .trim()
       )
       .filter(Boolean);
+    const hasSavedPreferences =
+      savedLifestyle.length > 0 ||
+      savedAllergies.length > 0 ||
+      Boolean(prefrences?.goal) ||
+      typeof prefrences?.calorie_target === "number";
+
+    if (!hasSavedBodyInfo && !hasSavedPreferences) {
+      setIsLoadingPreferences(false);
+      return;
+    }
 
     if (
       savedLifestyle.length ||
       savedAllergies.length ||
-      user ||
-      prefrences?.goal ||
-      typeof prefrences?.calorie_target === "number"
+      hasSavedBodyInfo ||
+      hasSavedPreferences
     ) {
       setCulturalLifestylePreferences(savedLifestyle);
       setAllergies(savedAllergies);
@@ -433,19 +448,21 @@ const OnboardingPreferences = () => {
       if (typeof prefrences?.calorie_target === "number") {
         setCalorieTarget(prefrences.calorie_target);
       }
-      setBodyInformation({
-        age: user?.age ?? null,
-        height: user?.height ?? null,
-        weight: user?.weight ?? null,
-        gender: user?.gender ?? null,
-        isAthlete: false,
-        trainingLevel: null,
-      });
-      setBodyUnits((prev) => ({
-        ...prev,
-        heightUnit: "cm",
-        weightUnit: "kg",
-      }));
+      if (hasSavedBodyInfo) {
+        setBodyInformation({
+          age: user?.age ?? null,
+          height: user?.height ?? null,
+          weight: user?.weight ?? null,
+          gender: user?.gender ?? null,
+          isAthlete: false,
+          trainingLevel: null,
+        });
+        setBodyUnits((prev) => ({
+          ...prev,
+          heightUnit: "cm",
+          weightUnit: "kg",
+        }));
+      }
       setPrefilledFromSaved(true);
     }
 
@@ -550,14 +567,14 @@ const OnboardingPreferences = () => {
       styles.nextButtonBase,
       hasSelection ? styles.nextButtonActive : styles.nextButtonInactive,
     ],
-    [hasSelection]
+    [hasSelection, styles.nextButtonActive, styles.nextButtonBase, styles.nextButtonInactive]
   );
   const nextButtonTextStyle = useMemo(
     () => [
       styles.nextButtonText,
       !hasSelection && styles.nextButtonTextInactive,
     ],
-    [hasSelection]
+    [hasSelection, styles.nextButtonText, styles.nextButtonTextInactive]
   );
 
   const toggleOption = useCallback(
@@ -709,6 +726,11 @@ const OnboardingPreferences = () => {
         setCurrentStep((prev) => clampStep(prev + delta));
         slideAnim.setValue(enterStartValue);
         fadeAnim.setValue(0);
+
+        // Release the lock immediately when the new screen appears
+        // This allows users to navigate without waiting for entrance animation
+        transitionLockRef.current = false;
+
         Animated.parallel([
           Animated.timing(fadeAnim, {
             toValue: 1,
@@ -721,9 +743,7 @@ const OnboardingPreferences = () => {
             tension: 120,
             useNativeDriver: true,
           }),
-        ]).start(() => {
-          transitionLockRef.current = false;
-        });
+        ]).start();
       });
     },
     [clampStep, fadeAnim, safeCurrentStep, slideAnim]
@@ -827,6 +847,8 @@ const OnboardingPreferences = () => {
           if (fromProfile === "true") {
             router.replace("/(main)/(home)/profile");
           } else {
+
+            
             router.replace("/(main)/(home)/main");
           }
         } else {
@@ -1009,11 +1031,17 @@ const OnboardingPreferences = () => {
     () => (
       <View style={styles.progressContainer}>
         {progressStages.map((stage, index) => (
-          <ProgressDot key={stage} index={index} progressAnim={progressAnim} />
+          <ProgressDot
+            key={stage}
+            index={index}
+            progressAnim={progressAnim}
+            colors={progressColors}
+            styles={styles}
+          />
         ))}
       </View>
     ),
-    [progressAnim, progressStages]
+    [progressAnim, progressStages, progressColors, styles]
   );
 
   const renderNextButton = useCallback(
@@ -1120,6 +1148,7 @@ const OnboardingPreferences = () => {
                     isSelected={option.isSelected}
                     scale={option.scale}
                     onSelect={toggleOption}
+                    styles={styles}
                   />
                 ))}
               </View>
@@ -1173,10 +1202,10 @@ const OnboardingPreferences = () => {
               <View style={styles.allergyInputSection}>
                 <Text style={styles.sectionLabel}>Add Custom Allergy</Text>
                 <View style={styles.inputRow}>
-                  <TextInput
+                  <AppTextInput
                     style={styles.allergyInput}
                     placeholder="Enter allergy (e.g., Peanuts)"
-                    placeholderTextColor="#B0B0B0"
+                    placeholderTextColor={palette.textMuted}
                     value={allergyInput}
                     onChangeText={setAllergyInput}
                     onSubmitEditing={addAllergy}
@@ -1210,6 +1239,7 @@ const OnboardingPreferences = () => {
                         isEditing={editingAllergyIndex === index}
                         onEdit={editAllergy}
                         onDelete={deleteAllergy}
+                        styles={styles}
                       />
                     ))}
                   </View>
@@ -1227,6 +1257,7 @@ const OnboardingPreferences = () => {
                       label={label}
                       selected={isSelected}
                       onSelect={selectCommonAllergy}
+                      styles={styles}
                     />
                   ))}
                 </View>
@@ -1326,311 +1357,334 @@ const OnboardingPreferences = () => {
   return null;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    paddingTop: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  loadingText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.muted,
-  },
-  welcomeContainer: {
-    flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 80,
-    paddingBottom: 60,
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  welcomeTitle: {
-    fontSize: 42,
-    fontWeight: "700",
-    color: COLORS.dark,
-    lineHeight: 50,
-    textAlign: "center",
-    alignSelf: "center",
-  },
-  logoContainer: {
-    alignItems: "center",
-  },
-  logoImage: {
-    width: 260,
-    height: 260,
-  },
-  welcomeNextButton: {
-    width: "100%",
-    alignSelf: "center",
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-  },
-  backButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.lightGray,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 28,
-    alignSelf: "flex-start",
-  },
-  backIcon: {
-    fontSize: 24,
-    color: COLORS.dark,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: COLORS.dark,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: COLORS.muted,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  progressContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 24,
-  },
-  progressDot: {
-    width: 48,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E0E0E0",
-  },
-  optionsContainer: {
-    marginBottom: 32,
-    gap: 12,
-  },
-  goalConflictText: {
-    marginTop: -12,
-    marginBottom: 12,
-    color: "#FF3B30",
-    fontSize: 13,
-    fontWeight: "600",
-    textAlign: "center",
-  },
-  optionItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  optionItemSelected: {
-    borderColor: COLORS.orange,
-    backgroundColor: "#FFF4EC",
-  },
-  optionLabel: {
-    fontSize: 16,
-    color: COLORS.dark,
-    fontWeight: "500",
-  },
-  optionLabelSelected: {
-    color: COLORS.orange,
-  },
-  radioOuter: {
-    width: 25,
-    height: 25,
-    borderRadius: 13,
-    borderWidth: 2,
-    borderColor: COLORS.green,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  radioOuterActive: {
-    borderColor: COLORS.orange,
-  },
-  radioInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: COLORS.orange,
-  },
-  nextButtonBase: {
-    borderRadius: 14,
-    paddingVertical: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 20,
-  },
-  nextButtonActive: {
-    backgroundColor: COLORS.green,
-    shadowColor: COLORS.green,
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  nextButtonInactive: {
-    backgroundColor: "#C4C4C4",
-    shadowColor: "transparent",
-    shadowOpacity: 0,
-    shadowOffset: { width: 0, height: 0 },
-    shadowRadius: 0,
-    elevation: 0,
-  },
-  nextButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  nextButtonTextInactive: {
-    color: "#F6F6F6",
-  },
-  allergyInputSection: {
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 32,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  sectionLabel: {
-    fontSize: 14,
-    color: COLORS.muted,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-  },
-  allergyInput: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    color: COLORS.dark,
-  },
-  addButton: {
-    backgroundColor: COLORS.green,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    marginLeft: 10,
-  },
-  addButtonDisabled: {
-    backgroundColor: "#B0EAC0",
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-  allergiesListSection: {
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 20,
-    marginBottom: 30,
-  },
-  allergiesList: {
-    gap: 10,
-  },
-  allergyTag: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  allergyTagEditing: {
-    borderColor: COLORS.orange,
-  },
-  allergyTagText: {
-    fontSize: 14,
-    color: COLORS.dark,
-    fontWeight: "500",
-  },
-  allergyActions: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  allergyActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.background,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  allergyEditIcon: {
-    color: COLORS.green,
-    fontSize: 16,
-  },
-  allergyDeleteIcon: {
-    color: "#FF3B30",
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  commonAllergiesSection: {
-    backgroundColor: COLORS.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    padding: 20,
-    marginBottom: 30,
-  },
-  commonAllergiesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-  },
-  commonAllergyChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  commonAllergyChipSelected: {
-    backgroundColor: "#FFF4EC",
-    borderColor: COLORS.orange,
-  },
-  commonAllergyText: {
-    fontSize: 14,
-    color: COLORS.chipText,
-    fontWeight: "500",
-  },
-  commonAllergyTextSelected: {
-    color: COLORS.orange,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 40,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    loadingText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    welcomeContainer: {
+      flex: 1,
+      paddingHorizontal: 30,
+      paddingTop: 80,
+      paddingBottom: 60,
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    welcomeTitle: {
+      fontSize: 42,
+      fontWeight: "700",
+      color: palette.text,
+      lineHeight: 50,
+      textAlign: "center",
+      alignSelf: "center",
+    },
+    logoContainer: {
+      alignItems: "center",
+    },
+    logoImage: {
+      width: 260,
+      height: 260,
+    },
+    welcomeNextButton: {
+      width: "100%",
+      alignSelf: "center",
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 40,
+    },
+    backButton: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: palette.card,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 28,
+      alignSelf: "flex-start",
+    },
+    backIcon: {
+      fontSize: 24,
+      color: palette.text,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginBottom: 16,
+    },
+    progressContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 24,
+    },
+    progressDot: {
+      width: 48,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: withAlpha(palette.textMuted, 0.3),
+    },
+    optionsContainer: {
+      marginBottom: 32,
+      gap: 12,
+    },
+    goalConflictText: {
+      marginTop: -12,
+      marginBottom: 12,
+      color: palette.error,
+      fontSize: 13,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    optionItem: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    optionItemSelected: {
+      borderColor: palette.warning,
+      backgroundColor: withAlpha(palette.warning, 0.12),
+    },
+    optionLabel: {
+      fontSize: 16,
+      color: palette.text,
+      fontWeight: "500",
+    },
+    optionLabelSelected: {
+      color: palette.warning,
+    },
+    radioOuter: {
+      width: 25,
+      height: 25,
+      borderRadius: 13,
+      borderWidth: 2,
+      borderColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    radioOuterActive: {
+      borderColor: palette.warning,
+    },
+    radioInner: {
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: palette.warning,
+    },
+    nextButtonBase: {
+      borderRadius: 14,
+      paddingVertical: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 20,
+    },
+    nextButtonActive: {
+      backgroundColor: palette.success,
+      shadowColor: palette.success,
+      shadowOpacity: 0.2,
+      shadowOffset: { width: 0, height: 6 },
+      shadowRadius: 10,
+      elevation: 3,
+    },
+    nextButtonInactive: {
+      backgroundColor: withAlpha(palette.textMuted, 0.25),
+      shadowColor: "transparent",
+      shadowOpacity: 0,
+      shadowOffset: { width: 0, height: 0 },
+      shadowRadius: 0,
+      elevation: 0,
+    },
+    nextButtonText: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    nextButtonTextInactive: {
+      color: withAlpha(palette.card, 0.85),
+    },
+    allergyInputSection: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 32,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    sectionLabel: {
+      fontSize: 14,
+      color: palette.textMuted,
+      fontWeight: "600",
+      marginBottom: 12,
+    },
+    inputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingVertical: 4,
+      paddingHorizontal: 10,
+    },
+    allergyInput: {
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: 12,
+      fontSize: 16,
+      color: palette.text,
+    },
+    addButton: {
+      backgroundColor: palette.success,
+      borderRadius: 10,
+      paddingVertical: 12,
+      paddingHorizontal: 18,
+      marginLeft: 10,
+    },
+    addButtonDisabled: {
+      backgroundColor: withAlpha(palette.success, 0.5),
+    },
+    addButtonText: {
+      color: palette.card,
+      fontWeight: "600",
+      fontSize: 14,
+    },
+    allergiesListSection: {
+      backgroundColor: palette.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+      padding: 20,
+      marginBottom: 30,
+    },
+    allergiesList: {
+      gap: 10,
+    },
+    allergyTag: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    allergyTagEditing: {
+      borderColor: palette.warning,
+    },
+    allergyTagText: {
+      fontSize: 14,
+      color: palette.text,
+      fontWeight: "500",
+    },
+    allergyActions: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    allergyActionButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: palette.card,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    allergyEditIcon: {
+      color: palette.success,
+    },
+    allergyDeleteIcon: {
+      color: palette.error,
+      fontSize: 18,
+      fontWeight: "700",
+    },
+    commonAllergiesSection: {
+      backgroundColor: palette.background,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: palette.border,
+      padding: 20,
+      marginBottom: 30,
+    },
+    commonAllergiesGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 10,
+    },
+    commonAllergyChip: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 20,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    commonAllergyChipSelected: {
+      backgroundColor: withAlpha(palette.warning, 0.12),
+      borderColor: palette.warning,
+    },
+    commonAllergyText: {
+      fontSize: 14,
+      color: palette.text,
+      fontWeight: "500",
+    },
+    commonAllergyTextSelected: {
+      color: palette.warning,
+    },
+  });
+
+type PreferenceStyles = ReturnType<typeof createStyles>;
 
 type PreferenceOptionItemProps = {
   id: string;
@@ -1638,10 +1692,11 @@ type PreferenceOptionItemProps = {
   isSelected: boolean;
   scale: Animated.Value;
   onSelect: (id: string) => void;
+  styles: PreferenceStyles;
 };
 
 const PreferenceOptionItem = React.memo(
-  ({ id, label, isSelected, scale, onSelect }: PreferenceOptionItemProps) => {
+  ({ id, label, isSelected, scale, onSelect, styles }: PreferenceOptionItemProps) => {
     const handlePress = useCallback(() => onSelect(id), [id, onSelect]);
 
     return (
@@ -1682,10 +1737,11 @@ type AllergyTagProps = {
   isEditing: boolean;
   onEdit: (index: number) => void;
   onDelete: (index: number) => void;
+  styles: PreferenceStyles;
 };
 
 const AllergyTag = React.memo(
-  ({ index, label, isEditing, onEdit, onDelete }: AllergyTagProps) => {
+  ({ index, label, isEditing, onEdit, onDelete, styles }: AllergyTagProps) => {
     const handleEdit = useCallback(() => onEdit(index), [index, onEdit]);
     const handleDelete = useCallback(() => onDelete(index), [index, onDelete]);
 
@@ -1702,7 +1758,7 @@ const AllergyTag = React.memo(
             onPress={handleEdit}
             style={styles.allergyActionButton}
           >
-            <Text style={styles.allergyEditIcon}>✎</Text>
+            <Ionicons name="create-outline" size={16} style={styles.allergyEditIcon} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleDelete}
@@ -1720,10 +1776,11 @@ type CommonAllergyChipProps = {
   label: string;
   selected: boolean;
   onSelect: (value: string) => void;
+  styles: PreferenceStyles;
 };
 
 const CommonAllergyChip = React.memo(
-  ({ label, selected, onSelect }: CommonAllergyChipProps) => {
+  ({ label, selected, onSelect, styles }: CommonAllergyChipProps) => {
     const handleSelect = useCallback(() => onSelect(label), [label, onSelect]);
     return (
       <TouchableOpacity
@@ -1750,17 +1807,19 @@ const CommonAllergyChip = React.memo(
 type ProgressDotProps = {
   index: number;
   progressAnim: Animated.Value;
+  colors: { inactive: string; active: string };
+  styles: PreferenceStyles;
 };
 
 const ProgressDot = React.memo(
-  ({ index, progressAnim }: ProgressDotProps) => (
+  ({ index, progressAnim, colors, styles }: ProgressDotProps) => (
     <Animated.View
       style={[
         styles.progressDot,
         {
           backgroundColor: progressAnim.interpolate({
             inputRange: [index - 0.5, index + 0.5],
-            outputRange: ["#E0E0E0", COLORS.orange],
+            outputRange: [colors.inactive, colors.active],
             extrapolate: "clamp",
           }),
         },

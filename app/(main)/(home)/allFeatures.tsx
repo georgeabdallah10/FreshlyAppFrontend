@@ -1,3 +1,6 @@
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -27,37 +30,50 @@ type Feature = {
   proTip: string;
 };
 
-const theme = {
-  colors: {
-    bg: "#FFFFFF",
-    bgAlt: "#FAFAFA",
-    card: "#FFFFFF",
-    cardAlt: "#F7F9FC",
-    primary: "#00A86B", // GREEN
-    primaryDark: "#008F5C",
-    accent: "#FD8100", // ORANGE
-    primaryTint: "#E8F8F1",
-    accentTint: "#FFF3E6",
-    text: "#0A0A0A",
-    textMut: "#5B6975",
-    chipBg: "#F3F5F7",
-    border: "#EAEAEA",
-    shadow: "rgba(0,0,0,0.12)",
-  },
-  radius: {
-    sm: 10,
-    md: 14,
-    lg: 18,
-    xl: 22,
-  },
-  space: {
-    xs: 6,
-    sm: 10,
-    md: 14,
-    lg: 20,
-    xl: 28,
-    xxl: 36,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => {
+  const primary = colors.primary;
+  const accent = colors.warning;
+  return {
+    bg: colors.background,
+    bgAlt: withAlpha(colors.textSecondary, 0.03),
+    card: colors.card,
+    cardAlt: withAlpha(colors.card, 0.96),
+    primary,
+    primaryDark: withAlpha(primary, 0.85),
+    accent,
+    primaryTint: withAlpha(primary, 0.12),
+    accentTint: withAlpha(accent, 0.12),
+    text: colors.textPrimary,
+    textMut: colors.textSecondary,
+    chipBg: withAlpha(colors.textSecondary, 0.08),
+    border: colors.border,
+    shadow: withAlpha(colors.textPrimary, 0.12),
+  };
+};
+
+const radius = {
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 22,
+};
+
+const space = {
+  xs: 6,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
+  xxl: 36,
 };
 
 const features: Feature[] = [
@@ -158,27 +174,17 @@ const KPI = [
   { icon: "pricetag", label: "Budget-Friendly", value: "Save more" },
 ] as const;
 
-const Hero = () => {
-  const router = useRouter();
+type Palette = ReturnType<typeof createPalette>;
+type ScreenStyles = ReturnType<typeof createStyles>;
+
+const Hero = ({ palette, styles }: { palette: Palette; styles: ScreenStyles }) => {
   return (
     <LinearGradient
-      colors={[theme.colors.primaryTint, theme.colors.bg]}
+      colors={[palette.primaryTint, palette.bg]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.hero}
-    >
-      <Animated.View
-        entering={FadeInUp.duration(600).easing(Easing.out(Easing.cubic))}
-        style={styles.heroHeader}
-      >
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={[styles.headerButton]}
-        >
-          <Ionicons name="arrow-back" size={24} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </Animated.View>
-      
+    > 
       <Animated.View 
         entering={FadeInUp.delay(100).duration(600).easing(Easing.out(Easing.cubic))}
         style={styles.titleContainer}
@@ -207,7 +213,7 @@ const Hero = () => {
             style={styles.kpiChip}
           >
             <View style={styles.kpiIconWrap}>
-              <Ionicons name={k.icon} size={18} color={theme.colors.primary} />
+              <Ionicons name={k.icon} size={18} color={palette.primary} />
             </View>
             <View style={styles.kpiContent}>
               <Text style={styles.kpiLabel}>{k.label}</Text>
@@ -220,7 +226,7 @@ const Hero = () => {
   );
 };
 
-const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
+const FeatureCard = ({ item, index, palette, styles }: { item: Feature; index: number; palette: Palette; styles: ScreenStyles }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -231,8 +237,7 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
         styles.card,
         {
           borderLeftWidth: 4,
-          borderLeftColor:
-            index % 2 ? theme.colors.accent : theme.colors.primary,
+          borderLeftColor: index % 2 ? palette.accent : palette.primary,
         },
       ]}
     >
@@ -242,25 +247,25 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
         accessibilityLabel={`${item.title}. ${
           expanded ? "Collapse" : "Expand"
         } for details.`}
-        android_ripple={{ color: "rgba(0,168,107,0.08)" }}
+        android_ripple={{ color: withAlpha(palette.primary, 0.08) }}
         style={styles.cardInner}
       >
         <View style={styles.cardHeader}>
           <View style={[
             styles.iconWrap,
-            { backgroundColor: index % 2 ? theme.colors.accentTint : theme.colors.primaryTint }
+            { backgroundColor: index % 2 ? palette.accentTint : palette.primaryTint }
           ]}>
             <Ionicons 
               name={item.icon} 
               size={22} 
-              color={index % 2 ? theme.colors.accent : theme.colors.primary} 
+              color={index % 2 ? palette.accent : palette.primary} 
             />
           </View>
           <Text style={styles.cardTitle}>{item.title}</Text>
           <Ionicons
             name={expanded ? "chevron-up" : "chevron-down"}
             size={20}
-            color={theme.colors.textMut}
+            color={palette.textMut}
           />
         </View>
 
@@ -275,7 +280,7 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
           >
             <View style={styles.proTipBar} />
             <View style={styles.proTipContent}>
-              <Ionicons name="sparkles" size={16} color={theme.colors.accent} />
+              <Ionicons name="sparkles" size={16} color={palette.accent} />
               <Text style={styles.proTipText}>{item.proTip}</Text>
             </View>
           </Animated.View>
@@ -285,7 +290,7 @@ const FeatureCard = ({ item, index }: { item: Feature; index: number }) => {
   );
 };
 
-const StepItem = ({ text, index }: { text: string; index: number }) => {
+const StepItem = ({ text, index, palette, styles }: { text: string; index: number; palette: Palette; styles: ScreenStyles }) => {
   return (
     <Animated.View 
       layout={Layout.springify()} 
@@ -293,7 +298,7 @@ const StepItem = ({ text, index }: { text: string; index: number }) => {
       style={styles.stepItem}
     >
       <LinearGradient
-        colors={[theme.colors.primary, theme.colors.primaryDark]}
+        colors={[palette.primary, palette.primaryDark]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.stepBadge}
@@ -305,19 +310,19 @@ const StepItem = ({ text, index }: { text: string; index: number }) => {
   );
 };
 
-const TipPill = ({ text, index }: { text: string; index: number }) => {
+const TipPill = ({ text, index, palette, styles }: { text: string; index: number; palette: Palette; styles: ScreenStyles }) => {
   return (
     <Animated.View 
       entering={FadeInUp.delay(index * 60).duration(400)}
       style={styles.tipPill}
     >
-      <Ionicons name="bulb" size={15} color={theme.colors.accent} />
+      <Ionicons name="bulb" size={15} color={palette.accent} />
       <Text style={styles.tipText}>{text}</Text>
     </Animated.View>
   );
 };
 
-const CTAButton = ({ onPress }: { onPress: () => void }) => {
+const CTAButton = ({ onPress, palette, styles }: { onPress: () => void; palette: Palette; styles: ScreenStyles }) => {
   const [pressed, setPressed] = useState(false);
   return (
     <Animated.View entering={FadeInUp.delay(100).duration(600)}>
@@ -330,14 +335,14 @@ const CTAButton = ({ onPress }: { onPress: () => void }) => {
         style={[styles.ctaWrap, pressed && { transform: [{ scale: 0.97 }] }]}
       >
         <LinearGradient
-          colors={[theme.colors.accent, theme.colors.primary]}
+          colors={[palette.accent, palette.primary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.ctaBtn}
         >
-          <Ionicons name="sparkles" size={20} color="#FFFFFF" />
+          <Ionicons name="sparkles" size={20} color={palette.card} />
           <Text style={styles.ctaText}>Start Planning</Text>
-          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          <Ionicons name="arrow-forward" size={18} color={palette.card} />
         </LinearGradient>
       </Pressable>
     </Animated.View>
@@ -345,15 +350,32 @@ const CTAButton = ({ onPress }: { onPress: () => void }) => {
 };
 
 export default function SavrFeaturesScreen() {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const featureList = useMemo(() => features, []);
+  const scrollContentStyle = useScrollContentStyle();
+    const router = useRouter();
+
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+            <Animated.View
+        entering={FadeInUp.duration(600).easing(Easing.out(Easing.cubic))}
+        style={styles.heroHeader}
+      >
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.headerButton]}
+        >
+          <Ionicons name="arrow-back" size={24} color={palette.primary} />
+        </TouchableOpacity>
+      </Animated.View>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, scrollContentStyle]}
         showsVerticalScrollIndicator={false}
         overScrollMode="never"
       >
-        <Hero />
+        <Hero palette={palette} styles={styles} />
 
         {/* Core Features */}
         <View style={styles.section}>
@@ -365,7 +387,7 @@ export default function SavrFeaturesScreen() {
 
           <View style={styles.cardGrid}>
             {featureList.map((f, i) => (
-              <FeatureCard key={f.id} item={f} index={i} />
+              <FeatureCard key={f.id} item={f} index={i} palette={palette} styles={styles} />
             ))}
           </View>
         </View>
@@ -379,7 +401,7 @@ export default function SavrFeaturesScreen() {
           </Text>
           <View style={styles.stepsWrap}>
             {steps.map((s, i) => (
-              <StepItem key={i} text={s} index={i} />
+              <StepItem key={i} text={s} index={i} palette={palette} styles={styles} />
             ))}
           </View>
         </View>
@@ -389,7 +411,7 @@ export default function SavrFeaturesScreen() {
           <Text style={styles.h2}>Tips to Get the Most Out of It</Text>
           <View style={styles.tipsRow}>
             {tips.map((t, i) => (
-              <TipPill key={t} text={t} index={i} />
+              <TipPill key={t} text={t} index={i} palette={palette} styles={styles} />
             ))}
           </View>
         </View>
@@ -407,295 +429,302 @@ export default function SavrFeaturesScreen() {
               // Example: open a marketing page or navigate to onboarding
               Linking.openURL("https://example.com/savr"); // replace with your deep link or route
             }}
+            palette={palette}
+            styles={styles}
           />*/}
         </View>
 
-        <View style={{ height: theme.space.xxl }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: theme.colors.bg,
-  },
-  container: {
-    paddingBottom: theme.space.xxl,
-  },
-  hero: {
-    backgroundColor: theme.colors.bg,
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.md,
-    paddingBottom: theme.space.xl,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  heroHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: theme.space.lg,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: theme.colors.primaryTint,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,168,107,0.3)",
-  },
-  titleContainer: {
-    alignItems: "center",
-    marginBottom: theme.space.md,
-  },
-  h1: {
-    fontSize: 34,
-    fontWeight: "800",
-    color: theme.colors.text,
-    letterSpacing: 0.5,
-    textAlign: "center",
-  },
-  h1Accent: {
-    color: theme.colors.primary,
-  },
-  subtitle: {
-    marginTop: theme.space.md,
-    fontSize: 15.5,
-    lineHeight: 23,
-    color: theme.colors.textMut,
-    textAlign: "center",
-  },
-  kpiContainer: {
-    marginTop: theme.space.xl,
-    gap: theme.space.md,
-  },
-  kpiChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.space.md,
-    backgroundColor: theme.colors.card,
-    paddingVertical: theme.space.md,
-    paddingHorizontal: theme.space.lg,
-    borderRadius: theme.radius.lg,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primaryTint,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  kpiIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: theme.colors.primaryTint,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  kpiContent: {
-    flex: 1,
-  },
-  kpiLabel: {
-    color: theme.colors.text,
-    fontSize: 13,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  kpiValue: {
-    color: theme.colors.primary,
-    fontSize: 15,
-    fontWeight: "700",
-  },
+const createStyles = (palette: Palette) =>
+  StyleSheet.create({
+    safe: {
+      flex: 1,
+      backgroundColor: palette.bg,
+    },
+    container: {
+      paddingBottom: space.xxl,
+    },
+    hero: {
+      backgroundColor: palette.bg,
+      paddingHorizontal: space.lg,
+      paddingTop: space.md,
+      paddingBottom: space.xl,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: palette.border,
+    },
+    heroHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: space.lg,
+    },
+    headerButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: palette.primaryTint,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withAlpha(palette.primary, 0.3),
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    titleContainer: {
+      alignItems: "center",
+      marginBottom: space.md,
+    },
+    h1: {
+      fontSize: 34,
+      fontWeight: "800",
+      color: palette.text,
+      letterSpacing: 0.5,
+      textAlign: "center",
+    },
+    h1Accent: {
+      color: palette.primary,
+    },
+    subtitle: {
+      marginTop: space.md,
+      fontSize: 15.5,
+      lineHeight: 23,
+      color: palette.textMut,
+      textAlign: "center",
+    },
+    kpiContainer: {
+      marginTop: space.xl,
+      gap: space.md,
+    },
+    kpiChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.md,
+      backgroundColor: palette.card,
+      paddingVertical: space.md,
+      paddingHorizontal: space.lg,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: palette.primaryTint,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    kpiIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      backgroundColor: palette.primaryTint,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    kpiContent: {
+      flex: 1,
+    },
+    kpiLabel: {
+      color: palette.text,
+      fontSize: 13,
+      fontWeight: "600",
+      marginBottom: 2,
+    },
+    kpiValue: {
+      color: palette.primary,
+      fontSize: 15,
+      fontWeight: "700",
+    },
 
-  section: {
-    paddingHorizontal: theme.space.lg,
-    paddingTop: theme.space.xxl,
-  },
-  h2: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: theme.colors.text,
-    marginBottom: theme.space.sm,
-    letterSpacing: 0.3,
-    textAlign: "center",
-  },
-  sectionBlurb: {
-    fontSize: 14.5,
-    lineHeight: 22,
-    color: theme.colors.textMut,
-    marginBottom: theme.space.xl,
-    textAlign: "center",
-  },
+    section: {
+      paddingHorizontal: space.lg,
+      paddingTop: space.xxl,
+    },
+    h2: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: space.sm,
+      letterSpacing: 0.3,
+      textAlign: "center",
+    },
+    sectionBlurb: {
+      fontSize: 14.5,
+      lineHeight: 22,
+      color: palette.textMut,
+      marginBottom: space.xl,
+      textAlign: "center",
+    },
 
-  cardGrid: {
-    gap: theme.space.md,
-  },
-  card: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-    overflow: "hidden",
-  },
-  cardInner: {
-    padding: theme.space.lg,
-    gap: theme.space.md,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.space.md,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(0,168,107,0.25)",
-  },
-  cardTitle: {
-    flex: 1,
-    color: theme.colors.text,
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  cardBlurb: {
-    color: theme.colors.textMut,
-    fontSize: 14.5,
-    lineHeight: 21,
-  },
-  proTipBox: {
-    marginTop: theme.space.sm,
-    padding: theme.space.md,
-    borderRadius: theme.radius.md,
-    backgroundColor: theme.colors.accentTint,
-    borderWidth: 1,
-    borderColor: "rgba(253,129,0,0.3)",
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: theme.space.sm,
-  },
-  proTipBar: {
-    width: 3,
-    height: "100%",
-    backgroundColor: theme.colors.accent,
-    borderRadius: 2,
-  },
-  proTipContent: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-  },
-  proTipText: {
-    color: theme.colors.text,
-    fontSize: 13.5,
-    flex: 1,
-    lineHeight: 19,
-  },
+    cardGrid: {
+      gap: space.md,
+    },
+    card: {
+      backgroundColor: palette.card,
+      borderRadius: radius.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+      overflow: "hidden",
+    },
+    cardInner: {
+      padding: space.lg,
+      gap: space.md,
+    },
+    cardHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.md,
+    },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withAlpha(palette.primary, 0.25),
+    },
+    cardTitle: {
+      flex: 1,
+      color: palette.text,
+      fontSize: 17,
+      fontWeight: "700",
+      letterSpacing: 0.2,
+    },
+    cardBlurb: {
+      color: palette.textMut,
+      fontSize: 14.5,
+      lineHeight: 21,
+    },
+    proTipBox: {
+      marginTop: space.sm,
+      padding: space.md,
+      borderRadius: radius.md,
+      backgroundColor: palette.accentTint,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.accent, 0.3),
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: space.sm,
+    },
+    proTipBar: {
+      width: 3,
+      height: "100%",
+      backgroundColor: palette.accent,
+      borderRadius: 2,
+    },
+    proTipContent: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "flex-start",
+      gap: 8,
+    },
+    proTipText: {
+      color: palette.text,
+      fontSize: 13.5,
+      flex: 1,
+      lineHeight: 19,
+    },
 
-  stepsWrap: {
-    gap: theme.space.md,
-  },
-  stepItem: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: theme.space.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.space.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
-  },
-  stepBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stepBadgeText: {
-    color: "#FFFFFF",
-    fontWeight: "800",
-    fontSize: 16,
-  },
-  stepText: {
-    color: theme.colors.text,
-    fontSize: 14.5,
-    flex: 1,
-    lineHeight: 21,
-    fontWeight: "500",
-  },
+    stepsWrap: {
+      gap: space.md,
+    },
+    stepItem: {
+      backgroundColor: palette.card,
+      borderRadius: radius.lg,
+      padding: space.lg,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: space.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.06,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    stepBadge: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    stepBadgeText: {
+      color: palette.card,
+      fontWeight: "800",
+      fontSize: 16,
+    },
+    stepText: {
+      color: palette.text,
+      fontSize: 14.5,
+      flex: 1,
+      lineHeight: 21,
+      fontWeight: "500",
+    },
 
-  tipsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: theme.space.sm,
-    justifyContent: "center",
-  },
-  tipPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.card,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
-  },
-  tipText: {
-    color: theme.colors.text,
-    fontSize: 13.5,
-    fontWeight: "600",
-  },
+    tipsRow: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: space.sm,
+      justifyContent: "center",
+    },
+    tipPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      backgroundColor: palette.card,
+      borderRadius: 999,
+      borderWidth: 1.5,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 1,
+    },
+    tipText: {
+      color: palette.text,
+      fontSize: 13.5,
+      fontWeight: "600",
+    },
 
-  closing: {
-    paddingBottom: theme.space.xl,
-  },
-  ctaWrap: {
-    marginTop: theme.space.xl,
-  },
-  ctaBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 16,
-    paddingHorizontal: theme.space.xl,
-    justifyContent: "center",
-    borderRadius: theme.radius.xl,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  ctaText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    letterSpacing: 0.3,
-  },
-});
+    closing: {
+      paddingBottom: space.xl,
+    },
+    ctaWrap: {
+      marginTop: space.xl,
+    },
+    ctaBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 16,
+      paddingHorizontal: space.xl,
+      justifyContent: "center",
+      borderRadius: radius.xl,
+      shadowColor: palette.shadow,
+      shadowOpacity: 0.15,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
+    },
+    ctaText: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: palette.card,
+      letterSpacing: 0.3,
+    },
+  });

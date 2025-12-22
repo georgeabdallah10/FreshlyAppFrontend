@@ -9,6 +9,7 @@
  */
 
 import React, { useEffect, useRef } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   Animated,
   Modal,
@@ -241,7 +242,7 @@ export const SyncResultModal: React.FC<SyncResultModalProps> = ({
                   { backgroundColor: colors.danger + "20" },
                 ]}
               >
-                <Text style={styles.statIcon}>🗑</Text>
+                <Ionicons name="trash-outline" size={18} color={colors.danger} />
               </View>
               <Text style={[styles.statValue, { color: colors.text }]}>
                 {response.items_removed}

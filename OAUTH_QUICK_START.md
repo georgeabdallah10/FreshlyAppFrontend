@@ -1,6 +1,6 @@
-# 🚀 OAuth Quick Start & Testing Guide
+#  OAuth Quick Start & Testing Guide
 
-## ⚡ IMMEDIATE ACTION REQUIRED
+##  IMMEDIATE ACTION REQUIRED
 
 ### 1. Configure Supabase Dashboard (5 minutes)
 
@@ -22,7 +22,7 @@ Authentication → Providers → Google
 
 ---
 
-## 🧪 Quick Test Commands
+##  Quick Test Commands
 
 ### Test Deep Link (iOS)
 ```bash
@@ -41,7 +41,7 @@ npx expo start --clear
 
 ---
 
-## ✅ Testing Checklist
+##  Testing Checklist
 
 ### Login Flow
 ```
@@ -66,9 +66,9 @@ npx expo start --clear
 
 ---
 
-## 🔍 What to Look For in Console
+##  What to Look For in Console
 
-### ✅ SUCCESS:
+###  SUCCESS:
 ```
 [Login] google login started
 [Login] OAuth browser session completed
@@ -77,7 +77,7 @@ npx expo start --clear
 [UserContext] Auth state changed: SIGNED_IN
 ```
 
-### ❌ ERRORS:
+###  ERRORS:
 ```
 "Unable to open provider login page" → Enable Google in Supabase
 "Authentication failed" → Check redirect URLs
@@ -86,17 +86,17 @@ npx expo start --clear
 
 ---
 
-## 🎯 Files Modified
+##  Files Modified
 
-1. ✅ `/app/(auth)/Login.tsx` - Fixed scheme
-2. ✅ `/app/(auth)/signup.tsx` - Fixed scheme
-3. ✅ `/app/(auth)/callback.tsx` - NEW FILE
-4. ✅ `/context/usercontext.tsx` - Added auth listener
-5. ✅ `/src/supabase/client.ts` - Improved config
+1.  `/app/(auth)/Login.tsx` - Fixed scheme
+2.  `/app/(auth)/signup.tsx` - Fixed scheme
+3.  `/app/(auth)/callback.tsx` - NEW FILE
+4.  `/context/usercontext.tsx` - Added auth listener
+5.  `/src/supabase/client.ts` - Improved config
 
 ---
 
-## 🆘 Quick Fixes
+##  Quick Fixes
 
 ### OAuth Not Opening Browser?
 ```typescript
@@ -113,13 +113,13 @@ npx expo run:ios
 
 ### Session Not Persisting?
 ```typescript
-// Check: UserContext has onAuthStateChange listener (DONE ✅)
-// Check: Supabase client has persistSession: true (DONE ✅)
+// Check: UserContext has onAuthStateChange listener (DONE )
+// Check: Supabase client has persistSession: true (DONE )
 ```
 
 ---
 
-## 📊 Expected Results
+##  Expected Results
 
 ### First Time User (Signup)
 ```
@@ -148,7 +148,7 @@ npx expo run:ios
 
 ---
 
-## 🎨 User Experience Flow
+##  User Experience Flow
 
 ```
 ┌─────────────────┐
@@ -170,7 +170,7 @@ npx expo run:ios
 
 ---
 
-## 📱 Platform Notes
+##  Platform Notes
 
 ### iOS
 - Works in simulator
@@ -189,17 +189,17 @@ npx expo run:ios
 
 ---
 
-## 🔐 Security Checklist
+##  Security Checklist
 
-- ✅ Tokens stored in SecureStore
-- ✅ skipBrowserRedirect: true
-- ✅ Backend validates Supabase tokens
-- ✅ User-friendly error messages
-- ✅ No credentials in logs
+-  Tokens stored in SecureStore
+-  skipBrowserRedirect: true
+-  Backend validates Supabase tokens
+-  User-friendly error messages
+-  No credentials in logs
 
 ---
 
-## 📞 Still Not Working?
+##  Still Not Working?
 
 1. **Clear app data**
    ```bash
@@ -224,6 +224,6 @@ npx expo run:ios
 
 ---
 
-**🎉 Once OAuth works, you're done!**
+** Once OAuth works, you're done!**
 
 All fixes have been applied. Just need to configure Supabase Dashboard and test.

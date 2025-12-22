@@ -8,10 +8,12 @@ import { uploadAvatarViaProxy } from "@/src/user/uploadViaBackend";
 import { Storage } from "@/src/utils/storage";
 import * as ImagePicker from "expo-image-picker";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +21,8 @@ import {
   View
 } from "react-native";
 
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 
 type Step = "initial" | "scanning" | "success";
@@ -64,6 +68,9 @@ export const SetPfp = () => {
   const user = userContext?.user;
   const updateUserInfo = userContext?.updateUserInfo;
   const refreshUser = userContext?.refreshUser;
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
 
   const [toast, setToast] = useState<ToastState>({
     visible: false,
@@ -233,9 +240,21 @@ export const SetPfp = () => {
 
   const handleTakePhoto = async () => {
     try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      const { status, canAskAgain } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== "granted") {
-        showToast("error", "Camera permission is required");
+        if (!canAskAgain) {
+          // Permission was permanently denied, prompt user to open settings
+          Alert.alert(
+            "Camera Access Required",
+            "You have denied camera access. Please enable it in your device settings to take a photo.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() }
+            ]
+          );
+        } else {
+          showToast("error", "Camera permission is required, Please enable it in settings.");
+        }
         return;
       }
       const result = await ImagePicker.launchCameraAsync({
@@ -308,7 +327,7 @@ export const SetPfp = () => {
       
       let errorMessage = "Unable to capture photo. ";
       if (err?.message?.toLowerCase().includes("permission")) {
-        errorMessage = "Camera permission denied. Please enable camera access in your device settings.";
+        errorMessage = "Camera permission is required, Please enable it in settings..";
       } else if (err?.message?.toLowerCase().includes("cancelled") || err?.message?.toLowerCase().includes("canceled")) {
         // User cancelled, don't show error
         setCurrentStep("initial");
@@ -326,10 +345,22 @@ export const SetPfp = () => {
 
   const handleChooseFromGallery = async () => {
     try {
-      const { status } =
+      const { status, canAskAgain } =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== "granted") {
-        showToast("error", "Gallery permission is required");
+        if (!canAskAgain) {
+          // Permission was permanently denied, prompt user to open settings
+          Alert.alert(
+            "Gallery Access Required",
+            "You have denied gallery access. Please enable it in your device settings to choose a photo.",
+            [
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() }
+            ]
+          );
+        } else {
+          showToast("error", "Gallery permission is required");
+        }
         return;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -430,6 +461,13 @@ export const SetPfp = () => {
     }
   };
 
+  const handleSkip = () => {
+    router.replace({
+      pathname: "/(main)/(user)/getLocation",
+      params: { fromOnboarding: "true" },
+    });
+  };
+
   const handleClose = () => {
     setCurrentStep("initial");
     setSelectedImage(null);
@@ -444,7 +482,7 @@ export const SetPfp = () => {
           onPress={() => router.back()}
           style={styles.backButton}
         >
-          <Icon name="back" size={24} color="#333" />
+          <Icon name="back" size={24} color={palette.text} />
         </TouchableOpacity>
       ) : null}
 
@@ -455,7 +493,7 @@ export const SetPfp = () => {
       
       {/* Debug info - remove in production */}
       {__DEV__ && (
-        <Text style={{ fontSize: 12, color: '#999', marginBottom: 10 }}>
+        <Text style={{ fontSize: 12, color: palette.textMuted, marginBottom: 10 }}>
           UserID: {userID || 'Not set'} | From: {fromProfile || 'signup'}
         </Text>
       )}
@@ -463,7 +501,7 @@ export const SetPfp = () => {
       <View style={styles.faceIconContainer}>
         <View style={styles.faceCircleOuter}>
           <View style={styles.faceCircleInner}>
-            <Icon name="user" size={80} color="#00A86B" />
+            <Icon name="user" size={80} color={palette.primary} />
           </View>
         </View>
       </View>
@@ -496,7 +534,7 @@ export const SetPfp = () => {
               },
             ]}
           />
-          <Icon name="camera" size={20} color="#FFF" style={{ marginRight: 8 }} />
+          <Icon name="camera" size={20} color={palette.card} style={{ marginRight: 8 }} />
           <Text style={styles.scanButtonText}>Take Photo</Text>
         </TouchableOpacity>
 
@@ -527,9 +565,19 @@ export const SetPfp = () => {
               },
             ]}
           />
-          <Icon name="image" size={20} color="#00A86B" style={{ marginRight: 8 }} />
+          <Icon name="image" size={20} color={palette.primary} style={{ marginRight: 8 }} />
           <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
         </TouchableOpacity>
+
+        {fromProfile !== "true" && (
+          <TouchableOpacity
+            style={styles.skipButton}
+            onPress={handleSkip}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.skipButtonText}>Skip for now</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -556,7 +604,7 @@ export const SetPfp = () => {
                   resizeMode="cover"
                 />
               ) : (
-                <Text style={styles.faceImageEmoji}>👨</Text>
+                <Icon name="user" size={48} color={palette.textMuted} />
               )}
             </View>
 
@@ -604,7 +652,7 @@ export const SetPfp = () => {
                   resizeMode="cover"
                 />
               ) : (
-                <Text style={styles.successImageEmoji}>👨</Text>
+                <Icon name="user" size={48} color={palette.textMuted} />
               )}
             </View>
           </View>
@@ -655,10 +703,33 @@ export const SetPfp = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryAlt: withAlpha(colors.primary, 0.85),
+  primaryLight: withAlpha(colors.primary, 0.12),
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+});
+
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: palette.background,
     paddingTop: 90,
   },
   content: {
@@ -674,19 +745,19 @@ const styles = StyleSheet.create({
     height: 50,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: palette.background,
     borderRadius: 100,
   },
   title: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#000",
+    color: palette.text,
     marginBottom: 12,
     textAlign: "center",
   },
   subtitle: {
     fontSize: 15,
-    color: "#999",
+    color: palette.textMuted,
     textAlign: "center",
     lineHeight: 22,
     marginBottom: 60,
@@ -699,18 +770,18 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: "#E8F5F0",
+    backgroundColor: palette.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 3,
-    borderColor: "#00A86B",
+    borderColor: palette.primary,
     borderStyle: "dashed",
   },
   faceCircleInner: {
     width: 260,
     height: 260,
     borderRadius: 130,
-    backgroundColor: "#D4F1E5",
+    backgroundColor: withAlpha(palette.primary, 0.2),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -725,10 +796,10 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#00A86B",
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -737,13 +808,13 @@ const styles = StyleSheet.create({
   scanButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: palette.card,
   },
   galleryButton: {
     width: "100%",
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: palette.background,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -751,7 +822,7 @@ const styles = StyleSheet.create({
   galleryButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#000",
+    color: palette.text,
   },
   closeButton: {
     position: "absolute",
@@ -760,13 +831,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: withAlpha(palette.card, 0.3),
     alignItems: "center",
     justifyContent: "center",
   },
   closeIcon: {
     fontSize: 20,
-    color: "#fff",
+    color: palette.text,
     fontWeight: "600",
   },
   scanningContainer: {
@@ -786,7 +857,7 @@ const styles = StyleSheet.create({
     width: 240,
     height: 240,
     borderRadius: 120,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: palette.background,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -806,18 +877,18 @@ const styles = StyleSheet.create({
     borderRadius: 140,
     borderWidth: 4,
     borderColor: "transparent",
-    borderTopColor: "#00A86B",
-    borderRightColor: "#00A86B",
+    borderTopColor: palette.primary,
+    borderRightColor: palette.primary,
   },
   progressText: {
     fontSize: 48,
     fontWeight: "700",
-    color: "#00A86B",
+    color: palette.primary,
     marginBottom: 8,
   },
   scanningText: {
     fontSize: 16,
-    color: "#333",
+    color: palette.text,
     opacity: 0.9,
   },
   nextButton: {
@@ -826,10 +897,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#00A86B",
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -837,7 +908,7 @@ const styles = StyleSheet.create({
   },
   nextButtonText: {
     fontSize: 28,
-    color: "#fff",
+    color: palette.card,
     fontWeight: "600",
   },
   successContainer: {
@@ -852,7 +923,7 @@ const styles = StyleSheet.create({
     width: 160,
     height: 160,
     borderRadius: 80,
-    backgroundColor: "#f0f0f0",
+    backgroundColor: palette.background,
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
@@ -870,13 +941,13 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
   },
   successCheckIcon: {
     fontSize: 40,
-    color: "#fff",
+    color: palette.card,
     fontWeight: "700",
   },
   successDot: {
@@ -884,17 +955,17 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
   },
   successTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: "#000",
+    color: palette.text,
     marginBottom: 12,
   },
   successSubtitle: {
     fontSize: 15,
-    color: "#999",
+    color: palette.textMuted,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -904,10 +975,10 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 56,
     borderRadius: 28,
-    backgroundColor: "#00A86B",
+    backgroundColor: palette.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#00A86B",
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -916,14 +987,14 @@ const styles = StyleSheet.create({
   okButtonText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#fff",
+    color: palette.card,
   },
   fillOverlay: {
     position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: withAlpha(palette.card, 0.2),
     borderRadius: 28,
   },
   fillOverlayLight: {
@@ -931,8 +1002,20 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: "rgba(0, 168, 107, 0.1)",
+    backgroundColor: withAlpha(palette.primary, 0.1),
     borderRadius: 28,
+  },
+  skipButton: {
+    width: "100%",
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 8,
+  },
+  skipButtonText: {
+    fontSize: 15,
+    fontWeight: "500",
+    color: palette.textMuted,
   },
 });
 
@@ -951,7 +1034,7 @@ export default SetPfp;
 // const handleTakePhoto = async () => {
 //   const { status } = await ImagePicker.requestCameraPermissionsAsync();
 //   if (status !== 'granted') {
-//     Alert.alert('Permission needed', 'Camera permission is required');
+//     Alert.alert('Permission needed', 'Camera permission is required, Please enable it in settings.');
 //     return;
 //   }
 //   const result = await ImagePicker.launchCameraAsync({

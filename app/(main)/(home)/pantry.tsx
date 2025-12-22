@@ -1,52 +1,72 @@
 import ToastBanner from "@/components/generalMessage";
 import PantryItemImage from "@/components/pantry/PantryItemImage";
 import ScanConfirmModal from "@/components/scanConfirmModal";
+import AppTextInput from "@/components/ui/AppTextInput";
 import { useUser } from "@/context/usercontext";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import { GetItemByBarcode } from "@/src/scanners/barcodeeScanner";
 import { preloadPantryImages } from "@/src/services/pantryImageService";
 import {
-    deletePantryItem,
-    updatePantryItem,
-    upsertPantryItemByName,
+  deletePantryItem,
+  updatePantryItem,
+  upsertPantryItemByName,
 } from "@/src/user/pantry";
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    Animated,
-    Button,
-    Easing,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    LayoutAnimation,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    UIManager,
-    View,
+  ActivityIndicator,
+  Animated,
+  Button,
+  Easing,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  UIManager,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  charcoal: "#4C4D59",
-  charcoalLight: "#F0F0F2",
-  white: "#FFFFFF",
-  text: "#0A0A0A",
-  textMuted: "#666666",
-  border: "#E0E0E0",
-  background: "#FAFAFA",
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  accent: colors.warning,
+  accentLight: withAlpha(colors.warning, 0.12),
+  warning: colors.warning,
+  warningLight: withAlpha(colors.warning, 0.12),
+  success: colors.success,
+  successLight: withAlpha(colors.success, 0.12),
+  error: colors.error,
+  errorLight: withAlpha(colors.error, 0.12),
+  charcoal: colors.textPrimary,
+  charcoalLight: withAlpha(colors.textSecondary, 0.08),
+  white: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  background: colors.background,
+});
 
 const DEFAULT_CATEGORIES = [
   "Produce",
@@ -112,31 +132,6 @@ const DEFAULT_EXPIRATION_DAYS: Record<string, number> = {
   "Legumes & Nuts": 120, "Sweets & Desserts": 30, Household: 365, Other: 30,
 };
 
-const CATEGORY_ICON_MAP: Record<string, string> = {
-  'produce': '🥬', 'fruits': '🍎', 'vegetables': '🥕', 'dairy': '🥛',
-  'meat': '🍖', 'seafood': '🐟', 'grains-&-pasta': '🍝', 'grains & pasta': '🍝',
-  'bakery': '🥖', 'canned-&-jarred': '🥫', 'canned & jarred': '🥫',
-  'frozen': '🧊', 'snacks': '🍪', 'beverages': '🥤', 'spices-&-herbs': '🌿',
-  'spices & herbs': '🌿', 'baking': '🧁', 'condiments-&-sauces': '🍯',
-  'condiments & sauces': '🍯', 'oils-&-vinegars': '🫒', 'oils & vinegars': '🫒',
-  'breakfast-&-cereal': '🥣', 'breakfast & cereal': '🥣', 'legumes-&-nuts': '🫘',
-  'legumes & nuts': '🫘', 'sweets-&-desserts': '🍫', 'sweets & desserts': '🍫',
-  'household': '🧼', 'other': '📦', 'uncategorized': '📦', 'all': '📦'
-};
-
-const normalizeCategoryKey = (val?: string | null) => {
-  if (!val) return 'other';
-  return String(val).trim().toLowerCase();
-};
-
-const getCategoryIcon = (category?: string | null): string => {
-  const key = normalizeCategoryKey(category);
-  if (CATEGORY_ICON_MAP[key]) return CATEGORY_ICON_MAP[key];
-  const dashed = key.replace(/\s+/g, '-');
-  if (CATEGORY_ICON_MAP[dashed]) return CATEGORY_ICON_MAP[dashed];
-  return '📦';
-};
-
 const toDateOnly = (d: Date) => {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -159,12 +154,17 @@ const formatQuantityDisplay = (value: string | number | null | undefined) => {
 const PantryDashboard = () => {
   const router = useRouter();
   const userContext = useUser();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   
   const contextFamilyId = userContext?.activeFamilyId;
   const refreshFamilyMembership = userContext?.refreshFamilyMembership;
   const logout = userContext?.logout;
   const isInFamily = userContext?.isInFamily ?? false;
   const families = userContext?.families ?? [];
+
+  const bottomNavInset = useBottomNavInset();
   const contextPantryItems = userContext?.pantryItems ?? [];
   const loadPantryItems = userContext?.loadPantryItems;
 
@@ -307,14 +307,14 @@ const PantryDashboard = () => {
   };
 
   const getExpirationColor = (dateStr?: string | null) => {
-    if (!dateStr) return COLORS.border;
+    if (!dateStr) return palette.border;
     const today = new Date();
     const exp = new Date(dateStr);
     const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 3600 * 24));
-    if (diffDays <= 0) return "#FF3B30";
-    if (diffDays <= 3) return COLORS.accent;
-    if (diffDays <= 7) return "#FFD60A";
-    return COLORS.primary;
+    if (diffDays <= 0) return palette.error;
+    if (diffDays <= 3) return palette.accent;
+    if (diffDays <= 7) return palette.warning;
+    return palette.primary;
   };
 
   useEffect(() => {
@@ -346,7 +346,7 @@ const PantryDashboard = () => {
 
   useEffect(() => {
     if (currentScannedProduct && currentScannedProduct.ingredient_name) {
-      console.log("⏳ Waiting for pending request:", currentScannedProduct.ingredient_name);
+      console.log("Waiting for pending request:", currentScannedProduct.ingredient_name);
     }
   }, [currentScannedProduct?.ingredient_name]);
 
@@ -370,13 +370,12 @@ const PantryDashboard = () => {
   }, [showQRScanner]);
 
   const mapApiItemToUI = (api: any): PantryItem => {
-    const fallbackIcon = getCategoryIcon(api?.category ?? "other");
     const qtyRaw = api?.quantity ?? api?.amount ?? "";
     return {
       id: String(api.id),
       name: api?.ingredient_name ?? api?.name ?? "Unknown",
       quantity: `${qtyRaw ?? ""}`.trim() || "—",
-      image: api?.image_url ?? api?.image ?? fallbackIcon,
+      image: api?.image_url ?? api?.image ?? "",
       category: (api?.category ?? "Uncategorized") as string,
       expires_at: api?.expires_at ?? null,
       unit: api?.unit ? api?.unit : "units",
@@ -737,13 +736,13 @@ const PantryDashboard = () => {
     if (!perm) {
       const req = await requestPermission();
       if (!req?.granted) {
-        showToast('error', 'Camera permission denied. Please enable it in settings.');
+        showToast('error', 'Camera permission is required, Please enable it in settings..');
         return;
       }
     } else if (!perm.granted) {
       const req = await requestPermission();
       if (!req?.granted) {
-        showToast('error', 'Camera permission denied. Please enable it in settings.');
+        showToast('error', 'Camera permission is required, Please enable it in settings..');
         return;
       }
     }
@@ -802,7 +801,7 @@ const PantryDashboard = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <ToastBanner
         visible={toast.visible}
         type={toast.type}
@@ -814,7 +813,7 @@ const PantryDashboard = () => {
       {/* Phase F6: Grocery sync indicator */}
       {isGrocerySyncing && (
         <View style={styles.grocerySyncBanner}>
-          <ActivityIndicator size="small" color={COLORS.primary} />
+          <ActivityIndicator size="small" color={palette.primary} />
           <Text style={styles.grocerySyncText}>Updating grocery list...</Text>
         </View>
       )}
@@ -847,10 +846,10 @@ const PantryDashboard = () => {
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <TextInput
+        <AppTextInput
           style={styles.searchInput}
           placeholder="Search pantry items..."
-          placeholderTextColor="#999"
+          placeholderTextColor={palette.textMuted}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -895,7 +894,7 @@ const PantryDashboard = () => {
             <Text style={styles.addCategoryIcon}>+</Text>
           </TouchableOpacity>
           {categories.map((category, index) => {
-            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+            const colors = [palette.primary, palette.accent, palette.charcoal];
             const color = colors[index % 3];
             const isActive = selectedCategory === category.id;
             
@@ -925,27 +924,27 @@ const PantryDashboard = () => {
       {/* Grocery List */}
       {loading ? (
         <View style={[styles.emptyState, { paddingTop: 40 }]}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={{ marginTop: 8, color: "#999" }}>Loading pantry…</Text>
+          <ActivityIndicator size="large" color={palette.primary} />
+          <Text style={{ marginTop: 8, color: palette.textMuted }}>Loading pantry…</Text>
         </View>
       ) : needsFamilySelection ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>👨‍👩‍👧‍👦</Text>
+          <Ionicons name="people-outline" size={44} color={palette.textMuted} style={styles.emptyIcon} />
           <Text style={styles.emptyText}>Select a family to view its pantry.</Text>
         </View>
       ) : filteredItems.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📁🔍</Text>
+          <Ionicons name="search-outline" size={44} color={palette.textMuted} style={styles.emptyIcon} />
           <Text style={styles.emptyText}>No Data Available</Text>
         </View>
       ) : (
         <FlatList
           data={filteredItems}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: bottomNavInset + 40 }]}
           showsVerticalScrollIndicator={false}
           renderItem={({ item, index }) => {
-            const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+            const colors = [palette.primary, palette.accent, palette.charcoal];
             const accentColor = colors[index % 3];
             const isDropdownOpen = expandedItemId === item.id;
             const isAdjusting = quantityUpdatingId === item.id;
@@ -982,7 +981,7 @@ const PantryDashboard = () => {
                   </View>
                   <View style={styles.itemActions}>
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: COLORS.primaryLight }]}
+                      style={[styles.actionButton, { backgroundColor: palette.primaryLight }]}
                       onPress={() => openEditSheet(item)}
                     >
                       <Image
@@ -992,7 +991,7 @@ const PantryDashboard = () => {
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: "#FFE5E5" }]}
+                      style={[styles.actionButton, { backgroundColor: palette.errorLight }]}
                       onPress={() => handleDeleteItem(item.id)}
                     >
                       <Image
@@ -1009,9 +1008,11 @@ const PantryDashboard = () => {
                       ]}
                       onPress={() => toggleDropdown(item.id)}
                     >
-                      <Text style={styles.dropdownToggleText}>
-                        {isDropdownOpen ? "▲" : "▼"}
-                      </Text>
+                      <Ionicons
+                        name={isDropdownOpen ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={palette.text}
+                      />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1090,17 +1091,17 @@ const PantryDashboard = () => {
                       style={styles.menuCardIcon}
                       resizeMode="contain"
                     />
-                    <TextInput
+                    <AppTextInput
                       style={styles.modalTextInput}
                       placeholder="Enter category name"
-                      placeholderTextColor="#B0B0B0"
+                      placeholderTextColor={palette.textMuted}
                       value={newCategoryName}
                       onChangeText={setNewCategoryName}
                     />
                   </View>
                   <TouchableOpacity style={styles.modalButton} onPress={handleAddCategory}>
                     <LinearGradient
-                      colors={[COLORS.primary, "#008F5C"]}
+                      colors={[palette.primary, withAlpha(palette.primary, 0.85)]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.buttonGradient}
@@ -1243,10 +1244,10 @@ const PantryDashboard = () => {
                       style={styles.menuCardIcon}
                       resizeMode="contain"
                     />
-                    <TextInput
+                    <AppTextInput
                       style={styles.modalTextInput}
                       placeholder="Enter product name"
-                      placeholderTextColor="#B0B0B0"
+                      placeholderTextColor={palette.textMuted}
                       value={newProductName}
                       onChangeText={setNewProductName}
                     />
@@ -1262,7 +1263,7 @@ const PantryDashboard = () => {
                       <TextInput
                         style={styles.modalTextInput}
                         placeholder="Quantity"
-                        placeholderTextColor="#B0B0B0"
+                        placeholderTextColor={palette.textMuted}
                         keyboardType="numeric"
                         value={newProductQuantity}
                         onChangeText={setNewProductQuantity}
@@ -1314,10 +1315,10 @@ const PantryDashboard = () => {
                           ]}
                         >
                           <View style={styles.unitSearchBar}>
-                            <TextInput
+                            <AppTextInput
                               style={styles.unitSearchInput}
                               placeholder="Search unit…"
-                              placeholderTextColor="#B0B0B0"
+                              placeholderTextColor={palette.textMuted}
                               value={unitSearch}
                               onChangeText={setUnitSearch}
                               autoFocus
@@ -1376,7 +1377,7 @@ const PantryDashboard = () => {
                     <TextInput
                       style={styles.modalTextInput}
                       placeholder="Expiration (YYYY-MM-DD) — optional"
-                      placeholderTextColor="#B0B0B0"
+                      placeholderTextColor={palette.textMuted}
                       value={newProductExpiresAt}
                       onChangeText={setNewProductExpiresAt}
                       keyboardType="numbers-and-punctuation"
@@ -1388,7 +1389,7 @@ const PantryDashboard = () => {
 
                   <TouchableOpacity style={styles.modalButton} onPress={handleSaveProduct}>
                     <LinearGradient
-                      colors={[COLORS.primary, "#008F5C"]}
+                      colors={[palette.primary, withAlpha(palette.primary, 0.85)]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.buttonGradient}
@@ -1531,9 +1532,14 @@ const PantryDashboard = () => {
         }}
         onPress={openCreateSheet}
       >
-        <Animated.View style={[styles.fabButton, { transform: [{ scale: fabScale }] }]}>
+        <Animated.View
+          style={[
+            styles.fabButton,
+            { bottom: bottomNavInset + 20, transform: [{ scale: fabScale }] },
+          ]}
+        >
           <LinearGradient
-            colors={[COLORS.accent, COLORS.primary]}
+            colors={[palette.accent, palette.primary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.fabGradient}
@@ -1546,23 +1552,23 @@ const PantryDashboard = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.background,
   },
   // Phase F6: Grocery sync banner styles
   grocerySyncBanner: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     paddingVertical: 10,
     paddingHorizontal: 16,
     gap: 10,
   },
   grocerySyncText: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -1573,24 +1579,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   headerButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  headerIcon: { fontSize: 20, color: COLORS.primary, fontWeight: "600" },
-  headerTitle: { fontSize: 24, fontWeight: "700", color: COLORS.text },
+  headerIcon: { fontSize: 20, color: palette.primary, fontWeight: "600" },
+  headerTitle: { fontSize: 24, fontWeight: "700", color: palette.text },
   familyNote: {
     marginHorizontal: 20,
     marginTop: 12,
   },
   familyNoteText: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -1604,15 +1610,15 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderColor: palette.border,
+    backgroundColor: palette.white,
     paddingVertical: 10,
     alignItems: "center",
   },
   scopeButtonActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-    shadowColor: COLORS.primary,
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -1624,10 +1630,10 @@ const styles = StyleSheet.create({
   scopeButtonText: {
     fontSize: 15,
     fontWeight: "600",
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   scopeButtonTextActive: {
-    color: COLORS.white,
+    color: palette.white,
   },
   familySelectorContainer: {
     paddingHorizontal: 20,
@@ -1640,11 +1646,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   familyLoadingText: {
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontSize: 14,
   },
   familySelectorHint: {
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontSize: 14,
   },
   familyPillRow: {
@@ -1656,43 +1662,43 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
+    borderColor: palette.border,
+    backgroundColor: palette.white,
   },
   familyPillActive: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primary,
+    backgroundColor: palette.primaryLight,
+    borderColor: palette.primary,
   },
   familyPillText: {
     fontSize: 14,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: "600",
   },
   familyPillTextActive: {
-    color: COLORS.primary,
+    color: palette.primary,
   },
   tooltip: {
     position: "absolute",
     top: 120,
     right: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
     zIndex: 10,
   },
-  tooltipText: { fontSize: 13, color: COLORS.textMuted, lineHeight: 18 },
+  tooltipText: { fontSize: 13, color: palette.textMuted, lineHeight: 18 },
   categoriesWrapper: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     paddingVertical: 12,
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: "#000",
+    borderColor: palette.border,
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 6,
@@ -1706,21 +1712,21 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     borderWidth: 2,
-    borderColor: COLORS.primary,
+    borderColor: palette.primary,
     borderStyle: "dashed",
     justifyContent: "center",
     alignItems: "center",
   },
-  addCategoryIcon: { fontSize: 24, color: COLORS.primary, fontWeight: "600" },
+  addCategoryIcon: { fontSize: 24, color: palette.primary, fontWeight: "600" },
   categoryButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 24,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
   },
-  categoryText: { fontSize: 16, fontWeight: "600", color: COLORS.text },
-  categoryTextActive: { color: COLORS.white },
-  listContent: { padding: 20, paddingBottom: 100 },
+  categoryText: { fontSize: 16, fontWeight: "600", color: palette.text },
+  categoryTextActive: { color: palette.white },
+  listContent: { padding: 20 },
   itemContainer: {
     marginBottom: 12,
   },
@@ -1728,12 +1734,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 2,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 6,
@@ -1743,32 +1749,32 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 4,
   },
-  itemQuantity: { fontSize: 14, color: COLORS.textMuted },
+  itemQuantity: { fontSize: 14, color: palette.textMuted },
   itemActions: { flexDirection: "row", gap: 8, alignItems: "center" },
   actionButton: { 
     padding: 10,
     borderRadius: 10,
   },
   dropdownToggleButton: {
-    backgroundColor: COLORS.charcoalLight,
+    backgroundColor: palette.charcoalLight,
   },
   dropdownToggleButtonActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: palette.primary,
   },
   dropdownToggleText: {
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
     fontWeight: "700",
   },
   adjustDropdown: {
     flexDirection: "row",
     gap: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -1785,34 +1791,34 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   decrementButton: {
-    backgroundColor: "#FFE5E5",
+    backgroundColor: palette.errorLight,
   },
   incrementButton: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
   },
   adjustButtonText: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
   },
   adjustButtonLabel: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.text,
+    color: palette.text,
   },
   adjustButtonDisabled: {
     opacity: 0.5,
   },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyIcon: { fontSize: 80, marginBottom: 16, opacity: 0.3 },
-  emptyText: { fontSize: 18, color: "#CCCCCC", fontWeight: "600" },
+  emptyIcon: { marginBottom: 16, opacity: 0.6 },
+  emptyText: { fontSize: 18, color: palette.textMuted, fontWeight: "600" },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: withAlpha(palette.text, 0.5),
     justifyContent: "flex-end",
   },
   modalContent: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -1821,7 +1827,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: COLORS.border,
+    backgroundColor: palette.border,
     borderRadius: 2,
     alignSelf: "center",
     marginBottom: 20,
@@ -1829,25 +1835,25 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
     marginBottom: 24,
   },
   modalInput: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
   },
-  modalTextInput: { flex: 1, fontSize: 16, color: COLORS.text },
-  placeholderText: { color: "#B0B0B0" },
-  dropdownIcon: { fontSize: 12, color: COLORS.textMuted },
+  modalTextInput: { flex: 1, fontSize: 16, color: palette.text },
+  placeholderText: { color: palette.textMuted },
+  dropdownIcon: { fontSize: 12, color: palette.textMuted },
   modalButton: {
     borderRadius: 12,
     overflow: "hidden",
-    shadowColor: COLORS.primary,
+    shadowColor: palette.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1857,15 +1863,15 @@ const styles = StyleSheet.create({
     padding: 18,
     alignItems: "center",
   },
-  modalButtonText: { fontSize: 18, fontWeight: "700", color: COLORS.white },
+  modalButtonText: { fontSize: 18, fontWeight: "700", color: palette.white },
   dropdownMenu: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     marginTop: -8,
     marginBottom: 16,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1878,26 +1884,26 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  dropdownItemSelected: { backgroundColor: COLORS.primaryLight },
-  dropdownItemText: { fontSize: 16, color: COLORS.text },
-  dropdownItemTextSelected: { color: COLORS.primary, fontWeight: "600" },
-  dropdownCheck: { fontSize: 16, color: COLORS.primary, fontWeight: "700" },
-  scannerOverlay: { flex: 1, backgroundColor: COLORS.white, paddingTop: 60 },
+  dropdownItemSelected: { backgroundColor: palette.primaryLight },
+  dropdownItemText: { fontSize: 16, color: palette.text },
+  dropdownItemTextSelected: { color: palette.primary, fontWeight: "600" },
+  dropdownCheck: { fontSize: 16, color: palette.primary, fontWeight: "700" },
+  scannerOverlay: { flex: 1, backgroundColor: palette.white, paddingTop: 60 },
   scannerBack: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     justifyContent: "center",
     alignItems: "center",
     marginLeft: 20,
     marginBottom: 20,
   },
-  scannerBackIcon: { fontSize: 20, color: COLORS.primary, fontWeight: "600" },
+  scannerBackIcon: { fontSize: 20, color: palette.primary, fontWeight: "600" },
   scannerTitle: {
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
     marginBottom: 60,
   },
@@ -1910,7 +1916,7 @@ const styles = StyleSheet.create({
   },
   scannerText: {
     fontSize: 16,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textAlign: "center",
     marginTop: 80,
   },
@@ -1922,7 +1928,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     overflow: "hidden",
-    shadowColor: COLORS.accent,
+    shadowColor: palette.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1934,20 +1940,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  fabIcon: { fontSize: 28, color: COLORS.white, fontWeight: "300" },
+  fabIcon: { fontSize: 28, color: palette.white, fontWeight: "300" },
   searchContainer: {
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
   searchInput: {
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   menuCardIcon: {
     width: 23,
@@ -1970,22 +1976,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 12,
     paddingVertical: 16,
     paddingHorizontal: 14,
   },
   unitPickerText: {
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitDropdown: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     marginTop: 6,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1997,15 +2003,15 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "#EFEFEF",
+    borderBottomColor: palette.border,
   },
   unitSearchInput: {
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 12,
     fontSize: 15,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitOption: {
     flexDirection: "row",
@@ -2015,14 +2021,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   unitOptionSelected: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
   },
   unitOptionText: {
     fontSize: 16,
-    color: COLORS.text,
+    color: palette.text,
   },
   unitOptionTextSelected: {
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "600",
   },
   unitEmpty: {
@@ -2031,11 +2037,11 @@ const styles = StyleSheet.create({
   },
   unitEmptyText: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   hintText: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     marginBottom: 16,
     marginTop: -8,
   },

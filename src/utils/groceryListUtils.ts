@@ -41,7 +41,7 @@ export type SortConfig = {
 export const SORT_OPTIONS: SortConfig[] = [
   { option: "alphabetical", label: "A-Z", icon: "↑" },
   { option: "alphabetical-desc", label: "Z-A", icon: "↓" },
-  { option: "category", label: "Category", icon: "📂" },
+  { option: "category", label: "Category", icon: "≡" },
   { option: "checked", label: "Checked First", icon: "✓" },
   { option: "unchecked", label: "Unchecked First", icon: "○" },
   { option: "quantity", label: "Quantity (Low)", icon: "1↑" },

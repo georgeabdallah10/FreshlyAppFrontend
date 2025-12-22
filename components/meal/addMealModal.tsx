@@ -1,6 +1,9 @@
 import ToastBanner from '@/components/generalMessage';
+import AppTextInput from '@/components/ui/AppTextInput';
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { Ionicons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
     Modal,
@@ -20,16 +23,252 @@ interface AddMealModalProps {
 
 const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack', 'Dessert'];
 const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
-const EMOJI_OPTIONS = ['🍝', '🍕', '🥗', '🍲', '🍔', '🥙', '🍜', '🍱', '🥘', '🍛'];
+const DEFAULT_MEAL_ICON = "restaurant-outline";
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  cardAlt: withAlpha(colors.card, 0.96),
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  accent: colors.warning,
+  error: colors.error,
+  border: colors.border,
+  shadow: withAlpha(colors.textPrimary, 0.12),
+});
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+      paddingTop: 90,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withAlpha(palette.text, 0.5),
+    },
+    modalContainer: {
+      backgroundColor: palette.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      height: '92%',
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 12,
+      elevation: 5,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    closeButton: {
+      padding: 4,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: palette.text,
+    },
+    placeholder: {
+      width: 36,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+    },
+    section: {
+      marginBottom: 20,
+    },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    sectionLabel: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: palette.text,
+      marginBottom: 8,
+    },
+    input: {
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: palette.text,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    inputText: {
+      fontSize: 15,
+      color: palette.text,
+    },
+    multiline: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+    },
+    row: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    halfWidth: {
+      flex: 1,
+    },
+    macrosGrid: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    macroInput: {
+      flex: 1,
+    },
+    macroLabel: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: palette.textMuted,
+      marginBottom: 6,
+    },
+    emojiButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: palette.background,
+      borderWidth: 1,
+      borderColor: palette.border,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    selectedEmoji: {
+      fontSize: 32,
+    },
+    emojiPicker: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginTop: 12,
+      padding: 12,
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    emojiOption: {
+      padding: 8,
+    },
+    emojiText: {
+      fontSize: 32,
+    },
+    picker: {
+      backgroundColor: palette.card,
+      borderRadius: 12,
+      marginTop: 8,
+      borderWidth: 1,
+      borderColor: palette.border,
+      shadowColor: palette.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 3,
+    },
+    pickerOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    pickerText: {
+      fontSize: 15,
+      color: palette.text,
+    },
+    pickerTextActive: {
+      color: palette.success,
+      fontWeight: '600',
+    },
+    listItemContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      marginBottom: 12,
+    },
+    listInput: {
+      flex: 1,
+    },
+    addButton: {
+      padding: 4,
+    },
+    removeButton: {
+      padding: 4,
+      marginTop: 8,
+    },
+    footer: {
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: palette.border,
+      backgroundColor: palette.card,
+    },
+    submitButton: {
+      backgroundColor: palette.success,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+      shadowColor: palette.success,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    submitButtonText: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: palette.card,
+    },
+    bottomPadding: {
+      height: 20,
+    },
+  });
 export const AddMealModal: React.FC<AddMealModalProps> = ({
   visible,
   onClose,
   onSubmit,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   // Basic fields
   const [name, setName] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('🍝');
   const [calories, setCalories] = useState('');
   const [mealType, setMealType] = useState('Breakfast');
   const [difficulty, setDifficulty] = useState('Easy');
@@ -53,7 +292,6 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
   const [notes, setNotes] = useState('');
   
   // UI State
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showMealTypePicker, setShowMealTypePicker] = useState(false);
   const [showDifficultyPicker, setShowDifficultyPicker] = useState(false);
   
@@ -123,7 +361,6 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
 
   const resetForm = () => {
     setName('');
-    setSelectedEmoji('🍝');
     setCalories('');
     setMealType('Breakfast');
     setDifficulty('Easy');
@@ -185,7 +422,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
     const meal = {
       id: Date.now(),
       name: name.trim(),
-      image: selectedEmoji,
+      image: DEFAULT_MEAL_ICON,
       calories: parseInt(calories),
       prepTime: prepTime ? parseInt(prepTime) : undefined,
       cookTime: cookTime ? parseInt(cookTime) : undefined,
@@ -248,7 +485,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Ionicons name="close" size={28} color="#1A1A1A" />
+              <Ionicons name="close" size={28} color={palette.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>Add Meal</Text>
             <View style={styles.placeholder} />
@@ -262,10 +499,10 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             {/* Basic Info */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Meal Name *</Text>
-              <TextInput
+              <AppTextInput
                 style={styles.input}
                 placeholder="e.g., Grilled Chicken Salad"
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textMuted}
                 value={name}
                 onChangeText={setName}
               />
@@ -279,7 +516,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                 onPress={() => setShowMealTypePicker(!showMealTypePicker)}
               >
                 <Text style={styles.inputText}>{mealType}</Text>
-                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+                <Ionicons name="chevron-down" size={20} color={palette.textMuted} />
               </TouchableOpacity>
 
               {showMealTypePicker && (
@@ -302,7 +539,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                         {type}
                       </Text>
                       {mealType === type && (
-                        <Ionicons name="checkmark" size={20} color="#10B981" />
+                        <Ionicons name="checkmark" size={20} color={palette.success} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -317,7 +554,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                 <TextInput
                   style={styles.input}
                   placeholder="450"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={palette.textMuted}
                   value={calories}
                   onChangeText={setCalories}
                   keyboardType="numeric"
@@ -329,132 +566,13 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                 <TextInput
                   style={styles.input}
                   placeholder="2"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={palette.textMuted}
                   value={servings}
                   onChangeText={setServings}
                   keyboardType="numeric"
                 />
               </View>
             </View>
-
-            {/* Time Row */}
-            <View style={styles.row}>
-              <View style={[styles.section, styles.halfWidth]}>
-                <Text style={styles.sectionLabel}>Prep Time (min)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="15"
-                  placeholderTextColor="#9CA3AF"
-                  value={prepTime}
-                  onChangeText={setPrepTime}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={[styles.section, styles.halfWidth]}>
-                <Text style={styles.sectionLabel}>Cook Time (min)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="30"
-                  placeholderTextColor="#9CA3AF"
-                  value={cookTime}
-                  onChangeText={setCookTime}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Macros */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Macros (grams)</Text>
-              <View style={styles.macrosGrid}>
-                <View style={styles.macroInput}>
-                  <Text style={styles.macroLabel}>Protein</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="30"
-                    placeholderTextColor="#9CA3AF"
-                    value={protein}
-                    onChangeText={setProtein}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.macroInput}>
-                  <Text style={styles.macroLabel}>Fats</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="15"
-                    placeholderTextColor="#9CA3AF"
-                    value={fats}
-                    onChangeText={setFats}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.macroInput}>
-                  <Text style={styles.macroLabel}>Carbs</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="45"
-                    placeholderTextColor="#9CA3AF"
-                    value={carbs}
-                    onChangeText={setCarbs}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Difficulty */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Difficulty</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowDifficultyPicker(!showDifficultyPicker)}
-              >
-                <Text style={styles.inputText}>{difficulty}</Text>
-                <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-
-              {showDifficultyPicker && (
-                <View style={styles.picker}>
-                  {DIFFICULTIES.map((level) => (
-                    <TouchableOpacity
-                      key={level}
-                      style={styles.pickerOption}
-                      onPress={() => {
-                        setDifficulty(level);
-                        setShowDifficultyPicker(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerText,
-                          difficulty === level && styles.pickerTextActive,
-                        ]}
-                      >
-                        {level}
-                      </Text>
-                      {difficulty === level && (
-                        <Ionicons name="checkmark" size={20} color="#10B981" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            {/* Cuisine */}
-            <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Cuisine (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g., Italian, Mexican"
-                placeholderTextColor="#9CA3AF"
-                value={cuisine}
-                onChangeText={setCuisine}
-              />
-            </View>
-
             {/* Ingredients */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -468,10 +586,10 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               </View>
               {ingredients.map((ingredient, index) => (
                 <View key={index} style={styles.listItemContainer}>
-                  <TextInput
+                  <AppTextInput
                     style={[styles.input, styles.listInput]}
                     placeholder={`Ingredient ${index + 1}`}
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={palette.textMuted}
                     value={ingredient}
                     onChangeText={(text) => handleIngredientChange(text, index)}
                   />
@@ -480,7 +598,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                       onPress={() => handleRemoveIngredient(index)}
                       style={styles.removeButton}
                     >
-                      <Ionicons name="close-circle" size={24} color="#EF4444" />
+                      <Ionicons name="close-circle" size={24} color={palette.error} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -500,10 +618,10 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
               </View>
               {instructions.map((instruction, index) => (
                 <View key={index} style={styles.listItemContainer}>
-                  <TextInput
+                  <AppTextInput
                     style={[styles.input, styles.listInput, styles.multiline]}
                     placeholder={`Step ${index + 1}`}
-                    placeholderTextColor="#9CA3AF"
+                    placeholderTextColor={palette.textMuted}
                     value={instruction}
                     onChangeText={(text) => handleInstructionChange(text, index)}
                     multiline
@@ -513,7 +631,7 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
                       onPress={() => handleRemoveInstruction(index)}
                       style={styles.removeButton}
                     >
-                      <Ionicons name="close-circle" size={24} color="#EF4444" />
+                      <Ionicons name="close-circle" size={24} color={palette.error} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -523,10 +641,10 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
             {/* Notes */}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Notes (Optional)</Text>
-              <TextInput
+              <AppTextInput
                 style={[styles.input, styles.multiline]}
                 placeholder="Any additional notes..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={palette.textMuted}
                 value={notes}
                 onChangeText={setNotes}
                 multiline
@@ -562,210 +680,3 @@ export const AddMealModal: React.FC<AddMealModalProps> = ({
     </Modal>
   );
 };
-
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingTop: 90,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '92%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  placeholder: {
-    width: 36,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#1A1A1A',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  inputText: {
-    fontSize: 15,
-    color: '#1A1A1A',
-  },
-  multiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  macrosGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  macroInput: {
-    flex: 1,
-  },
-  macroLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  emojiButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  selectedEmoji: {
-    fontSize: 32,
-  },
-  emojiPicker: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-  },
-  emojiOption: {
-    padding: 8,
-  },
-  emojiText: {
-    fontSize: 32,
-  },
-  picker: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  pickerOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-  },
-  pickerText: {
-    fontSize: 15,
-    color: '#374151',
-  },
-  pickerTextActive: {
-    color: '#10B981',
-    fontWeight: '600',
-  },
-  listItemContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 12,
-  },
-  listInput: {
-    flex: 1,
-  },
-  addButton: {
-    padding: 4,
-  },
-  removeButton: {
-    padding: 4,
-    marginTop: 8,
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
-  },
-  submitButton: {
-    backgroundColor: '#10B981',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitButtonText: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  bottomPadding: {
-    height: 20,
-  },
-});

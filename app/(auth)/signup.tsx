@@ -5,7 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as AuthSession from "expo-auth-session";
 import { useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -27,6 +27,8 @@ import {
   sendVerificationCode,
   type OAuthProvider,
 } from "../../src/auth/auth";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -96,6 +98,9 @@ const moderateScale = (size: number, factor = 0.5) =>
 
 export default function CreateAccountScreen(): React.JSX.Element {
   const router = useRouter();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
@@ -659,10 +664,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 resizeMode="contain"
               />
               <Text style={styles.brandName}>SAVR</Text>
-              <Text style={{ color: "#00A86B", fontSize: 20 }}>
+              <Text style={[styles.welcomeLine, styles.welcomeAccentPrimary]}>
                 Smarter Shopping.
               </Text>
-              <Text style={{ color: "#FD8100", fontSize: 20 }}>
+              <Text style={[styles.welcomeLine, styles.welcomeAccentSecondary]}>
                 Healthier Living.
               </Text>
             </View>
@@ -696,9 +701,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
               >
                 <View style={styles.oauthButtonContent}>
                   {oauthLoading === "google" ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <ActivityIndicator color={palette.card} size="small" />
                   ) : (
-                    <Ionicons name="logo-google" size={18} color="#FFFFFF" />
+                    <Ionicons name="logo-google" size={18} color={palette.card} />
                   )}
                   <Text style={styles.oauthButtonText}>
                     Continue with Google
@@ -719,9 +724,9 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 >
                   <View style={styles.oauthButtonContent}>
                     {oauthLoading === "apple" ? (
-                      <ActivityIndicator color="#111111" size="small" />
+                      <ActivityIndicator color={palette.text} size="small" />
                     ) : (
-                      <Ionicons name="logo-apple" size={18} color="#111111" />
+                      <Ionicons name="logo-apple" size={18} color={palette.text} />
                     )}
                     <Text
                       style={[
@@ -751,16 +756,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/profile.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="person-outline" size={22} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter username"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={username}
                 onChangeText={setUsername}
                 onFocus={() => setFocusedField("username")}
@@ -776,16 +777,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/email.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="mail-outline" size={22} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter email"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setFocusedField("email")}
@@ -803,16 +800,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/call.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="call-outline" size={22} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter mobile number"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={mobile}
                 onChangeText={setMobile}
                 onFocus={() => setFocusedField("mobile")}
@@ -829,16 +822,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/lock.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="lock-closed-outline" size={22} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter password"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={password}
                 onChangeText={setPassword}
                 onFocus={() => setFocusedField("password")}
@@ -851,14 +840,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 onPress={() => setShowPassword(!showPassword)}
                 activeOpacity={0.6}
               >
-                <Image
-                  source={
-                    showPassword
-                      ? require("../../assets/icons/hidepass.png")
-                      : require("../../assets/icons/showpass.png")
-                  }
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={palette.textMuted}
                 />
               </TouchableOpacity>
             </View>
@@ -872,16 +857,12 @@ export default function CreateAccountScreen(): React.JSX.Element {
               ]}
             >
               <View style={styles.iconContainer}>
-                <Image
-                  source={require("../../assets/icons/lock.png")}
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
-                />
+                <Ionicons name="lock-closed-outline" size={22} color={palette.success} />
               </View>
               <TextInput
                 style={styles.input}
                 placeholder="confirm password"
-                placeholderTextColor="#B0B0B0"
+                placeholderTextColor={palette.textMuted}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 onFocus={() => setFocusedField("confirmPassword")}
@@ -894,14 +875,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                 activeOpacity={0.6}
               >
-                <Image
-                  source={
-                    showConfirmPassword
-                      ? require("../../assets/icons/hidepass.png")
-                      : require("../../assets/icons/showpass.png")
-                  }
-                  style={styles.menuCardIcon}
-                  resizeMode="contain"
+                <Ionicons
+                  name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={palette.textMuted}
                 />
               </TouchableOpacity>
             </View>
@@ -1035,302 +1012,335 @@ export default function CreateAccountScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    paddingTop: 55,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: SCREEN_WIDTH * 0.05,
-    paddingTop: verticalScale(40),
-    paddingBottom: verticalScale(20),
-  },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: verticalScale(5),
-    marginTop: -40,
-  },
-  logoPlaceholder: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  logoImage: {
-    width: moderateScale(150),
-    height: moderateScale(150),
-  },
-  card: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: moderateScale(20),
-    padding: moderateScale(20),
-    marginBottom: verticalScale(12),
-  },
-  title: {
-    fontSize: moderateScale(22),
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-    marginBottom: verticalScale(6),
-  },
-  subtitle: {
-    fontSize: moderateScale(13),
-    color: "#B0B0B0",
-    textAlign: "center",
-    lineHeight: moderateScale(18),
-    marginBottom: verticalScale(18),
-  },
-  oauthSection: {
-    marginBottom: verticalScale(14),
-  },
-  oauthButton: {
-    backgroundColor: "#4985F8",
-    borderRadius: moderateScale(10),
-    paddingVertical: verticalScale(12),
-    paddingHorizontal: scale(12),
-    justifyContent: "center",
-    marginBottom: verticalScale(10),
-  },
-  oauthButtonActive: {
-    opacity: 0.8,
-  },
-  oauthButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  oauthButtonText: {
-    color: "#FFFFFF",
-    fontSize: moderateScale(14),
-    fontWeight: "600",
-  },
-  oauthButtonApple: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-  },
-  oauthButtonAppleActive: {
-    opacity: 0.8,
-  },
-  oauthButtonAppleText: {
-    color: "#111111",
-  },
-  oauthDividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: verticalScale(18),
-    justifyContent: "center",
-  },
-  oauthDivider: {
-    flex: 1,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: "#E5E7EB",
-  },
-  oauthDividerText: {
-    fontSize: moderateScale(13),
-    color: "#9CA3AF",
-    textTransform: "uppercase",
-    letterSpacing: 1,
-    marginHorizontal: 10,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    borderRadius: moderateScale(10),
-    paddingHorizontal: scale(12),
-    paddingVertical: verticalScale(10),
-    marginBottom: verticalScale(10),
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-  },
-  inputContainerFocused: {
-    borderColor: "#00C853",
-    borderWidth: 1.5,
-  },
-  iconContainer: {
-    marginRight: scale(8),
-  },
-  icon: {
-    fontSize: moderateScale(16),
-    color: "#00C853",
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
-  input: {
-    flex: 1,
-    fontSize: 14,
-    color: "#111111",
-    fontFamily: "System",
-    borderWidth: 0,
-  },
-  eyeButton: {
-    padding: scale(4),
-  },
-  eyeIcon: {
-    fontSize: moderateScale(16),
-    color: "#B0B0B0",
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: verticalScale(6),
-    marginBottom: verticalScale(16),
-  },
-  checkbox: {
-    width: moderateScale(18),
-    height: moderateScale(18),
-    borderRadius: moderateScale(4),
-    borderWidth: 2,
-    borderColor: "#00C853",
-    marginRight: scale(8),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkboxInner: {
-    width: moderateScale(14),
-    height: moderateScale(14),
-    borderRadius: moderateScale(3),
-    backgroundColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  checkmark: {
-    color: "#FFFFFF",
-    fontSize: moderateScale(10),
-    fontWeight: "700",
-  },
-  termsText: {
-    flex: 1,
-    fontSize: moderateScale(12),
-    color: "#B0B0B0",
-    lineHeight: moderateScale(16),
-  },
-  termsLink: {
-    color: "#00C853",
-    fontWeight: "600",
-  },
-  createButtonWrapper: {
-    alignItems: "center",
-  },
-  createButton: {
-    width: moderateScale(56),
-    height: moderateScale(56),
-    borderRadius: moderateScale(28),
-    backgroundColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#00C853",
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  createButtonDisabled: {
-    backgroundColor: "#B0B0B0",
-    shadowColor: "#B0B0B0",
-    shadowOpacity: 0.2,
-  },
-  createButtonText: {
-    fontSize: moderateScale(24),
-    color: "#FFFFFF",
-    fontWeight: "300",
-  },
-  cooldownText: {
-    fontSize: moderateScale(12),
-    color: "#B0B0B0",
-    textAlign: "center",
-    marginTop: verticalScale(12),
-  },
-  signInContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: verticalScale(10),
-  },
-  signInText: {
-    fontSize: moderateScale(13),
-    color: "#B0B0B0",
-  },
-  signInLink: {
-    fontSize: moderateScale(13),
-    color: "#00C853",
-    fontWeight: "600",
-  },
-  menuCardIcon: {
-    width: 23,
-    height: 23,
-  },
-  brandName: {
-    fontSize: 56,
-    fontWeight: "700",
-    color: "#00A86B",
-    fontFamily: "System",
-    letterSpacing: -1,
-    marginTop: -30,
-  },
-  // Loading Overlay Styles
-  loadingOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 9999,
-  },
-  loadingCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: moderateScale(24),
-    padding: moderateScale(32),
-    alignItems: "center",
-    minWidth: SCREEN_WIDTH * 0.75,
-    maxWidth: SCREEN_WIDTH * 0.85,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
-  },
-  spinner: {
-    width: moderateScale(64),
-    height: moderateScale(64),
-    borderRadius: moderateScale(32),
-    borderWidth: 4,
-    borderColor: "#E8F5E9",
-    borderTopColor: "#00C853",
-    marginBottom: verticalScale(20),
-  },
-  spinnerInner: {
-    width: "100%",
-    height: "100%",
-    borderRadius: moderateScale(28),
-  },
-  loadingTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "700",
-    color: "#111111",
-    textAlign: "center",
-    marginBottom: verticalScale(8),
-  },
-  loadingSubtitle: {
-    fontSize: moderateScale(14),
-    color: "#757575",
-    textAlign: "center",
-    lineHeight: moderateScale(20),
-    paddingHorizontal: scale(8),
-  },
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  cardAlt: withAlpha(colors.textSecondary, 0.06),
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  accent: colors.warning,
+  error: colors.error,
+  overlay: withAlpha(colors.textPrimary, 0.75),
+  spinnerTrack: withAlpha(colors.success, 0.08),
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: 35,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: SCREEN_WIDTH * 0.05,
+      paddingTop: verticalScale(24),
+      paddingBottom: verticalScale(20),
+    },
+    logoContainer: {
+      alignItems: "center",
+      marginBottom: verticalScale(5),
+      marginTop: -40,
+    },
+    logoPlaceholder: {
+      width: moderateScale(60),
+      height: moderateScale(60),
+      borderRadius: moderateScale(30),
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    logoImage: {
+      width: moderateScale(150),
+      height: moderateScale(150),
+    },
+    card: {
+      backgroundColor: palette.cardAlt,
+      borderRadius: moderateScale(20),
+      padding: moderateScale(20),
+      marginBottom: verticalScale(12),
+    },
+    title: {
+      fontSize: moderateScale(22),
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: verticalScale(6),
+    },
+    subtitle: {
+      fontSize: moderateScale(13),
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: moderateScale(18),
+      marginBottom: verticalScale(18),
+    },
+    oauthSection: {
+      marginBottom: verticalScale(14),
+    },
+    oauthButton: {
+      backgroundColor: palette.primary,
+      borderRadius: moderateScale(10),
+      paddingVertical: verticalScale(12),
+      paddingHorizontal: scale(12),
+      justifyContent: "center",
+      marginBottom: verticalScale(10),
+    },
+    oauthButtonActive: {
+      opacity: 0.8,
+    },
+    oauthButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    oauthButtonText: {
+      color: palette.card,
+      fontSize: moderateScale(14),
+      fontWeight: "600",
+    },
+    oauthButtonApple: {
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    oauthButtonAppleActive: {
+      opacity: 0.8,
+    },
+    oauthButtonAppleText: {
+      color: palette.text,
+    },
+    oauthDividerRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: verticalScale(18),
+      justifyContent: "center",
+    },
+    oauthDivider: {
+      flex: 1,
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: palette.border,
+    },
+    oauthDividerText: {
+      fontSize: moderateScale(13),
+      color: palette.textMuted,
+      textTransform: "uppercase",
+      letterSpacing: 1,
+      marginHorizontal: 10,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.card,
+      borderRadius: moderateScale(10),
+      paddingHorizontal: scale(12),
+      paddingVertical: verticalScale(10),
+      marginBottom: verticalScale(10),
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    inputContainerFocused: {
+      borderColor: palette.success,
+      borderWidth: 1.5,
+    },
+    iconContainer: {
+      marginRight: scale(8),
+    },
+    icon: {
+      fontSize: moderateScale(16),
+      color: palette.success,
+    },
+    input: {
+      flex: 1,
+      fontSize: 14,
+      color: palette.text,
+      fontFamily: "System",
+      borderWidth: 0,
+    },
+    eyeButton: {
+      padding: scale(4),
+    },
+    eyeIcon: {
+      fontSize: moderateScale(16),
+      color: palette.textMuted,
+    },
+    checkboxContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: verticalScale(6),
+      marginBottom: verticalScale(16),
+    },
+    checkbox: {
+      width: moderateScale(18),
+      height: moderateScale(18),
+      borderRadius: moderateScale(4),
+      borderWidth: 2,
+      borderColor: palette.success,
+      marginRight: scale(8),
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkboxInner: {
+      width: moderateScale(14),
+      height: moderateScale(14),
+      borderRadius: moderateScale(3),
+      backgroundColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    checkmark: {
+      color: palette.card,
+      fontSize: moderateScale(10),
+      fontWeight: "700",
+    },
+    termsText: {
+      flex: 1,
+      fontSize: moderateScale(12),
+      color: palette.textMuted,
+      lineHeight: moderateScale(16),
+    },
+    termsLink: {
+      color: palette.success,
+      fontWeight: "600",
+    },
+    createButtonWrapper: {
+      alignItems: "center",
+      marginBottom: verticalScale(14),
+    },
+    createButton: {
+      width: moderateScale(56),
+      height: moderateScale(56),
+      borderRadius: moderateScale(28),
+      backgroundColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: palette.success,
+      shadowOffset: {
+        width: 0,
+        height: 6,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 8,
+    },
+    createButtonDisabled: {
+      backgroundColor: palette.textMuted,
+      shadowColor: palette.textMuted,
+      shadowOpacity: 0.2,
+    },
+    createButtonText: {
+      fontSize: moderateScale(24),
+      color: palette.card,
+      fontWeight: "300",
+    },
+    cooldownText: {
+      fontSize: moderateScale(12),
+      color: palette.textMuted,
+      textAlign: "center",
+      marginTop: verticalScale(12),
+    },
+    signInContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: verticalScale(10),
+    },
+    signInText: {
+      fontSize: moderateScale(13),
+      color: palette.textMuted,
+    },
+    signInLink: {
+      fontSize: moderateScale(13),
+      color: palette.success,
+      fontWeight: "600",
+    },
+    menuCardIcon: {
+      width: 23,
+      height: 23,
+    },
+    brandName: {
+      fontSize: 56,
+      fontWeight: "700",
+      color: palette.primary,
+      fontFamily: "System",
+      letterSpacing: -1,
+      marginTop: -30,
+    },
+    welcomeLine: {
+      fontSize: 20,
+    },
+    welcomeAccentPrimary: {
+      color: palette.primary,
+    },
+    welcomeAccentSecondary: {
+      color: palette.accent,
+    },
+    loadingOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: palette.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+    },
+    loadingCard: {
+      backgroundColor: palette.card,
+      borderRadius: moderateScale(24),
+      padding: moderateScale(32),
+      alignItems: "center",
+      minWidth: SCREEN_WIDTH * 0.75,
+      maxWidth: SCREEN_WIDTH * 0.85,
+      shadowColor: palette.text,
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 10,
+    },
+    spinner: {
+      width: moderateScale(64),
+      height: moderateScale(64),
+      borderRadius: moderateScale(32),
+      borderWidth: 4,
+      borderColor: palette.spinnerTrack,
+      borderTopColor: palette.success,
+      marginBottom: verticalScale(20),
+    },
+    spinnerInner: {
+      width: "100%",
+      height: "100%",
+      borderRadius: moderateScale(28),
+    },
+    loadingTitle: {
+      fontSize: moderateScale(20),
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginBottom: verticalScale(8),
+    },
+    loadingSubtitle: {
+      fontSize: moderateScale(14),
+      color: palette.textMuted,
+      textAlign: "center",
+      lineHeight: moderateScale(20),
+      paddingHorizontal: scale(8),
+    },
+  });

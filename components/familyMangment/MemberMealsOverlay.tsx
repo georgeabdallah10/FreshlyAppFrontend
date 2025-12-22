@@ -3,6 +3,9 @@ import { getMemberMeals } from "@/src/user/familyMeals";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AppTextInput from "@/components/ui/AppTextInput";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import {
   ActivityIndicator,
   Animated,
@@ -12,7 +15,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -28,20 +30,6 @@ interface MemberMealsOverlayProps {
   onClose: () => void;
   onSaveMeal: (meal: any) => Promise<void>;
 }
-
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  charcoal: "#4C4D59",
-  charcoalLight: "#F0F0F2",
-  white: "#FFFFFF",
-  background: "#F7F8FB",
-  text: "#0A0A0A",
-  textMuted: "#6B7280",
-  border: "#E9ECF2",
-};
 
 const CATEGORIES = [
   "All",
@@ -63,6 +51,9 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
   onClose,
   onSaveMeal,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
   const [meals, setMeals] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -228,7 +219,7 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
               onPress={onClose}
               activeOpacity={0.7}
             >
-              <Ionicons name="close" size={24} color={COLORS.text} />
+              <Ionicons name="close" size={24} color={palette.text} />
             </TouchableOpacity>
             <Text style={styles.headerTitle} numberOfLines={1}>
               {memberName}'s Meals
@@ -238,11 +229,11 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <Ionicons name="search-outline" size={20} color={COLORS.textMuted} style={styles.searchIcon} />
-            <TextInput
+            <Ionicons name="search-outline" size={20} color={palette.textMuted} style={styles.searchIcon} />
+            <AppTextInput
               style={styles.searchInput}
               placeholder="Search meals..."
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={palette.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               returnKeyType="search"
@@ -257,7 +248,7 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
               contentContainerStyle={styles.categoriesContent}
             >
               {CATEGORIES.map((category, index) => {
-                const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+                const colors = [palette.primary, palette.accent, palette.charcoal];
                 const color = colors[index % 3];
                 const isActive = selectedCategory === category;
 
@@ -288,12 +279,17 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
           {/* Content Area */}
           {isLoading ? (
             <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary} />
+              <ActivityIndicator size="large" color={palette.primary} />
               <Text style={styles.loadingText}>Loading meals...</Text>
             </View>
           ) : error ? (
             <View style={styles.centerContainer}>
-              <Text style={styles.errorEmoji}>😕</Text>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={48}
+                  color={palette.textMuted}
+                  style={styles.centerStateIcon}
+                />
               <Text style={styles.errorTitle}>Couldn't Load Meals</Text>
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
@@ -306,7 +302,12 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
             </View>
           ) : filteredMeals.length === 0 ? (
             <View style={styles.centerContainer}>
-              <Text style={styles.emptyEmoji}>🍽️</Text>
+                <Ionicons
+                  name="restaurant-outline"
+                  size={48}
+                  color={palette.textMuted}
+                  style={styles.centerStateIcon}
+                />
               <Text style={styles.emptyTitle}>No Meals Found</Text>
               <Text style={styles.emptyText}>
                 {meals.length === 0
@@ -321,7 +322,7 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
               showsVerticalScrollIndicator={false}
             >
               {filteredMeals.map((meal, index) => {
-                const colors = [COLORS.primary, COLORS.accent, COLORS.charcoal];
+                const colors = [palette.primary, palette.accent, palette.charcoal];
                 const accentColor = colors[index % 3];
                 const isSaving = savingMealId === meal.id;
 
@@ -350,43 +351,43 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
                       activeOpacity={0.8}
                     >
                       {isSaving ? (
-                        <ActivityIndicator size="small" color={COLORS.white} />
+                        <ActivityIndicator size="small" color={palette.card} />
                       ) : (
-                        <Ionicons name="add-circle" size={28} color={COLORS.white} />
+                        <Ionicons name="add-circle" size={28} color={palette.card} />
                       )}
                     </TouchableOpacity>
 
                     {/* Favorite indicator */}
-                    {meal.isFavorite && (
-                      <View style={styles.favoriteIndicator}>
-                        <Ionicons name="heart" size={16} color="#EF4444" />
-                      </View>
-                    )}
+                  {meal.isFavorite && (
+                    <View style={styles.favoriteIndicator}>
+                      <Ionicons name="heart" size={16} color={palette.error} />
+                    </View>
+                  )}
 
                     <View style={styles.mealOverlay}>
                       <View>
                         <Text style={styles.mealName}>{meal.name}</Text>
 
                         <View style={styles.mealMetaRow}>
+                        <View style={styles.metaItem}>
+                          <Ionicons name="flame-outline" size={14} color={palette.card} />
+                          <Text style={styles.metaText}>{meal.calories}kcal</Text>
+                        </View>
+                        {meal.totalTime !== 0 && (
                           <View style={styles.metaItem}>
-                            <Text style={styles.metaIcon}>🔥</Text>
-                            <Text style={styles.metaText}>{meal.calories}kcal</Text>
+                            <Ionicons name="time-outline" size={14} color={palette.card} />
+                            <Text style={styles.metaText}>{meal.totalTime}min</Text>
                           </View>
-                          {meal.totalTime !== 0 && (
-                            <View style={styles.metaItem}>
-                              <Text style={styles.metaIcon}>⏱</Text>
-                              <Text style={styles.metaText}>{meal.totalTime}min</Text>
-                            </View>
-                          )}
+                        )}
                         </View>
                       </View>
 
                       <View style={styles.macrosRow}>
                         {meal.macros?.protein !== 0 && (
                           <View style={styles.macroItem}>
-                            <View style={styles.macroCircle}>
-                              <LinearGradient
-                                colors={[COLORS.primary, "#008F5C"]}
+                          <View style={styles.macroCircle}>
+                            <LinearGradient
+                                colors={[palette.primary, withAlpha(palette.primary, 0.85)]}
                                 style={styles.macroGradient}
                               />
                             </View>
@@ -400,9 +401,9 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
                         )}
                         {meal.macros?.fats !== 0 && (
                           <View style={styles.macroItem}>
-                            <View style={styles.macroCircle}>
-                              <LinearGradient
-                                colors={[COLORS.accent, "#E67700"]}
+                          <View style={styles.macroCircle}>
+                            <LinearGradient
+                                colors={[palette.accent, withAlpha(palette.accent, 0.85)]}
                                 style={styles.macroGradient}
                               />
                             </View>
@@ -416,9 +417,9 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
                         )}
                         {meal.macros?.carbs !== 0 && (
                           <View style={styles.macroItem}>
-                            <View style={styles.macroCircle}>
-                              <LinearGradient
-                                colors={[COLORS.charcoal, "#3A3B44"]}
+                          <View style={styles.macroCircle}>
+                            <LinearGradient
+                                colors={[palette.charcoal, withAlpha(palette.charcoal, 0.85)]}
                                 style={styles.macroGradient}
                               />
                             </View>
@@ -444,297 +445,308 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  content: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: SCREEN_HEIGHT * 0.92,
-    backgroundColor: COLORS.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 2,
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.charcoalLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: "700",
-    color: COLORS.text,
-    textAlign: "center",
-    marginHorizontal: 12,
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
 
-  // Search
-  searchContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    paddingHorizontal: 12,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: 16,
-    color: COLORS.text,
-  },
-
-  // Categories
-  categoriesWrapper: {
-    marginBottom: 12,
-  },
-  categoriesContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  categoryChip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: COLORS.white,
-    borderWidth: 2,
-    borderColor: COLORS.border,
-  },
-  categoryChipPressed: {
-    transform: [{ scale: 0.97 }],
-    opacity: 0.92,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-  },
-  categoryTextActive: {
-    color: COLORS.white,
-  },
-
-  // Center containers for loading/error/empty states
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: COLORS.textMuted,
-  },
-  errorEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  errorText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: COLORS.textMuted,
-    textAlign: "center",
-  },
-
-  // Meals list
-  mealsContainer: {
-    flex: 1,
-  },
-  mealsContent: {
-    paddingHorizontal: 16,
-  },
-
-  // Meal card
-  mealCard: {
-    height: 220,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: "hidden",
-    backgroundColor: COLORS.charcoalLight,
-    position: "relative",
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  mealImageContainer: {
-    ...StyleSheet.absoluteFillObject,
-    width: "100%",
-    height: "100%",
-  },
-  saveButton: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(0, 168, 107, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
-  },
-  favoriteIndicator: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  mealOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    padding: 16,
-    justifyContent: "space-between",
-  },
-  mealName: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: COLORS.white,
-    marginBottom: 10,
-    marginTop: 50,
-    letterSpacing: 0.3,
-    textShadowColor: "rgba(0,0,0,0.3)",
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
-  },
-  mealMetaRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.2)",
-  },
-  metaIcon: {
-    fontSize: 14,
-  },
-  metaText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-  macrosRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 8,
-  },
-  macroItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  macroCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
-  macroGradient: {
-    flex: 1,
-  },
-  macroValue: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: COLORS.white,
-  },
-  macroLabel: {
-    fontSize: 11,
-    color: "rgba(255,255,255,0.8)",
-  },
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  accent: colors.warning,
+  charcoal: colors.textPrimary,
+  charcoalLight: withAlpha(colors.textSecondary, 0.1),
+  card: colors.card,
+  white: colors.card,
+  background: colors.background,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    modalContainer: {
+      flex: 1,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withAlpha(palette.text, 0.5),
+    },
+    content: {
+      position: "absolute",
+      bottom: 0,
+      left: 0,
+      right: 0,
+      height: SCREEN_HEIGHT * 0.92,
+      backgroundColor: palette.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      backgroundColor: palette.border,
+      borderRadius: 2,
+      alignSelf: "center",
+      marginTop: 12,
+      marginBottom: 8,
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: palette.charcoalLight,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    headerTitle: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      marginHorizontal: 12,
+    },
+    headerPlaceholder: {
+      width: 40,
+    },
+    searchContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginHorizontal: 16,
+      marginVertical: 12,
+      borderRadius: 12,
+      backgroundColor: palette.card,
+      borderWidth: 1,
+      borderColor: palette.border,
+      paddingHorizontal: 12,
+    },
+    searchIcon: {
+      marginRight: 8,
+    },
+    searchInput: {
+      flex: 1,
+      height: 44,
+      fontSize: 16,
+      color: palette.text,
+    },
+    categoriesWrapper: {
+      marginBottom: 12,
+    },
+    categoriesContent: {
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    categoryChip: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: palette.card,
+      borderWidth: 2,
+      borderColor: palette.border,
+    },
+    categoryChipPressed: {
+      transform: [{ scale: 0.97 }],
+      opacity: 0.92,
+    },
+    categoryText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    categoryTextActive: {
+      color: palette.card,
+    },
+    centerContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 32,
+    },
+    loadingText: {
+      marginTop: 16,
+      fontSize: 16,
+      color: palette.textMuted,
+    },
+    centerStateIcon: {
+      marginBottom: 16,
+    },
+    errorTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 8,
+    },
+    errorText: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+      marginBottom: 20,
+    },
+    retryButton: {
+      paddingHorizontal: 24,
+      paddingVertical: 12,
+      backgroundColor: palette.primary,
+      borderRadius: 12,
+    },
+    retryButtonText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 8,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: palette.textMuted,
+      textAlign: "center",
+    },
+    mealsContainer: {
+      flex: 1,
+    },
+    mealsContent: {
+      paddingHorizontal: 16,
+    },
+    mealCard: {
+      height: 220,
+      borderRadius: 16,
+      marginBottom: 16,
+      overflow: "hidden",
+      backgroundColor: palette.charcoalLight,
+      position: "relative",
+      shadowColor: palette.text,
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 4,
+    },
+    mealImageContainer: {
+      ...StyleSheet.absoluteFillObject,
+      width: "100%",
+      height: "100%",
+    },
+    saveButton: {
+      position: "absolute",
+      top: 12,
+      left: 12,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: withAlpha(palette.primary, 0.9),
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10,
+      shadowColor: palette.text,
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 3,
+    },
+    favoriteIndicator: {
+      position: "absolute",
+      top: 12,
+      right: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: withAlpha(palette.card, 0.9),
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10,
+    },
+    mealOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      padding: 16,
+      justifyContent: "space-between",
+    },
+    mealName: {
+      fontSize: 22,
+      fontWeight: "800",
+      color: palette.card,
+      marginBottom: 10,
+      marginTop: 50,
+      letterSpacing: 0.3,
+      textShadowColor: "rgba(0,0,0,0.3)",
+      textShadowOffset: { width: 0, height: 2 },
+      textShadowRadius: 4,
+    },
+    mealMetaRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    metaItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: "rgba(0,0,0,0.4)",
+      borderWidth: 1,
+      borderColor: "rgba(255,255,255,0.2)",
+    },
+    metaIcon: {
+      fontSize: 14,
+    },
+    metaText: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: palette.card,
+    },
+    macrosRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      paddingTop: 8,
+    },
+    macroItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    macroCircle: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      overflow: "hidden",
+      borderWidth: 2,
+      borderColor: "rgba(255,255,255,0.4)",
+    },
+    macroGradient: {
+      flex: 1,
+    },
+    macroValue: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.card,
+    },
+    macroLabel: {
+      fontSize: 11,
+      color: "rgba(255,255,255,0.8)",
+    },
+  });
 
 export default MemberMealsOverlay;

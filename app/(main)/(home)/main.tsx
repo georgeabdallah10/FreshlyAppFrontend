@@ -1,15 +1,17 @@
 import ToastBanner from "@/components/generalMessage";
 import IconButton from "@/components/iconComponent";
 import NotificationBell from "@/components/NotificationBell";
-import { AddProductModal } from "@/components/quickAddModal";
-import HomeTutorial, { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
+import { checkTutorialCompleted, TargetMeasurements } from "@/components/tutorial/HomeTutorial";
+import { useTutorialContext } from "@/context/bottomNavContext";
+import { useThemeContext } from "@/context/ThemeContext";
 import { usePendingRequestCount } from "@/hooks/useMealShare";
-import { useLocalSearchParams, useRouter, useSegments } from "expo-router";
-import React, { useEffect, useRef, useState } from "react";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
+import { ColorTokens } from "@/theme/colors";
+import { Ionicons } from "@expo/vector-icons";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Animated,
   Image,
-  ImageSourcePropType,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,183 +20,37 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-// 🔧 DEV MODE: Set to true to always show tutorial (for testing)
+// DEV MODE: Set to true to always show tutorial (for testing)
 const TUTORIAL_DEV_MODE = false;
 
 type MenuItem = {
   id: string;
   title: string;
   subtitle: string;
-  iconSource: ImageSourcePropType;
+  iconName: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
   bgColor: string;
   onPress: () => void;
 };
 
-// Bottom Navigation Component
-const BottomNavigation = ({
-  activeTab,
-  onTabPress,
-  safeBottom,
-  quickAddRef,
-  chatButtonRef,
-  familyButtonRef,
-  settingsButtonRef,
-  disabled,
-}: {
-  activeTab: string;
-  onTabPress: (tab: string) => void;
-  safeBottom?: number;
-  quickAddRef?: React.RefObject<View | null>;
-  chatButtonRef?: React.RefObject<View | null>;
-  familyButtonRef?: React.RefObject<View | null>;
-  settingsButtonRef?: React.RefObject<View | null>;
-  disabled?: boolean;
-}) => {
-  const inset = Math.max(0, safeBottom || 0);
-  const slideAnim = useRef(new Animated.Value(0)).current;
-
-  const tabs = ["+", "chat", "family", "profile"];
-  const tabWidth = 48;
-  const spacing = 24; // Approximate spacing between tabs
-  const router = useRouter();
-  const segmants = useSegments() as string[];
-  const [quickAddModal, setQuickAddModal] = useState(false);
-
-  useEffect(() => {
-    const activeIndex = tabs.indexOf(activeTab);
-    const targetPosition = activeIndex * (tabWidth + spacing);
-
-    Animated.spring(slideAnim, {
-      toValue: targetPosition,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 10,
-    }).start();
-  }, [activeTab]);
-
-  const handleNavOnPress = (button: string) => {
-    onTabPress(button);
-    if (button == "main") {
-      if (segmants.includes("home")) {
-        console.log("You are currently at home");
-      } else {
-        router.replace("/(main)/(home)/main");
-      }
-    } else if (button == "+") {
-      console.log("Quick add product");
-      setQuickAddModal(true);
-    } else if (button == "chat") {
-      console.log("Go to chat");
-      router.push("/(main)/(home)/chat");
-    } else if ((button = "family")) {
-      router.push("/(main)/(home)/MyFamily");
-    } else if ((button = "profile")) {
-      router.push("/(main)/(home)/profile");
-    }
-  };
-
-  return (
-    <View style={[styles.bottomNavWrapper, { bottom: inset }]}>
-      <View style={[styles.bottomDock, { paddingBottom: 3 }]}>
-        <View style={styles.bottomNav}>
-          <AddProductModal
-            visible={quickAddModal}
-            onClose={() => setQuickAddModal(false)}
-          />
-          {/* Sliding Background Indicator */}
-          {/* 
-          <Animated.View
-            style={[
-              styles.slidingIndicator,
-              {
-                transform: [{ translateX: slideAnim }],
-              },
-            ]}
-          />
-          */}
-          <TouchableOpacity
-            ref={quickAddRef}
-            style={styles.navItem}
-            onPress={() => handleNavOnPress("+")}
-            activeOpacity={0.8}
-            disabled={disabled}
-          >
-            <View style={styles.navIconContainer}>
-              <Text
-                style={
-                  activeTab === "explore"
-                    ? styles.navIcon
-                    : styles.navIconInactive
-                }
-              >
-                <IconButton iconName="add" iconSize={35} iconColor="black" />
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            ref={chatButtonRef}
-            style={styles.navItem}
-            onPress={() => handleNavOnPress("chat")}
-            activeOpacity={0.8}
-            disabled={disabled}
-          >
-            <View style={styles.navIconContainer}>
-              <Text
-                style={
-                  activeTab === "favorites"
-                    ? styles.navIcon
-                    : styles.navIconInactive
-                }
-              >
-                <IconButton iconName="chatbox-ellipses-outline"  iconSize={35} />
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            ref={familyButtonRef}
-            style={styles.navItem}
-            onPress={() => handleNavOnPress("family")}
-            activeOpacity={0.8}
-            disabled={disabled}
-          >
-            <View style={styles.navIconContainer}>
-              <Text
-                style={
-                  activeTab === "orders"
-                    ? styles.navIcon
-                    : styles.navIconInactive
-                }
-              >
-              <IconButton iconName='people-circle-outline' iconColor="#000000" iconSize={40} />
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            ref={settingsButtonRef}
-            style={styles.navItem}
-            onPress={() => router.push("/(main)/(home)/profile")}
-            activeOpacity={0.8}
-            disabled={disabled}
-          >
-            <View style={styles.navIconContainer}>
-              <IconButton  iconName="settings-outline" iconSize={35} />
-            </View>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-};
-
 const HomeDashboard = () => {
-  const [activeTab, setActiveTab] = useState("home");
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { familyDeleted } = useLocalSearchParams<{ familyDeleted?: string }>();
   const { data: pendingShareCount = 0 } = usePendingRequestCount();
+  const bottomNavInset = useBottomNavInset();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette, insets), [palette, insets]);
+
+  // Tutorial context - tutorial is rendered in layout, controlled from here
+  const {
+    tutorialState,
+    setTutorialVisible,
+    setTutorialMeasurements,
+    setOnTutorialComplete,
+  } = useTutorialContext();
+  const showTutorial = tutorialState.visible;
 
   // Toast state for showing messages from navigation
   const [showToast, setShowToast] = useState(false);
@@ -210,26 +66,23 @@ const HomeDashboard = () => {
     }
   }, [familyDeleted]);
 
-  // Tutorial state
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [targetMeasurements, setTargetMeasurements] = useState<Record<string, TargetMeasurements>>({});
-
-  // Refs for measuring positions
+  // Refs for measuring positions (menu cards)
   const pantryRef = useRef<View>(null);
   const mealPlansRef = useRef<View>(null);
   const groceryRef = useRef<View>(null);
   const quickMealsRef = useRef<View>(null);
   const allFeaturesRef = useRef<View>(null);
 
-  // Bottom navigation refs
-  const quickAddRef = useRef<View>(null);
-  const chatButtonRef = useRef<View>(null);
-  const familyButtonRef = useRef<View>(null);
-  const settingsButtonRef = useRef<View>(null);
-
   // Header button refs
   const faqButtonRef = useRef<View>(null);
   const notificationsButtonRef = useRef<View>(null);
+
+  // Set up tutorial complete callback
+  useEffect(() => {
+    setOnTutorialComplete(() => {
+      setTutorialVisible(false);
+    });
+  }, [setOnTutorialComplete, setTutorialVisible]);
 
   // Check if tutorial should be shown - AFTER animations complete
   useEffect(() => {
@@ -240,7 +93,7 @@ const HomeDashboard = () => {
         setTimeout(() => {
           measureAllTargets();
           // Add small delay between measurement and showing to ensure measurements are complete
-          setTimeout(() => setShowTutorial(true), 100);
+          setTimeout(() => setTutorialVisible(true), 100);
         }, 800);
         return;
       }
@@ -252,7 +105,7 @@ const HomeDashboard = () => {
         setTimeout(() => {
           measureAllTargets();
           // Add small delay between measurement and showing to ensure measurements are complete
-          setTimeout(() => setShowTutorial(true), 100);
+          setTimeout(() => setTutorialVisible(true), 100);
         }, 800);
       }
     };
@@ -260,21 +113,37 @@ const HomeDashboard = () => {
     checkAndShowTutorial();
   }, []);
 
-  // Measure all target positions
+  // Measure all target positions and send to context
   const measureAllTargets = () => {
+    const measurements: Record<string, TargetMeasurements> = {};
+    let pendingMeasurements = 7;
+
+    const checkComplete = () => {
+      pendingMeasurements--;
+      if (pendingMeasurements === 0) {
+        console.log('[Tutorial] All measurements complete:', measurements);
+        setTutorialMeasurements(measurements);
+      }
+    };
+
     const measureElement = (ref: React.RefObject<View | null>, key: string) => {
       if (ref.current) {
-        // Use requestAnimationFrame to ensure layout is complete
         requestAnimationFrame(() => {
           if (ref.current) {
             ref.current.measureInWindow((x, y, width, height) => {
               console.log(`[Tutorial] Measured ${key}:`, { x, y, width, height });
-              setTargetMeasurements(prev => ({ ...prev, [key]: { x, y, width, height } }));
+              if (width > 0 && height > 0) {
+                measurements[key] = { x, y, width, height };
+              }
+              checkComplete();
             });
+          } else {
+            checkComplete();
           }
         });
       } else {
         console.warn(`[Tutorial] Failed to measure ${key}: ref.current is null`);
+        checkComplete();
       }
     };
 
@@ -283,16 +152,8 @@ const HomeDashboard = () => {
     measureElement(groceryRef, 'grocery');
     measureElement(quickMealsRef, 'quickMeals');
     measureElement(allFeaturesRef, 'allFeatures');
-    measureElement(quickAddRef, 'quickAdd');
-    measureElement(chatButtonRef, 'chatButton');
-    measureElement(familyButtonRef, 'familyButton');
-    measureElement(settingsButtonRef, 'settingsButton');
     measureElement(faqButtonRef, 'faqButton');
     measureElement(notificationsButtonRef, 'notificationsButton');
-  };
-
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
   };
 
   const menuItems: MenuItem[] = [
@@ -300,37 +161,39 @@ const HomeDashboard = () => {
       id: "grocery",
       title: "Pantry",
       subtitle: "Track what you have",
-      iconSource: require("../../../assets/icons/groceryIcon.png"),
-      bgColor: "#D6F0FF",
+      iconName: "nutrition-outline",
+      iconColor: palette.primary,
+      bgColor: palette.cardPrimaryTint,
       onPress: () => router.push("/(main)/(home)/pantry"),
     },
     {
       id: "mealPlans",
       title: "Meal Plans",
       subtitle: "Your favorite meals",
-      iconSource: require("../../../assets/icons/mealPlans.png"),
-      bgColor: "#F5E6FF",
+      iconName: "restaurant-outline",
+      iconColor: palette.accent,
+      bgColor: palette.cardAccentTint,
       onPress: () => router.push("/(main)/(home)/meals"),
     },
     {
       id: "groceryLists",
       title: "Grocery Lists",
       subtitle: "Upload Groceries",
-      iconSource: require("../../../assets/icons/grocery.png"),
-      bgColor: "#F0F0F0",
+      iconName: "cart-outline",
+      iconColor: palette.text,
+      bgColor: palette.cardNeutralTint,
       onPress: () => router.push("/(main)/(home)/groceryLists"),
     },
     {
       id: "Mealplanner",
       title: "Quick Meals",
       subtitle: "Whip it up!",
-      iconSource: require("../../../assets/icons/qm2.png"),
-      bgColor: "#D3F0E3",
+      iconName: "flash-outline",
+      iconColor: palette.success,
+      bgColor: palette.cardSuccessTint,
       onPress: () => router.push("/(main)/(home)/quickMeals"),
     },
   ];
-
-  const chatIconSource = require("../../../assets/icons/element.png");
 
   const handleMenuPress = (item: MenuItem) => {
     item.onPress();
@@ -341,57 +204,52 @@ const HomeDashboard = () => {
     router.push("/(main)/(home)/allFeatures");
   };
 
-  const handleTabPress = (tab: string) => {
-    setActiveTab(tab);
-    console.log("Navigate to:", tab);
-  };
-
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Fixed Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          ref={faqButtonRef}
+          style={styles.menuButton}
+          activeOpacity={0.6}
+          onPress={() => router.push("/(main)/(home)/faq")}
+          disabled={showTutorial}
+        >
+          <IconButton
+            iconName="accessibility-outline"
+            style={styles.headerIconButton}
+            iconContainerStyle={styles.headerIconContainer}
+          />
+          <View style={styles.menuIcon}></View>
+        </TouchableOpacity>
+        <View style={styles.logoContainer}>
+          <Image
+            source={require("@/assets/images/logo.png")}
+            style={styles.logoImage}
+            resizeMode="contain"
+            accessibilityLabel="Freshly logo"
+          />
+        </View>
+        <View ref={notificationsButtonRef}>
+          <NotificationBell
+            iconSize={24}
+            onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
+            extraCount={pendingShareCount}
+            containerStyle={styles.notificationButton}
+          />
+        </View>
+      </View>
+
+      {/* Scrollable Content */}
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 20 }]}
         showsVerticalScrollIndicator={false}
         scrollEnabled={!showTutorial}
       >
-        <View style={styles.header}>
-          <TouchableOpacity
-            ref={faqButtonRef}
-            style={styles.menuButton}
-            activeOpacity={0.6}
-            onPress={() => router.push("/(main)/(home)/faq")}
-            disabled={showTutorial}
-          >
-            <IconButton
-              iconName="accessibility-outline"
-              style={styles.headerIconButton}
-              iconContainerStyle={styles.headerIconContainer}
-            />
-            <View style={styles.menuIcon}></View>
-          </TouchableOpacity>
-          <View style={styles.logoContainer}>
-            <Image
-              source={require("../../../assets/images/logo.png")} // Update with your image path
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
-          </View>
-          <View ref={notificationsButtonRef}>
-            <NotificationBell
-              iconSize={24}
-              iconColor="#1F2937"
-              badgeColor="#FF3B30"
-              onPress={() => !showTutorial && router.push("/(main)/(home)/notifications")}
-              extraCount={pendingShareCount}
-              containerStyle={styles.notificationButton}
-            />
-          </View>
-        </View>
-
         {/* Welcome Text */}
         <Text style={styles.welcomeText}>
-          <Text style={{ color: "#00A86B" }}> Smarter Shopping.</Text> {"\n"}
-          <Text style={{ color: "#FD8100" }}>Healthier Living.</Text>
+          <Text style={styles.welcomeAccentPrimary}> Smarter Shopping.</Text> {"\n"}
+          <Text style={styles.welcomeAccentSecondary}>Healthier Living.</Text>
         </Text>
         {/* Menu Grid */}
         <View style={styles.menuGrid}>
@@ -414,10 +272,10 @@ const HomeDashboard = () => {
             >
               <View style={styles.menuCardHeader}>
                 <View style={styles.menuIconContainer}>
-                  <Image
-                    source={item.iconSource}
-                    style={styles.menuCardIcon}
-                    resizeMode="contain"
+                  <Ionicons
+                    name={item.iconName}
+                    size={28}
+                    color={item.iconColor}
                   />
                 </View>
                 <Text style={styles.menuCardTitle}>{item.title}</Text>
@@ -434,10 +292,10 @@ const HomeDashboard = () => {
         {/* Start New Chat Section */}
         <View ref={allFeaturesRef} style={styles.chatSection}>
         <View style={styles.chatIconContainer}>
-          <Image
-            source={chatIconSource}
-            style={styles.chatSectionIcon}
-            resizeMode="contain"
+          <Ionicons
+            name="apps-outline"
+            size={26}
+            color={palette.card}
           />
         </View>
         <Text style={styles.chatSectionTitle}>All features</Text>
@@ -454,25 +312,6 @@ const HomeDashboard = () => {
       </View>
       </ScrollView>
 
-      {/* Bottom Navigation Component */}
-      <BottomNavigation
-        activeTab={activeTab}
-        onTabPress={handleTabPress}
-        safeBottom={insets.bottom}
-        quickAddRef={quickAddRef}
-        chatButtonRef={chatButtonRef}
-        familyButtonRef={familyButtonRef}
-        settingsButtonRef={settingsButtonRef}
-        disabled={showTutorial}
-      />
-
-      {/* Tutorial Overlay */}
-      <HomeTutorial
-        visible={showTutorial}
-        onComplete={handleTutorialComplete}
-        targetMeasurements={targetMeasurements}
-      />
-
       {/* Toast for navigation messages */}
       <ToastBanner
         visible={showToast}
@@ -485,241 +324,217 @@ const HomeDashboard = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    paddingTop: 50,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    marginTop: -30,
-    marginBottom: -25,
-  },
-  menuButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuIcon: {
-    width: 24,
-    height: 24,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-  },
-  menuDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#111111",
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  notificationButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  headerIconButton: {
-    padding: 0,
-    marginTop: 22
-  },
-  headerIconContainer: {
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "transparent",
-  },
-  notificationIcon: {
-    fontSize: 24,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-  },
-  logoContainer: {
-    alignItems: "center",
-  },
-  welcomeText: {
-    fontSize: 26,
-    fontWeight: "700",
-    color: "#4C4D59",
-    textAlign: "center",
-    lineHeight: 32,
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  menuGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 14,
-  },
-  menuCard: {
-    width: "48%",
-    borderRadius: 18,
-    padding: 14,
-    minHeight: 130,
-    justifyContent: "space-between",
-  },
-  menuCardHeader: {
-    gap: 10,
-  },
-  menuIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  menuCardIcon: {
-    width: 26,
-    height: 26,
-  },
-  menuCardTitle: {
-    fontSize: 17,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  menuCardFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-  },
-  menuCardSubtitle: {
-    fontSize: 13,
-    color: "#111111",
-    flex: 1,
-    lineHeight: 17,
-  },
-  arrowIcon: {
-    fontSize: 22,
-    color: "#111111",
-  },
-  chatSection: {
-    backgroundColor: "#E8F8F2",
-    borderRadius: 18,
-    padding: 16,
-    alignItems: "center",
-  },
-  chatIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: "#00C853",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  chatSectionIcon: {
-    width: 26,
-    height: 26,
-  },
-  chatSectionTitle: {
-    fontSize: 19,
-    fontWeight: "700",
-    color: "#111111",
-    marginBottom: 14,
-  },
-  startChatButton: {
-    width: "100%",
-    backgroundColor: "#00C853",
-    borderRadius: 50,
-    paddingVertical: 14,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 10,
-  },
-  startChatButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  startChatArrow: {
-    fontSize: 18,
-    color: "#FFFFFF",
-  },
-  bottomNavWrapper: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
-  bottomNav: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-    width: "90%",
-    borderRadius: 28,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderWidth: 1,
-    borderColor: "#EAEAEA",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 1,
-    elevation: 2,
-  },
-  bottomDock: {
-    width: "100%",
-    backgroundColor: "#F7F8FA",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 10,
-    alignItems: "center",
-  },
-  slidingIndicator: {
-    position: "absolute",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#00C853",
-    left: 20,
-  },
-  navItem: {
-    alignItems: "center",
-    zIndex: 2,
-  },
-  navIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  navIcon: {
-    fontSize: 22,
-    color: "#FFFFFF",
-  },
-  navIconInactive: {
-    fontSize: 22,
-    color: "#9AA0A6",
-    opacity: 0.6,
-  },
-  logoImage: {
-    width: 150,
-    height: 150,
-  },
-  logoImageInactive: {
-    opacity: 0.6,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  accent: colors.warning,
+  success: colors.success,
+  cardPrimaryTint: withAlpha(colors.primary, 0.14),
+  cardAccentTint: withAlpha(colors.warning, 0.16),
+  cardNeutralTint: withAlpha(colors.textSecondary, 0.08),
+  cardSuccessTint: withAlpha(colors.success, 0.16),
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: number }) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: palette.background,
+      paddingTop: Math.max(50, insets.top),
+    },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+    },
+    menuButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      flexShrink: 0,
+      backgroundColor: palette.card,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    menuIcon: {
+      width: 24,
+      height: 24,
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 4,
+    },
+    menuDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: palette.text,
+    },
+    headerTitle: {
+      fontSize: 24,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    notificationButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      flexShrink: 0,
+      backgroundColor: palette.card,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    headerIconButton: {
+      padding: 0,
+      marginTop: 22,
+    },
+    headerIconContainer: {
+      width: 24,
+      height: 24,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: "transparent",
+    },
+    notificationIcon: {
+      fontSize: 24,
+    },
+    scrollContent: {
+      paddingHorizontal: 20,
+      paddingBottom: 20,
+    },
+    logoContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 12,
+    },
+    welcomeText: {
+      fontSize: 26,
+      fontWeight: "700",
+      color: palette.text,
+      textAlign: "center",
+      lineHeight: 32,
+      marginTop: 10,
+      marginBottom: 16,
+    },
+    welcomeAccentPrimary: {
+      color: palette.primary,
+    },
+    welcomeAccentSecondary: {
+      color: palette.accent,
+    },
+    menuGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 12,
+      marginBottom: 16,
+    },
+    menuCard: {
+      width: "48%",
+      borderRadius: 20,
+      padding: 16,
+      minHeight: 160,
+      justifyContent: "space-between",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    menuCardHeader: {
+      gap: 12,
+    },
+    menuIconContainer: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: withAlpha(palette.card, 0.6),
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    menuCardTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    menuCardFooter: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+    },
+    menuCardSubtitle: {
+      fontSize: 13,
+      color: palette.textMuted,
+      flex: 1,
+      lineHeight: 17,
+    },
+    arrowIcon: {
+      fontSize: 22,
+      color: palette.text,
+    },
+    chatSection: {
+      backgroundColor: palette.cardSuccessTint,
+      borderRadius: 18,
+      padding: 16,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    chatIconContainer: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: palette.success,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 10,
+    },
+    chatSectionTitle: {
+      fontSize: 19,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 14,
+    },
+    startChatButton: {
+      width: "100%",
+      backgroundColor: palette.success,
+      borderRadius: 50,
+      paddingVertical: 14,
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 10,
+    },
+    startChatButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    startChatArrow: {
+      fontSize: 18,
+      color: palette.card,
+    },
+    logoImage: {
+      height: 65,
+      aspectRatio: 674 / 370,
+      maxWidth: 250,
+      flexShrink: 1,
+    },
+  });
 
 export default HomeDashboard;

@@ -3,6 +3,7 @@ import SyncPantryButton from "@/components/grocery/SyncPantryButton";
 import SyncResultModal from "@/components/grocery/SyncResultModal";
 import { useGroceryList } from "@/context/groceryListContext";
 import { useUser } from "@/context/usercontext";
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import type { GroceryListItemSummary } from "@/src/services/grocery.service";
 import {
   formatQuantityDisplay,
@@ -12,8 +13,11 @@ import {
   sortItems,
   type SortOption
 } from "@/src/utils/groceryListUtils";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Modal,
@@ -43,19 +47,30 @@ interface ToastState {
   topOffset?: number;
 }
 
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  white: "#FFFFFF",
-  text: "#0A0A0A",
-  textMuted: "#666666",
-  border: "#E0E0E0",
-  background: "#FAFAFA",
-  success: "#00A86B",
-  danger: "#FF3B30",
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 };
+
+const createPalette = (colors: ColorTokens) => ({
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  accent: colors.warning,
+  accentLight: withAlpha(colors.warning, 0.12),
+  charcoal: colors.textPrimary,
+  charcoalLight: withAlpha(colors.textSecondary, 0.1),
+  white: colors.card,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  border: colors.border,
+  background: colors.background,
+  success: colors.success,
+  danger: colors.error,
+});
 
 // ============================================
 // SORT DROPDOWN COMPONENT
@@ -66,6 +81,7 @@ interface SortDropdownProps {
   currentSort: SortOption;
   onSelect: (option: SortOption) => void;
   onClose: () => void;
+  styles: ReturnType<typeof createStyles>;
 }
 
 const SortDropdown: React.FC<SortDropdownProps> = ({
@@ -73,6 +89,7 @@ const SortDropdown: React.FC<SortDropdownProps> = ({
   currentSort,
   onSelect,
   onClose,
+  styles,
 }) => {
   if (!visible) return null;
 
@@ -124,6 +141,8 @@ interface CategoryHeaderProps {
   checkedCount: number;
   isExpanded: boolean;
   onToggle: () => void;
+  palette: ReturnType<typeof createPalette>;
+  styles: ReturnType<typeof createStyles>;
 }
 
 const CategoryHeader: React.FC<CategoryHeaderProps> = ({
@@ -132,6 +151,8 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({
   checkedCount,
   isExpanded,
   onToggle,
+  palette,
+  styles,
 }) => {
   return (
     <TouchableOpacity
@@ -140,7 +161,12 @@ const CategoryHeader: React.FC<CategoryHeaderProps> = ({
       activeOpacity={0.7}
     >
       <View style={styles.categoryHeaderLeft}>
-        <Text style={styles.categoryExpandIcon}>{isExpanded ? "▼" : "▶"}</Text>
+        <Ionicons
+          name={isExpanded ? "chevron-down" : "chevron-forward"}
+          size={18}
+          color={palette.textMuted}
+          style={styles.categoryExpandIcon}
+        />
         <Text style={styles.categoryName}>{category}</Text>
       </View>
       <View style={styles.categoryHeaderRight}>
@@ -160,12 +186,16 @@ const GroceryListDetailScreen: React.FC = () => {
   const router = useRouter();
   const userContext = useUser();
   const groceryContext = useGroceryList();
+  const bottomNavInset = useBottomNavInset();
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
 
   if (!userContext || !groceryContext) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={palette.primary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -531,7 +561,7 @@ const GroceryListDetailScreen: React.FC = () => {
               onPress={() => handleMarkPurchased(item.id, item.ingredient_name)}
               activeOpacity={0.7}
             >
-              <Text style={styles.purchaseButtonText}>🛒</Text>
+              <Ionicons name="cart-outline" size={18} color={palette.primary} />
             </TouchableOpacity>
             {/* Remove button - passes isManual for different confirmation (Phase F3) */}
             <TouchableOpacity
@@ -554,6 +584,8 @@ const GroceryListDetailScreen: React.FC = () => {
       checkedCount={section.checkedCount}
       isExpanded={section.isExpanded}
       onToggle={() => toggleCategory(section.title)}
+      palette={palette}
+      styles={styles}
     />
   );
 
@@ -561,7 +593,7 @@ const GroceryListDetailScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
+          <ActivityIndicator size="large" color={palette.primary} />
           <Text style={styles.loadingText}>Loading...</Text>
         </View>
       </SafeAreaView>
@@ -603,6 +635,7 @@ const GroceryListDetailScreen: React.FC = () => {
         currentSort={sortOption}
         onSelect={setSortOption}
         onClose={() => setShowSortDropdown(false)}
+        styles={styles}
       />
 
       {/* Header */}
@@ -610,9 +643,10 @@ const GroceryListDetailScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Text style={styles.backButtonText}>‹</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         {/* Long-press on title opens debug mode (Phase F5) */}
         <Pressable
@@ -646,7 +680,7 @@ const GroceryListDetailScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           {deleting ? (
-            <ActivityIndicator size="small" color={COLORS.danger} />
+            <ActivityIndicator size="small" color={palette.danger} />
           ) : (
             <Text style={styles.deleteListButtonText}>Delete</Text>
           )}
@@ -661,14 +695,14 @@ const GroceryListDetailScreen: React.FC = () => {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: COLORS.success }]}>
+          <Text style={[styles.statValue, { color: palette.success }]}>
             {checkedItems}
           </Text>
           <Text style={styles.statLabel}>Checked</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={[styles.statValue, { color: COLORS.accent }]}>
+          <Text style={[styles.statValue, { color: palette.accent }]}>
             {remainingItems}
           </Text>
           <Text style={styles.statLabel}>Remaining</Text>
@@ -703,7 +737,7 @@ const GroceryListDetailScreen: React.FC = () => {
           }}
           activeOpacity={0.7}
         >
-          <Text style={styles.groupToggleIcon}>📂</Text>
+          <Ionicons name="bookmark-outline" size={18} color={palette.primary} />
           <Text
             style={[
               styles.groupToggleText,
@@ -733,10 +767,10 @@ const GroceryListDetailScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           {clearing ? (
-            <ActivityIndicator color={COLORS.text} size="small" />
+            <ActivityIndicator color={palette.text} size="small" />
           ) : (
             <>
-              <Text style={styles.actionButtonIcon}>🗑️</Text>
+              <Ionicons name="trash-outline" size={18} color={palette.text} />
               <Text style={styles.actionButtonTextSecondary}>Clear Checked</Text>
             </>
           )}
@@ -756,10 +790,10 @@ const GroceryListDetailScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             {isRebuilding ? (
-              <ActivityIndicator color={COLORS.primary} size="small" />
+              <ActivityIndicator color={palette.primary} size="small" />
             ) : (
               <>
-                <Text style={styles.rebuildButtonIcon}>🔄</Text>
+                <Ionicons name="refresh" size={18} color={palette.primary} />
                 <Text style={styles.rebuildButtonText}>Rebuild from Meal Plan</Text>
               </>
             )}
@@ -770,7 +804,7 @@ const GroceryListDetailScreen: React.FC = () => {
       {/* Items List */}
       {totalItems === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>📝</Text>
+          <Ionicons name="receipt" size={28} color={palette.textMuted} style={styles.emptyStateIcon} />
           <Text style={styles.emptyStateTitle}>No Items</Text>
           <Text style={styles.emptyStateDescription}>
             Add a meal to add ingredients to this list
@@ -782,14 +816,14 @@ const GroceryListDetailScreen: React.FC = () => {
           renderItem={renderItem}
           renderSectionHeader={renderSectionHeader}
           keyExtractor={(item) => `item-${item.id}`}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: bottomNavInset + 24 }]}
           stickySectionHeadersEnabled={true}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
+              tintColor={palette.primary}
+              colors={[palette.primary]}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -800,13 +834,13 @@ const GroceryListDetailScreen: React.FC = () => {
           renderItem={renderItem}
           renderSectionHeader={() => null}
           keyExtractor={(item) => `item-${item.id}`}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[styles.listContainer, { paddingBottom: bottomNavInset + 24 }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
+              tintColor={palette.primary}
+              colors={[palette.primary]}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -820,10 +854,10 @@ const GroceryListDetailScreen: React.FC = () => {
 // STYLES
 // ============================================
 
-const styles = StyleSheet.create({
+const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
   },
   header: {
     flexDirection: "row",
@@ -831,23 +865,27 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
+    borderRadius: 22,
+    backgroundColor: palette.primaryLight,
+    shadowColor: palette.text,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   backButtonText: {
-    fontSize: 32,
-    fontWeight: "300",
-    color: COLORS.text,
-    marginTop: -4,
+    fontSize: 22,
+    fontWeight: "600",
+    color: palette.primary,
   },
   headerCenter: {
     flex: 1,
@@ -857,14 +895,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     textAlign: "center",
   },
   deleteListButton: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     minWidth: 60,
     alignItems: "center",
     justifyContent: "center",
@@ -872,7 +910,7 @@ const styles = StyleSheet.create({
   deleteListButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.danger,
+    color: palette.danger,
   },
   scopeBadge: {
     paddingHorizontal: 12,
@@ -880,28 +918,28 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   scopeBadgePersonal: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
   },
   scopeBadgeFamily: {
-    backgroundColor: COLORS.accentLight,
+    backgroundColor: palette.accentLight,
   },
   scopeBadgeText: {
     fontSize: 11,
     fontWeight: "600",
   },
   scopeBadgeTextPersonal: {
-    color: COLORS.primary,
+    color: palette.primary,
   },
   scopeBadgeTextFamily: {
-    color: COLORS.accent,
+    color: palette.accent,
   },
   statsBar: {
     flexDirection: "row",
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     paddingVertical: 16,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   statItem: {
     flex: 1,
@@ -910,27 +948,27 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontWeight: "500",
   },
   statDivider: {
     width: 1,
-    backgroundColor: COLORS.border,
+    backgroundColor: palette.border,
     marginHorizontal: 8,
   },
   sortingBar: {
     flexDirection: "row",
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     paddingVertical: 12,
     paddingHorizontal: 20,
     gap: 12,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: palette.border,
   },
   sortButton: {
     flexDirection: "row",
@@ -938,7 +976,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     gap: 6,
   },
   sortButtonIcon: {
@@ -947,7 +985,7 @@ const styles = StyleSheet.create({
   sortButtonText: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.text,
+    color: palette.text,
   },
   groupToggle: {
     flexDirection: "row",
@@ -955,11 +993,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 20,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     gap: 6,
   },
   groupToggleActive: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
   },
   groupToggleIcon: {
     fontSize: 14,
@@ -967,16 +1005,16 @@ const styles = StyleSheet.create({
   groupToggleText: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.text,
+    color: palette.text,
   },
   groupToggleTextActive: {
-    color: COLORS.primary,
+    color: palette.primary,
   },
   actionButtons: {
     flexDirection: "row",
     padding: 16,
     gap: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
   },
   actionButton: {
     flex: 1,
@@ -989,9 +1027,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButtonSecondary: {
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
   },
   actionButtonIcon: {
     fontSize: 16,
@@ -999,7 +1037,7 @@ const styles = StyleSheet.create({
   actionButtonTextSecondary: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.text,
+    color: palette.text,
   },
   listContainer: {
     padding: 20,
@@ -1009,13 +1047,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     paddingVertical: 12,
     paddingHorizontal: 16,
     marginBottom: 8,
     marginTop: 4,
     borderRadius: 10,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -1027,13 +1065,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   categoryExpandIcon: {
-    fontSize: 12,
-    color: COLORS.textMuted,
+    // Used by Ionicons
   },
   categoryName: {
     fontSize: 15,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
   },
   categoryHeaderRight: {
     flexDirection: "row",
@@ -1042,17 +1079,17 @@ const styles = StyleSheet.create({
   categoryCount: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   itemCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
     gap: 12,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -1066,18 +1103,18 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: COLORS.border,
+    borderColor: palette.border,
     alignItems: "center",
     justifyContent: "center",
   },
   checkboxChecked: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: palette.primary,
+    borderColor: palette.primary,
   },
   checkIcon: {
     fontSize: 14,
     fontWeight: "700",
-    color: COLORS.white,
+    color: palette.white,
   },
   itemContent: {
     flex: 1,
@@ -1093,7 +1130,7 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: "600",
-    color: COLORS.text,
+    color: palette.text,
     flexShrink: 1,
   },
   // Phase F3: Manual item badge
@@ -1101,16 +1138,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: "#E3F2FD",
+    backgroundColor: palette.primaryLight,
   },
   manualBadgeText: {
     fontSize: 10,
     fontWeight: "600",
-    color: "#1976D2",
+    color: palette.primary,
   },
   itemNameChecked: {
     textDecorationLine: "line-through",
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   itemMeta: {
     flexDirection: "row",
@@ -1120,22 +1157,22 @@ const styles = StyleSheet.create({
   },
   itemQuantity: {
     fontSize: 14,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   categoryBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
   },
   categoryBadgeText: {
     fontSize: 11,
     fontWeight: "500",
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   itemNote: {
     fontSize: 13,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     fontStyle: "italic",
     marginTop: 4,
   },
@@ -1145,42 +1182,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: COLORS.background,
+    backgroundColor: palette.background,
   },
   removeButtonText: {
     fontSize: 24,
     fontWeight: "300",
-    color: COLORS.danger,
+    color: palette.danger,
   },
   // Phase F2: Purchased item styles
   itemCardPurchased: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: withAlpha(palette.textMuted, 0.08),
     opacity: 0.85,
   },
   checkboxPurchased: {
-    backgroundColor: COLORS.success,
-    borderColor: COLORS.success,
+    backgroundColor: palette.success,
+    borderColor: palette.success,
   },
   itemNamePurchased: {
     textDecorationLine: "line-through",
-    color: "#999999",
+    color: palette.textMuted,
   },
   itemQuantityPurchased: {
-    color: "#AAAAAA",
+    color: palette.textMuted,
   },
   itemNotePurchased: {
-    color: "#AAAAAA",
+    color: palette.textMuted,
   },
   purchasedBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: "#E8F8F1",
+    backgroundColor: palette.primaryLight,
   },
   purchasedBadgeText: {
     fontSize: 11,
     fontWeight: "600",
-    color: COLORS.success,
+    color: palette.success,
   },
   purchasedIndicator: {
     width: 36,
@@ -1188,12 +1225,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 18,
-    backgroundColor: "#E8F8F1",
+    backgroundColor: palette.primaryLight,
   },
   purchasedCheckIcon: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.success,
+    color: palette.success,
   },
   itemActions: {
     flexDirection: "row",
@@ -1206,7 +1243,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 16,
-    backgroundColor: "#E8F8F1",
+    backgroundColor: palette.primaryLight,
   },
   purchaseButtonText: {
     fontSize: 16,
@@ -1215,7 +1252,7 @@ const styles = StyleSheet.create({
   rebuildButtonContainer: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
   },
   rebuildButton: {
     flexDirection: "row",
@@ -1224,9 +1261,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
     borderWidth: 1,
-    borderColor: COLORS.primary,
+    borderColor: palette.primary,
     gap: 8,
   },
   rebuildButtonDisabled: {
@@ -1238,7 +1275,7 @@ const styles = StyleSheet.create({
   rebuildButtonText: {
     fontSize: 14,
     fontWeight: "600",
-    color: COLORS.primary,
+    color: palette.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -1248,7 +1285,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
   },
   emptyState: {
     flex: 1,
@@ -1257,19 +1294,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyStateIcon: {
-    fontSize: 64,
     marginBottom: 16,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 8,
     textAlign: "center",
   },
   emptyStateDescription: {
     fontSize: 16,
-    color: COLORS.textMuted,
+    color: palette.textMuted,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -1282,12 +1318,12 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   dropdownContainer: {
-    backgroundColor: COLORS.white,
+    backgroundColor: palette.white,
     borderRadius: 16,
     padding: 16,
     width: "100%",
     maxWidth: 300,
-    shadowColor: "#000",
+    shadowColor: palette.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1296,7 +1332,7 @@ const styles = StyleSheet.create({
   dropdownTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: COLORS.text,
+    color: palette.text,
     marginBottom: 12,
     textAlign: "center",
   },
@@ -1309,7 +1345,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dropdownOptionSelected: {
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: palette.primaryLight,
   },
   dropdownOptionIcon: {
     fontSize: 16,
@@ -1317,16 +1353,16 @@ const styles = StyleSheet.create({
   },
   dropdownOptionText: {
     fontSize: 15,
-    color: COLORS.text,
+    color: palette.text,
     flex: 1,
   },
   dropdownOptionTextSelected: {
     fontWeight: "600",
-    color: COLORS.primary,
+    color: palette.primary,
   },
   dropdownCheckmark: {
     fontSize: 16,
-    color: COLORS.primary,
+    color: palette.primary,
     fontWeight: "700",
   },
 });

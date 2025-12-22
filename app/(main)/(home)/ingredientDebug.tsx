@@ -23,6 +23,7 @@ import {
 } from '@/src/services/ingredient.service';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
+import { useBottomNavInset } from "@/hooks/useBottomNavInset";
 import {
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -35,6 +36,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 
 // ============================================
 // COLORS (Debug theme)
@@ -171,7 +173,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ isComplete }) => (
     ]}
   >
     <Text style={styles.statusBadgeText}>
-      {isComplete ? '✓ Complete' : '⚠ Missing Data'}
+      {isComplete ? '✓ Complete' : 'Missing Data'}
     </Text>
   </View>
 );
@@ -182,6 +184,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ isComplete }) => (
 
 const IngredientDetailScreen: React.FC = () => {
   const router = useRouter();
+  const bottomNavInset = useBottomNavInset();
   const params = useLocalSearchParams<{ name?: string; id?: string }>();
   const ingredientName = params.name || '';
 
@@ -288,16 +291,16 @@ const IngredientDetailScreen: React.FC = () => {
 
   if (!ingredientName) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>🧪 Ingredient Debug</Text>
+          <Text style={styles.headerTitle}>Ingredient Debug</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <Ionicons name="warning" size={32} color={COLORS.debugWarning} style={styles.errorIcon} />
           <Text style={styles.errorText}>No ingredient name provided</Text>
         </View>
       </SafeAreaView>
@@ -306,12 +309,12 @@ const IngredientDetailScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>🧪 Ingredient Debug</Text>
+          <Text style={styles.headerTitle}>Ingredient Debug</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
@@ -324,16 +327,16 @@ const IngredientDetailScreen: React.FC = () => {
 
   if (error || !ingredient) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.header}>
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>🧪 Ingredient Debug</Text>
+          <Text style={styles.headerTitle}>Ingredient Debug</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>❌</Text>
+          <Ionicons name="alert-circle-outline" size={32} color={COLORS.debugError} style={styles.errorIcon} />
           <Text style={styles.errorText}>Failed to load ingredient</Text>
           <Text style={styles.errorSubtext}>
             {error?.message || `"${ingredientName}" not found`}
@@ -358,7 +361,7 @@ const IngredientDetailScreen: React.FC = () => {
   });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
@@ -368,7 +371,7 @@ const IngredientDetailScreen: React.FC = () => {
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>🧪 Ingredient Debug</Text>
+          <Text style={styles.headerTitle}>Ingredient Debug</Text>
           <View style={styles.headerSpacer} />
         </View>
 
@@ -410,7 +413,7 @@ const IngredientDetailScreen: React.FC = () => {
             />
             {canonicalUnit === 'count' && avgWeightPerUnit === null && (
               <Text style={styles.warningText}>
-                ⚠ Required for count-based ingredients
+                Required for count-based ingredients
               </Text>
             )}
           </View>
@@ -427,14 +430,14 @@ const IngredientDetailScreen: React.FC = () => {
             />
             {canonicalUnit === 'ml' && densityGPerMl === null && (
               <Text style={styles.warningText}>
-                ⚠ Required for volume-based ingredients
+                Required for volume-based ingredients
               </Text>
             )}
           </View>
 
           {/* Info Card */}
           <View style={[styles.card, styles.infoCard]}>
-            <Text style={styles.infoTitle}>📖 How Conversions Work</Text>
+            <Text style={styles.infoTitle}>How Conversions Work</Text>
             <Text style={styles.infoText}>
               • <Text style={styles.infoHighlight}>Grams (g)</Text>: Base weight unit, no conversion needed.
             </Text>
@@ -445,6 +448,7 @@ const IngredientDetailScreen: React.FC = () => {
               • <Text style={styles.infoHighlight}>Count</Text>: Uses avg_weight_per_unit to convert to grams.
             </Text>
           </View>
+          <View style={{ height: bottomNavInset + 24 }} />
         </ScrollView>
 
         {/* Save Button */}
@@ -518,7 +522,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 100,
+    paddingBottom: 16,
   },
 
   // Cards
@@ -714,7 +718,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   errorIcon: {
-    fontSize: 48,
     marginBottom: 16,
   },
   errorText: {

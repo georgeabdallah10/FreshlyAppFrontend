@@ -16,6 +16,7 @@ export type ChatMessage = {
   content: string;
   role: 'user' | 'assistant';
   timestamp: string;
+  image_url?: string | null; // URL to persisted image in Supabase Storage
 };
 
 export type Conversation = {
@@ -122,16 +123,23 @@ export async function askAI({
  * 1. If conversationId is provided: Do NOT send system (backend manages context)
  * 2. If conversationId is undefined: This starts a NEW conversation, system is allowed
  * 3. NEVER include message history - backend is the source of truth
- * 4. Payload must ONLY be: { prompt, conversation_id?, system? (first msg only) }
+ * 4. Payload: { prompt, conversation_id?, system? (first msg only), image? (optional base64) }
+ *
+ * MULTIMODAL SUPPORT:
+ * - If image is provided, it's sent as a base64 string alongside the text prompt
+ * - Backend validates image format (jpg/png/webp) and size
+ * - Text (prompt) is REQUIRED when sending an image
  */
 export async function sendMessage({
   prompt,
   system,
   conversationId,
+  image,
 }: {
   prompt: string;
   system?: string;
   conversationId?: number;
+  image?: string; // Optional base64-encoded image data
 }): Promise<ChatResponse> {
   const token = await getAuthToken();
   if (!token) {
@@ -146,6 +154,7 @@ export async function sendMessage({
     prompt: string;
     conversation_id?: number;
     system?: string;
+    image?: string;
   } = { prompt };
 
   if (conversationId !== undefined) {
@@ -164,6 +173,12 @@ export async function sendMessage({
       payload.system = system;
     }
     console.log('[sendMessage] Starting NEW conversation');
+  }
+
+  // MULTIMODAL: Include image if provided
+  if (image) {
+    payload.image = image;
+    console.log('[sendMessage] Including image attachment (base64)');
   }
 
   // Create AbortController for timeout

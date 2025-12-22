@@ -15,7 +15,7 @@ export type Ingredient = {
 export type Meal = {
   id: number;
   name: string;
-  image: string; // emoji
+  image: string; // Icon name or image URL
   calories: number;
   prepTime: number;
   cookTime: number;
@@ -41,7 +41,7 @@ export const mealsData: Meal[] = [
   {
     id: 1,
     name: 'Grilled Chicken Quinoa Bowl',
-    image: '🍗',
+    image: 'restaurant-outline',
     calories: 250,
     prepTime: 10,
     cookTime: 20,
@@ -76,7 +76,7 @@ export const mealsData: Meal[] = [
   {
     id: 2,
     name: 'Culinary Hill',
-    image: '🥗',
+    image: 'nutrition-outline',
     calories: 200,
     prepTime: 10,
     cookTime: 15,
@@ -110,7 +110,7 @@ export const mealsData: Meal[] = [
   {
     id: 3,
     name: 'Smoothie Bowl',
-    image: '🍓',
+    image: 'cafe-outline',
     calories: 300,
     prepTime: 5,
     cookTime: 0,
@@ -144,7 +144,7 @@ export const mealsData: Meal[] = [
   {
     id: 4,
     name: 'Grain Bowl',
-    image: '🍚',
+    image: 'restaurant-outline',
     calories: 250,
     prepTime: 10,
     cookTime: 20,

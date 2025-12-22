@@ -11,7 +11,7 @@ This app uses a comprehensive caching architecture with:
 
 ---
 
-## 📁 Architecture Components
+##  Architecture Components
 
 ### 1. React Query with MMKV Persistence
 
@@ -29,12 +29,12 @@ This app uses a comprehensive caching architecture with:
 ```
 
 **Persisted Queries**:
-- ✅ Pantry items
-- ✅ Meals
-- ✅ Meal plans
-- ✅ Notifications
-- ✅ Family data
-- ✅ Grocery lists
+-  Pantry items
+-  Meals
+-  Meal plans
+-  Notifications
+-  Family data
+-  Grocery lists
 
 ---
 
@@ -130,7 +130,7 @@ await setHasSeenTutorial(true);
 
 ---
 
-## 🎣 Using React Query Hooks
+##  Using React Query Hooks
 
 ### Example: Pantry Items
 
@@ -193,7 +193,7 @@ function MealPlanScreen() {
 
 ---
 
-## 🔧 Creating New API Hooks
+##  Creating New API Hooks
 
 ### Template
 
@@ -238,7 +238,7 @@ export function useCreateMyData() {
 
 ---
 
-## 🎯 Query Keys Convention
+##  Query Keys Convention
 
 All query keys are centralized in `src/config/queryClient.ts`:
 
@@ -261,7 +261,7 @@ export const queryKeys = {
 
 ---
 
-## 🔄 Cache Invalidation
+##  Cache Invalidation
 
 ### Invalidate All Queries of a Type
 
@@ -291,16 +291,16 @@ queryClient.invalidateQueries({ queryKey: ['custom', 'key'] });
 
 ---
 
-## 💾 Persistence Behavior
+##  Persistence Behavior
 
 ### What Gets Persisted?
 
-✅ **Persisted to MMKV**:
+ **Persisted to MMKV**:
 - All successful queries
 - User profile (Zustand)
 - Query cache (up to 7 days old)
 
-❌ **Not Persisted**:
+ **Not Persisted**:
 - Loading states
 - Error states
 - Failed queries
@@ -313,7 +313,7 @@ queryClient.invalidateQueries({ queryKey: ['custom', 'key'] });
 
 ---
 
-## 🚀 Performance Optimizations
+##  Performance Optimizations
 
 ### 1. Optimistic Updates
 
@@ -354,26 +354,26 @@ await prefetchQueries.mealDetail(mealId, () => fetchMealById(mealId));
 ### 3. Selective Re-renders
 
 ```typescript
-// ❌ Bad - Rerenders on any store change
+//  Bad - Rerenders on any store change
 const store = useUserStore();
 
-// ✅ Good - Only rerenders when age changes
+//  Good - Only rerenders when age changes
 const age = useUserStore(state => state.profile.age);
 ```
 
 ---
 
-## 🔐 Security Best Practices
+##  Security Best Practices
 
 ### Auth Tokens
-- ✅ Stored in **SecureStore** (Keychain/KeyStore)
-- ✅ Hardware-backed encryption
-- ✅ Never logged or exposed
+-  Stored in **SecureStore** (Keychain/KeyStore)
+-  Hardware-backed encryption
+-  Never logged or exposed
 
 ### Sensitive Data
-- ✅ MMKV encryption enabled
-- ✅ Separate storage instances
-- ✅ Custom encryption keys
+-  MMKV encryption enabled
+-  Separate storage instances
+-  Custom encryption keys
 
 ### Token Management
 
@@ -391,7 +391,7 @@ useUserStore.getState().resetProfile();
 
 ---
 
-## 📱 Offline Support
+##  Offline Support
 
 ### How It Works
 
@@ -413,7 +413,7 @@ const onRefresh = async () => {
 
 ---
 
-## 🐛 Debugging
+##  Debugging
 
 ### React Query DevTools
 
@@ -443,7 +443,7 @@ storage.clearAll();
 
 ---
 
-## 📝 Migration Guide
+##  Migration Guide
 
 ### From Direct API Calls to React Query
 
@@ -467,7 +467,7 @@ const { data, isLoading } = useMeals();
 
 ---
 
-## 🎓 Additional Resources
+##  Additional Resources
 
 - [React Query Docs](https://tanstack.com/query/latest)
 - [MMKV Docs](https://github.com/mrousavy/react-native-mmkv)
@@ -476,7 +476,7 @@ const { data, isLoading } = useMeals();
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 When adding new features:
 

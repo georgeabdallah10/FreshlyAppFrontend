@@ -1,9 +1,11 @@
 import ToastBanner from "@/components/generalMessage";
 import { useGroceryList } from "@/context/groceryListContext";
 import { useUser } from "@/context/usercontext";
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
 import type { GroceryListOut } from "@/src/services/grocery.service";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Animated,
@@ -43,6 +45,7 @@ const GroceryListsScreen: React.FC = () => {
   const router = useRouter();
   const groceryContext = useGroceryList();
   const userContext = useUser();
+  const scrollContentStyle = useScrollContentStyle();
   
   const myLists = groceryContext?.myLists ?? [];
   const familyLists = groceryContext?.familyLists ?? [];
@@ -158,7 +161,7 @@ const GroceryListsScreen: React.FC = () => {
                   isFamily ? styles.scopeBadgeTextFamily : styles.scopeBadgeTextPersonal,
                 ]}
               >
-                {isFamily ? "👨‍👩‍👧‍👦 Family" : "👤 Personal"}
+                {isFamily ? "Family" : "Personal"}
               </Text>
             </View>
           </View>
@@ -196,7 +199,7 @@ const GroceryListsScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyStateIcon}>🛒</Text>
+      <Ionicons name="cart-outline" size={48} color={COLORS.textMuted} style={styles.emptyStateIcon} />
       <Text style={styles.emptyStateTitle}>No Grocery Lists Yet</Text>
       <Text style={styles.emptyStateDescription}>
         Add a meal to create your first grocery list
@@ -257,9 +260,10 @@ const GroceryListsScreen: React.FC = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => router.back()}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Text style={styles.backButtonText}>‹</Text>
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Grocery Lists</Text>
         <View style={styles.headerSpacer} />
@@ -340,6 +344,7 @@ const GroceryListsScreen: React.FC = () => {
               contentContainerStyle={[
                 styles.listContainer,
                 sections.length === 0 && styles.listContainerEmpty,
+                scrollContentStyle,
               ]}
               ListEmptyComponent={renderEmptyState}
               refreshControl={
@@ -378,18 +383,22 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
+    borderRadius: 22,
     backgroundColor: COLORS.primaryLight,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
   },
   backButtonText: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "600",
     color: COLORS.primary,
-    marginTop: -2,
   },
   headerTitle: {
     fontSize: 20,
@@ -530,7 +539,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   emptyStateIcon: {
-    fontSize: 64,
     marginBottom: 16,
   },
   emptyStateTitle: {

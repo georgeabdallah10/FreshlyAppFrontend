@@ -1,9 +1,13 @@
 // components/ToastBanner.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
     Animated,
     Easing,
+    GestureResponderEvent,
+    PanResponder,
+    PanResponderGestureState,
     Platform,
+    Pressable,
     StyleSheet,
     Text,
     TouchableOpacity,
@@ -56,10 +60,25 @@ const ToastBanner: React.FC<Props> = ({
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-12)).current;
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevVisible = useRef(false);
+  const isHiding = useRef(false);
+  const latestOnHide = useRef(onHide);
+  const panDismissed = useRef(false);
   const isLong = message?.length > 40;
   const hasButtons = buttons && buttons.length > 0;
   // Don't auto-hide if there are buttons (user needs to make a choice)
   const autoDuration = hasButtons ? 0 : (duration ?? (isLong ? 5000 : 3000));
+
+  useEffect(() => {
+    latestOnHide.current = onHide;
+  }, [onHide]);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimer.current) {
+      clearTimeout(hideTimer.current);
+      hideTimer.current = null;
+    }
+  }, []);
 
   const palette =
     type === "success"
@@ -70,82 +89,105 @@ const ToastBanner: React.FC<Props> = ({
       ? { bg: "#007AFF", border: "#0051D5" }
       : { bg: "#5856D6", border: "#4240B8" }; // info
 
-  // Animate in / out when `visible` changes
-  useEffect(() => {
-    if (visible) {
-      // Clear any previous timers
-      if (hideTimer.current) {
-        clearTimeout(hideTimer.current);
-        hideTimer.current = null;
-      }
-      // Fade + slide in
-      Animated.parallel([
-        Animated.timing(opacity, {
-          toValue: 1,
-          duration: 180,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
+  const animateIn = useCallback(() => {
+    isHiding.current = false;
+    opacity.setValue(0);
+    translateY.setValue(-12);
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [opacity, translateY]);
 
-      // Schedule auto hide (only if duration > 0)
-      if (autoDuration > 0) {
-        hideTimer.current = setTimeout(() => {
-          Animated.parallel([
-            Animated.timing(opacity, {
-              toValue: 0,
-              duration: 180,
-              easing: Easing.in(Easing.quad),
-              useNativeDriver: true,
-            }),
-            Animated.timing(translateY, {
-              toValue: -12,
-              duration: 200,
-              easing: Easing.in(Easing.cubic),
-              useNativeDriver: true,
-            }),
-          ]).start(({ finished }) => {
-            if (finished && onHide) onHide();
-          });
-        }, autoDuration);
-      }
-    } else {
-      // Hide immediately if asked to
-      if (hideTimer.current) {
-        clearTimeout(hideTimer.current);
-        hideTimer.current = null;
-      }
+  const animateOut = useCallback(
+    (_reason: "auto" | "gesture" | "prop") => {
+      if (isHiding.current) return;
+      isHiding.current = true;
+      prevVisible.current = false;
+      clearHideTimer();
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 0,
-          duration: 140,
+          duration: 180,
           easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(translateY, {
           toValue: -12,
-          duration: 160,
+          duration: 200,
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
-        if (finished && onHide) onHide();
+        isHiding.current = false;
+        if (finished && latestOnHide.current) {
+          latestOnHide.current();
+        }
       });
+    },
+    [clearHideTimer, opacity, translateY]
+  );
+
+  const handleDismiss = useCallback(() => {
+    if (!visible) return;
+    animateOut("gesture");
+  }, [animateOut, visible]);
+
+  const shouldDismissGesture = useCallback((gestureState: PanResponderGestureState) => {
+    return gestureState.dy < -16 || gestureState.vy < -0.6;
+  }, []);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gestureState) =>
+        Math.abs(gestureState.dy) > 6 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+      onPanResponderMove: (_, gestureState) => {
+        if (!panDismissed.current && shouldDismissGesture(gestureState)) {
+          panDismissed.current = true;
+          handleDismiss();
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (shouldDismissGesture(gestureState)) {
+          handleDismiss();
+        }
+      },
+    })
+  ).current;
+
+  // Animate in / out when `visible` changes
+  useEffect(() => {
+    if (visible) {
+      panDismissed.current = false;
+      clearHideTimer();
+      animateIn();
+
+      // Schedule auto hide (only if duration > 0)
+      if (autoDuration > 0) {
+        hideTimer.current = setTimeout(() => {
+          animateOut("auto");
+        }, autoDuration);
+      }
+    } else if (prevVisible.current) {
+      animateOut("prop");
     }
 
+    prevVisible.current = visible;
+
     return () => {
-      if (hideTimer.current) {
-        clearTimeout(hideTimer.current);
-        hideTimer.current = null;
-      }
+      clearHideTimer();
     };
-  }, [visible, autoDuration, onHide, opacity, translateY]);
+  }, [visible, autoDuration, clearHideTimer, animateIn, animateOut]);
 
   return (
     <Animated.View
@@ -161,7 +203,7 @@ const ToastBanner: React.FC<Props> = ({
       ]}
       {...rest}
     >
-      <View
+      <Pressable
         style={[
           styles.card,
           {
@@ -171,7 +213,10 @@ const ToastBanner: React.FC<Props> = ({
           hasButtons && styles.cardWithButtons,
           style,
         ]}
-        pointerEvents="auto"
+        accessibilityRole="alert"
+        onPress={handleDismiss}
+        android_ripple={{ color: "rgba(255, 255, 255, 0.08)" }}
+        {...panResponder.panHandlers}
       >
         {/* Title (optional, for confirm dialogs) */}
         {title ? (
@@ -199,10 +244,11 @@ const ToastBanner: React.FC<Props> = ({
                   button.style === 'destructive' && styles.buttonDestructive,
                   button.style === 'cancel' && styles.buttonCancel,
                 ]}
-                onPress={() => {
+                onPress={(event: GestureResponderEvent) => {
+                  event?.stopPropagation?.();
                   button.onPress();
                   // Auto-hide after button press
-                  if (onHide) onHide();
+                  handleDismiss();
                 }}
                 activeOpacity={0.7}
               >
@@ -219,7 +265,7 @@ const ToastBanner: React.FC<Props> = ({
             ))}
           </View>
         ) : null}
-      </View>
+      </Pressable>
     </Animated.View>
   );
 };

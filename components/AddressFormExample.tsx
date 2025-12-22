@@ -25,7 +25,7 @@ export const AddressFormExample: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleAddressSelect = (address: ParsedAddress) => {
-    console.log('📍 Address selected:', address);
+    console.log('Address selected:', address);
     setSelectedAddress(address);
   };
 
@@ -160,7 +160,7 @@ export const AddressFormExample: React.FC = () => {
 
         {/* Usage Instructions */}
         <View style={styles.instructionsContainer}>
-          <Text style={styles.instructionsTitle}>💡 How it works:</Text>
+          <Text style={styles.instructionsTitle}>How it works:</Text>
           <Text style={styles.instructionText}>
             • Type at least 3 characters to see suggestions
           </Text>
@@ -177,7 +177,7 @@ export const AddressFormExample: React.FC = () => {
 
         {/* Cost Optimization Info */}
         <View style={styles.infoContainer}>
-          <Text style={styles.infoTitle}>🎯 Cost Optimizations:</Text>
+          <Text style={styles.infoTitle}>Cost Optimizations:</Text>
           <Text style={styles.infoText}>
             ✓ Session tokens (85% savings)
           </Text>

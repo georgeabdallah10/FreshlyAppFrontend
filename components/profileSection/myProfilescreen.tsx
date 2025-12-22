@@ -1,6 +1,10 @@
 // ==================== screens/MyProfileScreen.tsx ====================
 import ToastBanner from "@/components/generalMessage";
+import AppTextInput from "@/components/ui/AppTextInput";
 import { useUser } from "@/context/usercontext";
+import { useScrollContentStyle } from "@/hooks/useBottomNavInset";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -16,20 +20,6 @@ import {
 import DeleteAccountModal from "./components/deleteAccountModal";
 import Icon from "./components/icon";
 import PasswordModal from "./components/passwordModal";
-
-const COLORS = {
-  primary: "#00A86B",
-  primaryLight: "#E8F8F1",
-  accent: "#FD8100",
-  accentLight: "#FFF3E6",
-  charcoal: "#4C4D59",
-  charcoalLight: "#F0F0F2",
-  white: "#FFFFFF",
-  background: "#F7F8FB",
-  text: "#0A0A0A",
-  textMuted: "#6B7280",
-  border: "#E9ECF2",
-};
 
 type Props = {
   onBack: () => void;
@@ -54,6 +44,10 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   const logout = userContext?.logout;
   const updateUserInfo = userContext?.updateUserInfo;
   const router = useRouter();
+  const scrollContentStyle = useScrollContentStyle();
+  const { theme } = useThemeContext();
+  const palette = React.useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = React.useMemo(() => createStyles(palette), [palette]);
 
   // Toast state
   const [toast, setToast] = useState<{
@@ -181,7 +175,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
       />
       <View style={styles.headerBar}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Icon name="back" size={24} color="#333" />
+          <Icon name="back" size={24} color={palette.text} />
         </TouchableOpacity>
         <Text style={styles.screenTitle}>My Profile</Text>
         <TouchableOpacity
@@ -208,7 +202,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} contentContainerStyle={scrollContentStyle} showsVerticalScrollIndicator={false}>
         <Animated.View 
           style={[
             styles.profileHeader,
@@ -235,7 +229,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
                 style={styles.cameraButton}
                 onPress={() => handleEditProfile()}
               >
-                <Icon name="camera" size={16} color="#fff" />
+                <Icon name="camera" size={16} color={palette.card} />
               </TouchableOpacity>
             )}
           </View>
@@ -259,7 +253,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Full Name</Text>
-            <TextInput
+            <AppTextInput
               style={[styles.input, !isEditing && styles.inputDisabled]}
               value={editedProfile.name}
               onChangeText={(text) =>
@@ -301,7 +295,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Location</Text>
-            <TextInput
+            <AppTextInput
               style={[styles.input, !isEditing && styles.inputDisabled]}
               value={editedProfile.location}
               onChangeText={(text) =>
@@ -311,18 +305,6 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
               placeholder="Enter your location"
             />
           </View>
-        </Animated.View>
-
-        <Animated.View 
-          style={[
-            styles.section,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }]
-            }
-          ]}
-        >
-          <Text style={styles.sectionTitle}>Update your prefrences</Text>
 
           <TouchableOpacity
             style={styles.passwordButton}
@@ -335,7 +317,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
           >
             <View style={styles.passwordLeft}>
               <Text style={styles.passwordText}>
-                Update your prefrences here
+                Update your preferences here
               </Text>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -355,10 +337,10 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
 
           <TouchableOpacity
             style={styles.passwordButton}
-            onPress={() => setShowPasswordModal(true)}
+              onPress={() => setShowPasswordModal(true)}
           >
             <View style={styles.passwordLeft}>
-              <Icon name="lock" size={20} color={COLORS.primary} />
+              <Icon name="lock" size={20} color={palette.primary} />
               <Text style={styles.passwordText}>Change Password</Text>
             </View>
             <Text style={styles.chevron}>›</Text>
@@ -379,7 +361,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
             activeOpacity={0.7}
           >
             <View style={styles.passwordLeft}>
-              <Icon name="log-out" size={20} color="#FF6B35" />
+              <Icon name="log-out" size={20} color={palette.error} />
               <Text style={styles.logoutButtonText}>Logout</Text>
             </View>
             <Text style={styles.logoutChevron}>›</Text>
@@ -407,7 +389,7 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
           >
             <View style={styles.deleteButtonContent}>
               <View style={styles.deleteIconContainer}>
-                <Icon name="trash" size={18} color="#FF3B30" />
+                <Icon name="trash" size={18} color={palette.error} />
               </View>
               <View style={styles.deleteTextContainer}>
                 <Text style={styles.deleteAccountText}>Delete Account</Text>
@@ -456,290 +438,314 @@ const MyProfileScreen: React.FC<Props> = ({ onBack }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  screenContainer: {
-    flex: 1,
-    paddingTop: 90,
-    backgroundColor: COLORS.background,
-  },
-  headerBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 20,
-    paddingTop: 10,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryLight,
-  },
-  screenTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.text,
-  },
-  editButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  profileHeader: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  avatarLarge: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: COLORS.charcoalLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    position: "relative",
-    borderWidth: 4,
-    borderColor: COLORS.primaryLight,
-  },
-  avatarLargeEmoji: {
-    fontSize: 50,
-  },
-  cameraButton: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 3,
-    borderColor: COLORS.white,
-  },
-  statusBadgeLarge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.primaryLight,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-  },
-  statusTextLarge: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  section: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderLeftWidth: 3,
-    borderLeftColor: COLORS.primary,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 16,
-  },
-  inputGroup: {
-    marginBottom: 16,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: COLORS.background,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    color: COLORS.text,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  inputDisabled: {
-    backgroundColor: COLORS.charcoalLight,
-    color: COLORS.textMuted,
-  },
-  passwordButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-    backgroundColor: "#FFF5F0",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFE5DD",
-  },
-  logoutButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#FF6B35",
-  },
-  logoutChevron: {
-    fontSize: 24,
-    color: "#FF6B35",
-    fontWeight: "300",
-  },
-  deleteAccoutnButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-    backgroundColor: "#FF3B30",
-    borderRadius: 12,
-    marginBottom: 15,
-  },
-  dangerSection: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    borderLeftWidth: 3,
-    borderLeftColor: "#FF3B30",
-  },
-  dangerSectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FF3B30",
-    marginBottom: 4,
-  },
-  dangerSectionSubtitle: {
-    fontSize: 13,
-    color: COLORS.textMuted,
-    marginBottom: 16,
-  },
-  deleteAccountButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-    backgroundColor: "#FFF5F5",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#FFE5E5",
-  },
-  deleteButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
-  deleteIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: COLORS.white,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#FFE5E5",
-  },
-  deleteTextContainer: {
-    flex: 1,
-  },
-  deleteAccountText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FF3B30",
-    marginBottom: 2,
-  },
-  deleteAccountSubtext: {
-    fontSize: 12,
-    color: "#FF8A80",
-    fontWeight: "500",
-  },
-  deleteChevron: {
-    fontSize: 24,
-    color: "#FF8A80",
-    fontWeight: "300",
-  },
-  passwordLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  passwordText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: COLORS.text,
-  },
-  chevron: {
-    fontSize: 24,
-    color: COLORS.textMuted,
-    fontWeight: "300",
-  },
-  actionButtons: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 8,
-    marginBottom: 40,
-  },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: COLORS.charcoalLight,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.textMuted,
-  },
-  saveButton: {
-    flex: 1,
-    backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: COLORS.white,
-  },
-  imgStyle: {
-    width: 23,
-    height: 23,
-  },
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
+  accent: colors.warning,
+  accentLight: withAlpha(colors.warning, 0.12),
+  mutedSurface: withAlpha(colors.textSecondary, 0.1),
+  error: colors.error,
 });
+
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    screenContainer: {
+      flex: 1,
+      paddingTop: 90,
+      backgroundColor: palette.background,
+    },
+    headerBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 20,
+      paddingTop: 10,
+      backgroundColor: palette.card,
+      borderBottomWidth: 1,
+      borderBottomColor: palette.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 12,
+      backgroundColor: palette.primaryLight,
+    },
+    screenTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    editButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    content: {
+      flex: 1,
+      padding: 20,
+    },
+    profileHeader: {
+      alignItems: "center",
+      marginBottom: 24,
+    },
+    avatarLarge: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: palette.mutedSurface,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+      position: "relative",
+      borderWidth: 4,
+      borderColor: palette.primaryLight,
+    },
+    avatarLargeEmoji: {
+      fontSize: 50,
+    },
+    cameraButton: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: palette.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 3,
+      borderColor: palette.card,
+    },
+    statusBadgeLarge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: palette.primaryLight,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      gap: 6,
+    },
+    statusTextLarge: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.primary,
+    },
+    section: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      borderLeftWidth: 3,
+      borderLeftColor: palette.primary,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 16,
+    },
+    inputGroup: {
+      marginBottom: 16,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.textMuted,
+      marginBottom: 8,
+    },
+    input: {
+      backgroundColor: palette.background,
+      borderRadius: 12,
+      padding: 14,
+      fontSize: 16,
+      color: palette.text,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    inputDisabled: {
+      backgroundColor: palette.mutedSurface,
+      color: palette.textMuted,
+    },
+    passwordButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 14,
+      backgroundColor: palette.primaryLight,
+      borderRadius: 12,
+      marginBottom: 15,
+    },
+    logoutButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 14,
+      backgroundColor: withAlpha(palette.error, 0.08),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.error, 0.3),
+    },
+    logoutButtonText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.error,
+    },
+    logoutChevron: {
+      fontSize: 24,
+      color: palette.error,
+      fontWeight: "300",
+    },
+    deleteAccoutnButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 14,
+      backgroundColor: palette.error,
+      borderRadius: 12,
+      marginBottom: 15,
+    },
+    dangerSection: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      padding: 20,
+      marginBottom: 16,
+      shadowColor: palette.text,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      borderLeftWidth: 3,
+      borderLeftColor: palette.error,
+    },
+    dangerSectionTitle: {
+      fontSize: 16,
+      fontWeight: "700",
+      color: palette.error,
+      marginBottom: 4,
+    },
+    dangerSectionSubtitle: {
+      fontSize: 13,
+      color: palette.textMuted,
+      marginBottom: 16,
+    },
+    deleteAccountButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      padding: 14,
+      backgroundColor: withAlpha(palette.error, 0.08),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.error, 0.3),
+    },
+    deleteButtonContent: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      flex: 1,
+    },
+    deleteIconContainer: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: palette.card,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: withAlpha(palette.error, 0.3),
+    },
+    deleteTextContainer: {
+      flex: 1,
+    },
+    deleteAccountText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.error,
+      marginBottom: 2,
+    },
+    deleteAccountSubtext: {
+      fontSize: 12,
+      color: withAlpha(palette.error, 0.7),
+      fontWeight: "500",
+    },
+    deleteChevron: {
+      fontSize: 24,
+      color: withAlpha(palette.error, 0.7),
+      fontWeight: "300",
+    },
+    passwordLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+    },
+    passwordText: {
+      fontSize: 16,
+      fontWeight: "500",
+      color: palette.text,
+    },
+    chevron: {
+      fontSize: 24,
+      color: palette.textMuted,
+      fontWeight: "300",
+    },
+    actionButtons: {
+      flexDirection: "row",
+      gap: 12,
+      marginTop: 8,
+      marginBottom: 40,
+    },
+    cancelButton: {
+      flex: 1,
+      backgroundColor: palette.mutedSurface,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    cancelButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    saveButton: {
+      flex: 1,
+      backgroundColor: palette.primary,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+    },
+    saveButtonText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.card,
+    },
+    imgStyle: {
+      width: 23,
+      height: 23,
+    },
+  });
 
 export default MyProfileScreen;

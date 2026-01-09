@@ -13,6 +13,7 @@ import {
   removeFamilyMember,
   updateFamilyMemberRole,
 } from "@/src/user/family";
+import { invalidateQueries } from "@/src/config/queryClient";
 import { createMealForSingleUser } from "@/src/user/meals";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -554,6 +555,8 @@ const OwnerView: React.FC<OwnerViewProps> = ({
         isFavorite: false, // Start as not favorite in owner's collection
       };
       await createMealForSingleUser(mealCopy as any);
+      // Invalidate React Query cache so meal lists update
+      invalidateQueries.meals();
       showToast("success", `"${meal.name}" saved to your meals!`);
     } catch (error: any) {
       showToast("error", error?.message || "Failed to save meal");

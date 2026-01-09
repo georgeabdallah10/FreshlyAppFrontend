@@ -37,6 +37,7 @@ export interface ChatResponse {
   reply: string;
   conversation_id: number;
   message_id: number;
+  meal?: any; // Optional structured meal object from backend
 }
 
 export interface SendMessageInput {

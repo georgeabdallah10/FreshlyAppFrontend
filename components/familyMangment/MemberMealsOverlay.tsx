@@ -3,6 +3,7 @@ import { getMemberMeals } from "@/src/user/familyMeals";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import AppTextInput from "@/components/ui/AppTextInput";
 import { useThemeContext } from "@/context/ThemeContext";
 import { ColorTokens } from "@/theme/colors";
@@ -54,12 +55,17 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
   const { theme } = useThemeContext();
   const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
   const styles = useMemo(() => createStyles(palette), [palette]);
-  const [meals, setMeals] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [savingMealId, setSavingMealId] = useState<number | null>(null);
+  
+  // React Query for member meals
+  const { data: mealsData = [], isLoading, error, refetch } = useQuery({
+    queryKey: ['meals', 'member', familyId, memberId],
+    queryFn: () => getMemberMeals(Number(familyId), Number(memberId)),
+    enabled: visible && !!familyId && !!memberId,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
 
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -110,28 +116,14 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
     return "Dinner";
   };
 
-  // Fetch meals when overlay opens
-  const loadMeals = useCallback(async () => {
-    if (!familyId || !memberId) return;
-
-    try {
-      setIsLoading(true);
-      setError(null);
-      const data = await getMemberMeals(Number(familyId), Number(memberId));
-      const normalizedMeals = data.map(normalizeMeal);
-      setMeals(normalizedMeals);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load meals");
-      setMeals([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [familyId, memberId, normalizeMeal]);
+  // Normalize meals from React Query data
+  const meals = useMemo(() => {
+    return mealsData.map(normalizeMeal);
+  }, [mealsData, normalizeMeal]);
 
   // Animation effects
   useEffect(() => {
     if (visible) {
-      loadMeals();
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -159,7 +151,7 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
         }),
       ]).start();
     }
-  }, [visible, fadeAnim, slideAnim, loadMeals]);
+  }, [visible, fadeAnim, slideAnim]);
 
   // Filter meals by category and search
   const filteredMeals = useMemo(() => {
@@ -291,10 +283,12 @@ const MemberMealsOverlay: React.FC<MemberMealsOverlayProps> = ({
                   style={styles.centerStateIcon}
                 />
               <Text style={styles.errorTitle}>Couldn't Load Meals</Text>
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={styles.errorText}>
+                {error instanceof Error ? error.message : String(error || "Failed to load meals")}
+              </Text>
               <TouchableOpacity
                 style={styles.retryButton}
-                onPress={loadMeals}
+                onPress={() => refetch()}
                 activeOpacity={0.8}
               >
                 <Text style={styles.retryButtonText}>Try Again</Text>

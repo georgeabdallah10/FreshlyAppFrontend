@@ -3,8 +3,8 @@ import ToastBanner from "@/components/generalMessage";
 import AppTextInput from "@/components/ui/AppTextInput";
 import { useThemeContext } from "@/context/ThemeContext";
 import { useBottomNavInset } from "@/hooks/useBottomNavInset";
+import { useMeals, useCreateMeal } from "@/hooks/useMeals";
 import { preloadMealImages } from "@/src/services/mealImageService";
-import { createMealForSingleUser, getAllMealsForSingleUser } from "@/src/user/meals";
 import { ColorTokens } from "@/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -108,12 +108,22 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   );
 
   const [selectedCategory, setSelectedCategory] = useState<Category>("All");
-  const [meals, setMeals] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAddMealModal, setShowAddMealModal] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
   const [showFavouritesOnly, setShowFavouritesOnly] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // React Query hooks
+  const { data: meals = [], isLoading, error, refetch } = useMeals();
+  const createMeal = useCreateMeal({
+    onSuccess: () => {
+      setShowAddMealModal(false);
+      showToast("success", "Meal added successfully!");
+    },
+    onError: (error) => {
+      showToast("error", error?.message || "Failed to add meal. Please try again.");
+    },
+  });
   const [toast, setToast] = useState<ToastState>({
     visible: false,
     type: "success",
@@ -145,53 +155,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     return "Dinner";
   };
 
-  const normalizeMeal = (m: any) => ({
-    id: m.id,
-    name: m.name ?? "Untitled Meal",
-    image: m.image ?? "restaurant-outline",
-    calories: Number(m.calories ?? 0),
-    prepTime: Number(m.prep_time ?? m.prepTime ?? 0),
-    cookTime: Number(m.cook_time ?? m.cookTime ?? 0),
-    totalTime: Number(m.total_time ?? m.totalTime ?? 0),
-    mealType: mapMealType(m.meal_type ?? m.mealType),
-    cuisine: m.cuisine ?? "",
-    tags: Array.isArray(m.tags) ? m.tags : [],
-    macros: m.macros ?? { protein: 0, fats: 0, carbs: 0 },
-    difficulty: (m.difficulty ?? "Easy") as "Easy" | "Medium" | "Hard",
-    servings: Number(m.servings ?? 1),
-    dietCompatibility: Array.isArray(m.diet_compatibility ?? m.dietCompatibility) 
-      ? (m.diet_compatibility ?? m.dietCompatibility) 
-      : [],
-    goalFit: Array.isArray(m.goal_fit ?? m.goalFit) 
-      ? (m.goal_fit ?? m.goalFit) 
-      : [],
-    ingredients: Array.isArray(m.ingredients) 
-      ? m.ingredients.map((ing: any) => ({
-          name: ing.name ?? "",
-          amount: String(ing.amount ?? ""),
-          inPantry: Boolean(ing.in_pantry ?? ing.inPantry ?? false),
-        }))
-      : [],
-    instructions: Array.isArray(m.instructions) ? m.instructions : [],
-    cookingTools: Array.isArray(m.cooking_tools ?? m.cookingTools) 
-      ? (m.cooking_tools ?? m.cookingTools) 
-      : [],
-    notes: m.notes ?? "",
-    isFavorite: Boolean(m.is_favorite ?? m.isFavorite ?? false),
-    familyId: m.family_id ?? m.familyId ?? null,
-    createdByUserId: m.created_by_user_id ?? m.createdByUserId,
-  });
-
-  const reloadMeals = async () => {
-    try {
-      const res = await getAllMealsForSingleUser();
-      const data = await res?.json();
-      const list = Array.isArray(data) ? data.map(normalizeMeal) : [];
-      setMeals(list);
-    } catch (e) {
-      console.log("Failed to load meals:", e);
-    }
-  };
 
   // Entrance animation
   useEffect(() => {
@@ -227,9 +190,6 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
     ]).start();
   }, []);
 
-  useEffect(() => {
-    reloadMeals();
-  }, []);
 
   useEffect(() => {
     if (meals.length > 0) {
@@ -275,18 +235,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
   };
 
   const handleMealSubmit = async (meal: any) => {
-    try {
-      setIsSubmitting(true);
-      const response = await createMealForSingleUser(meal);
-      setMeals([...meals, normalizeMeal(response || meal)]);
-      setShowAddMealModal(false);
-      showToast("success", "Meal added successfully!");
-    } catch (error) {
-      console.log("Error creating meal:", error);
-      showToast("error", "Failed to add meal. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+    createMeal.mutate(meal);
   };
 
   const onAddCategory = () => {
@@ -319,7 +268,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
         onClose={() => setShowAddMealModal(false)}
         onSubmit={handleMealSubmit}
       />
-      {isSubmitting && (
+      {createMeal.isPending && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={palette.primary} />
         </View>
@@ -458,13 +407,13 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
       </Animated.View>
 
       {/* Loading State */}
-      {parentLoading ? (
+      {isLoading ? (
         <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
           <ActivityIndicator size="large" color={palette.primary} />
           <Text style={styles.emptyStateTitle}>Loading your meals...</Text>
           <Text style={styles.emptyStateSubtitle}>Just a moment</Text>
         </Animated.View>
-      ) : parentError ? (
+      ) : error ? (
         /* Error State */
         <Animated.View style={[styles.emptyStateContainer, { opacity: contentFadeAnim }]}>
           <Ionicons
@@ -479,7 +428,7 @@ const MealListScreen: React.FC<MealListScreenProps> = ({
           </Text>
           <TouchableOpacity 
             style={styles.retryButton}
-            onPress={reloadMeals}
+            onPress={() => refetch()}
             activeOpacity={0.8}
           >
             <LinearGradient

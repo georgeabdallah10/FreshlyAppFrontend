@@ -4,7 +4,6 @@ import MealDetailScreen from '@/components/meal/mealDetailScreen';
 import MealListScreen from '@/components/meal/mealListScreen';
 import { type Meal } from '@/components/meal/mealsData';
 import { useThemeContext } from '@/context/ThemeContext';
-import { getAllMealsForSingleUser } from '@/src/user/meals';
 import { ColorTokens } from '@/theme/colors';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -37,9 +36,7 @@ const MealsDashboard: React.FC = () => {
   const styles = useMemo(() => createStyles(palette), [palette]);
 
   const [currentScreen, setCurrentScreen] = useState<Screen>('list');
-  const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [hasError, setHasError] = useState(false);
+  const [selectedMealId, setSelectedMealId] = useState<number | null>(null);
 
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -76,13 +73,13 @@ const MealsDashboard: React.FC = () => {
   };
 
   const handleMealSelect = (meal: Meal) => {
-    setSelectedMeal(meal);
+    setSelectedMealId(meal.id);
     setCurrentScreen('detail');
   };
 
   const handleBack = () => {
     setCurrentScreen('list');
-    setSelectedMeal(null);
+    setSelectedMealId(null);
   };
 
   // Entrance animation
@@ -102,32 +99,6 @@ const MealsDashboard: React.FC = () => {
     ]).start();
   }, []);
 
-  useEffect(() => {
-    console.log("PRETEST");
-    const test = async () => {
-      try {
-        setIsLoading(true);
-        setHasError(false);
-        const res = await getAllMealsForSingleUser();
-        if (!res?.ok) {
-          const errText = await res?.text();
-          showToast("error", errText || "Failed to fetch meals.");
-          setHasError(true);
-          return;
-        }
-        const data = await res.json();
-        console.log(data);
-        // Don't show success toast on initial load, only on errors
-      } catch (err: any) {
-        console.log("Error loading meals:", err);
-        showToast("error", err?.message ?? "Error loading meals.");
-        setHasError(true);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    test();
-  }, []);
 
   return (
     <Animated.View 
@@ -140,13 +111,11 @@ const MealsDashboard: React.FC = () => {
       {currentScreen === 'list' ? (
         <MealListScreen 
           onMealSelect={handleMealSelect}
-          isLoading={isLoading}
-          hasError={hasError}
           onImageError={(msg) => showToast("error", msg, 4000)}
           scrollToEnd={scrollToEnd === 'true'}
         />
       ) : (
-        selectedMeal && <MealDetailScreen meal={selectedMeal} onBack={handleBack} />
+        selectedMealId && <MealDetailScreen mealId={selectedMealId} onBack={handleBack} />
       )}
       <ToastBanner
         visible={toast.visible}

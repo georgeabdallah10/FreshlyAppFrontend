@@ -31,6 +31,7 @@ export type ChatResponse = {
   reply: string;
   conversation_id: number;
   message_id: number;
+  meal?: any; // Optional structured meal object from backend
 };
 
 // Get auth token from AsyncStorage
@@ -135,11 +136,13 @@ export async function sendMessage({
   system,
   conversationId,
   image,
+  signal,
 }: {
   prompt: string;
   system?: string;
   conversationId?: number;
   image?: string; // Optional base64-encoded image data
+  signal?: AbortSignal; // Optional abort signal for cancellation
 }): Promise<ChatResponse> {
   const token = await getAuthToken();
   if (!token) {
@@ -181,9 +184,12 @@ export async function sendMessage({
     console.log('[sendMessage] Including image attachment (base64)');
   }
 
-  // Create AbortController for timeout
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 50000); // 50 second timeout
+  // Create AbortController for timeout (if no external signal provided)
+  const timeoutController = signal ? null : new AbortController();
+  const timeoutId = timeoutController ? setTimeout(() => timeoutController.abort(), 50000) : null; // 50 second timeout
+
+  // Use external signal if provided, otherwise use timeout controller
+  const abortSignal = signal || timeoutController?.signal;
 
   try {
     const resp = await fetch(`${baseUrl}/chat`, {
@@ -193,10 +199,10 @@ export async function sendMessage({
         "Authorization": `Bearer ${token}`
       },
       body: JSON.stringify(payload),
-      signal: controller.signal,
+      signal: abortSignal,
     });
 
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
     console.log('[sendMessage] Response status:', resp.status);
 
     if (!resp.ok) {
@@ -209,11 +215,16 @@ export async function sendMessage({
     console.log('[sendMessage] Success, conversation_id:', data.conversation_id);
     return data;
   } catch (error: any) {
-    clearTimeout(timeoutId);
+    if (timeoutId) clearTimeout(timeoutId);
 
     if (error.name === 'AbortError') {
-      console.log('[sendMessage] Request timed out after 50 seconds');
-      throw new Error('TIMEOUT');
+      if (signal?.aborted) {
+        console.log('[sendMessage] Request was cancelled by user');
+        throw new Error('CANCELLED');
+      } else {
+        console.log('[sendMessage] Request timed out after 50 seconds');
+        throw new Error('TIMEOUT');
+      }
     }
 
     console.log('[sendMessage] Fetch error:', error);

@@ -5,11 +5,7 @@ import { useGroceryList } from '@/context/groceryListContext';
 import { useThemeContext } from "@/context/ThemeContext";
 import { useUser } from '@/context/usercontext';
 import { useScrollContentStyle } from '@/hooks/useBottomNavInset';
-import {
-  deleteMealForSingleUser,
-  toggleMealFavorite,
-  updateMealForSingleUser,
-} from "@/src/user/meals";
+import { useMeal, useUpdateMeal, useDeleteMeal, useToggleMealFavorite } from "@/hooks/useMeals";
 import { ColorTokens } from "@/theme/colors";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -27,7 +23,7 @@ import { type Meal } from "./mealsData";
 import SendShareRequestModal from "./SendShareRequestModal";
 
 type Props = {
-  meal: Meal;
+  mealId: number;
   onBack: () => void;
 };
 
@@ -95,20 +91,61 @@ const createPalette = (colors: ColorTokens) => ({
   success: colors.success,
 });
 
-const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
+const MealDetailScreen: React.FC<Props> = ({ mealId, onBack }) => {
   const { theme } = useThemeContext();
   const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
   const styles = useMemo(() => createStyles(palette), [palette]);
+  
+  // React Query hooks
+  const { data: meal, isLoading: isLoadingMeal } = useMeal(mealId);
+  const updateMeal = useUpdateMeal({
+    onSuccess: () => {
+      setIsEditing(false);
+      showToast("success", "Meal updated successfully!");
+    },
+    onError: (error) => {
+      showToast("error", error?.message ?? "Update failed. Please try again.");
+    },
+  });
+  const deleteMeal = useDeleteMeal({
+    onSuccess: () => {
+      showToast("success", "Meal deleted successfully.");
+      setTimeout(() => onBack(), 500);
+    },
+    onError: (error) => {
+      showToast("error", error?.message ?? "Delete failed. Please try again.");
+    },
+  });
+  const toggleFavorite = useToggleMealFavorite({
+    onSuccess: (data) => {
+      showToast(
+        "success",
+        data.isFavorite
+          ? "Meal added to favorites"
+          : "Meal removed from favorites",
+        2500,
+        40
+      );
+    },
+    onError: (error) => {
+      showToast("error", error?.message || "Failed to update favorite status");
+    },
+  });
+  
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [editedMeal, setEditedMeal] = useState<Meal>({ ...meal });
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [editedMeal, setEditedMeal] = useState<Meal | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
   const [familyId, setFamilyId] = useState<number | null>(null);
-  const [isFavoriting, setIsFavoriting] = useState(false);
   const [addingToGrocery, setAddingToGrocery] = useState(false);
   const favoriteAnimValue = useRef(new Animated.Value(1)).current;
   const scrollContentStyle = useScrollContentStyle();
+  
+  // Sync editedMeal when meal loads
+  useEffect(() => {
+    if (meal) {
+      setEditedMeal(meal);
+    }
+  }, [meal]);
 
   // Animation values for entrance
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -187,21 +224,15 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   }, []);
 
   const handleSave = async () => {
-    try {
-      setSaving(true);
-      const payload = buildUpdateInputFromMeal(editedMeal);
-      await updateMealForSingleUser(meal.id, payload as any);
-      setIsEditing(false);
-      showToast("success", "Meal updated successfully!");
-    } catch (e: any) {
-      showToast("error", e?.message ?? "Update failed. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    if (!editedMeal) return;
+    const payload = buildUpdateInputFromMeal(editedMeal);
+    updateMeal.mutate({ id: mealId, ...payload });
   };
 
   const handleCancel = () => {
-    setEditedMeal({ ...meal });
+    if (meal) {
+      setEditedMeal(meal);
+    }
     setIsEditing(false);
   };
 
@@ -216,68 +247,38 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         {
           text: "Delete",
           style: "destructive",
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await deleteMealForSingleUser(meal.id);
-              showToast("success", "Meal deleted successfully.");
-              setTimeout(() => onBack(), 500);
-            } catch (e: any) {
-              showToast("error", e?.message ?? "Delete failed. Please try again.");
-            } finally {
-              setDeleting(false);
-            }
+          onPress: () => {
+            deleteMeal.mutate(mealId);
           },
         },
       ],
     });
   };
 
-  const toggleFavorite = async () => {
-    if (isFavoriting) return; // Prevent double clicks
-
+  const handleToggleFavorite = () => {
+    if (!meal || !editedMeal || toggleFavorite.isPending) return;
+    
     const newFavoriteStatus = !editedMeal.isFavorite;
 
-    try {
-      setIsFavoriting(true);
+    // Smooth pulse animation
+    Animated.sequence([
+      Animated.timing(favoriteAnimValue, {
+        toValue: 1.3,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(favoriteAnimValue, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
 
-      // Smooth pulse animation
-      Animated.sequence([
-        Animated.timing(favoriteAnimValue, {
-          toValue: 1.3,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-        Animated.timing(favoriteAnimValue, {
-          toValue: 1,
-          duration: 150,
-          useNativeDriver: true,
-        }),
-      ]).start();
+    // Optimistically update UI
+    setEditedMeal((m) => m ? { ...m, isFavorite: newFavoriteStatus } : null);
 
-      // Optimistically update UI
-      setEditedMeal((m) => ({ ...m, isFavorite: newFavoriteStatus }));
-
-      // Call backend with full meal payload
-      const mealPayload = buildUpdateInputFromMeal(editedMeal);
-      await toggleMealFavorite(meal.id, mealPayload as any, newFavoriteStatus);
-
-      // Show success toast
-      showToast(
-        "success",
-        newFavoriteStatus
-          ? "Meal added to favorites"
-          : "Meal removed from favorites",
-        2500,
-        40
-      );
-    } catch (error: any) {
-      // Rollback on error
-      setEditedMeal((m) => ({ ...m, isFavorite: !newFavoriteStatus }));
-      showToast("error", error?.message || "Failed to update favorite status");
-    } finally {
-      setIsFavoriting(false);
-    }
+    // Call mutation
+    toggleFavorite.mutate({ id: mealId, meal, isFavorite: newFavoriteStatus });
   };
 
   const handleAddToGroceryList = async (scope: 'personal' | 'family') => {
@@ -290,7 +291,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       setAddingToGrocery(true);
 
       const payload: any = {
-        meal_id: meal.id, // Using meal_id for semantic clarity (backend accepts both meal_id and recipe_id)
+        meal_id: mealId, // Using meal_id for semantic clarity (backend accepts both meal_id and recipe_id)
         scope: scope,
       };
 
@@ -338,8 +339,30 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
   };
 
   const hasImage =
+    editedMeal &&
     typeof editedMeal.image === "string" &&
     (editedMeal.image.startsWith("http") || editedMeal.image.startsWith("data:"));
+
+  // Loading state
+  if (isLoadingMeal || !meal || !editedMeal) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.backButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={[styles.content, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={palette.primary} />
+          <Text style={[styles.heroTitle, { marginTop: 16 }]}>Loading meal...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <Animated.View 
@@ -359,30 +382,30 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            onPress={toggleFavorite}
-            style={[styles.iconButton, isFavoriting && styles.iconButtonDisabled]}
+            onPress={handleToggleFavorite}
+            style={[styles.iconButton, toggleFavorite.isPending && styles.iconButtonDisabled]}
             activeOpacity={0.8}
-            disabled={isFavoriting}
+            disabled={toggleFavorite.isPending || !editedMeal}
           >
             <Animated.View
               style={{
                 transform: [{ scale: favoriteAnimValue }],
-                opacity: isFavoriting ? 0.6 : 1,
+                opacity: toggleFavorite.isPending ? 0.6 : 1,
               }}
             >
               <Ionicons
-                name={editedMeal.isFavorite ? "heart" : "heart-outline"}
+                name={editedMeal?.isFavorite ? "heart" : "heart-outline"}
                 size={20}
-                color={editedMeal.isFavorite ? "#EF4444" : palette.textMuted}
+                color={editedMeal?.isFavorite ? "#EF4444" : palette.textMuted}
               />
             </Animated.View>
           </TouchableOpacity>
           
-          {familyId !== null && (
+          {familyId !== null && meal && (
             <TouchableOpacity
               onPress={() => {
                 console.log("[MealDetailScreen] Share button pressed", {
-                  mealId: meal.id,
+                  mealId: mealId,
                   mealName: meal.name,
                   familyId,
                 });
@@ -400,9 +423,9 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             onPress={handleDelete}
             style={[styles.editButton, { backgroundColor: "#FF3B30" }]}
             activeOpacity={0.9}
-            disabled={deleting}
+            disabled={deleteMeal.isPending}
           >
-            {deleting ? (
+            {deleteMeal.isPending ? (
               <ActivityIndicator />
             ) : (
               <Text style={styles.editButtonText}>Delete</Text>
@@ -412,8 +435,9 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
             onPress={() => (isEditing ? handleSave() : setIsEditing(true))}
             style={styles.editButton}
             activeOpacity={0.9}
+            disabled={updateMeal.isPending}
           >
-            {saving ? (
+            {updateMeal.isPending ? (
               <ActivityIndicator />
             ) : isEditing ? (
               <Image
@@ -844,7 +868,7 @@ const MealDetailScreen: React.FC<Props> = ({ meal, onBack }) => {
       {familyId !== null && (
         <SendShareRequestModal
           visible={showShareModal}
-          mealId={meal.id}
+          mealId={mealId}
           mealName={meal.name}
           familyId={familyId}
           onClose={() => setShowShareModal(false)}

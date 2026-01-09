@@ -13,7 +13,9 @@ import {
   type Conversation
 } from "@/src/home/chat";
 import { getMealImage } from "@/src/services/mealImageService";
+import { invalidateQueries } from "@/src/config/queryClient";
 import { createMealForSingleUser, type CreateMealInput } from "@/src/user/meals";
+import { type Meal } from "@/src/services/meals.service";
 import { getCharacterCount, MAX_MESSAGE_LENGTH, validateChatMessage } from "@/src/utils/chatValidation";
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
@@ -89,8 +91,6 @@ export type RecipeCard = {
   servings: number;
   calories: number;
   dailyCaloriePercentage?: number; // what % of daily calories this meal uses
-  prepTimeMinutes: number;
-  cookTimeMinutes: number;
   totalTimeMinutes: number;
   proteinGrams: number;
   fatGrams: number;
@@ -276,126 +276,6 @@ const findFirstUserPrompt = (
   return null;
 };
 
-const INGREDIENT_DESCRIPTOR_KEYWORDS = [
-  "chopped",
-  "diced",
-  "minced",
-  "sliced",
-  "shredded",
-  "grated",
-  "crushed",
-  "peeled",
-  "halved",
-  "quartered",
-  "julienned",
-  "rinsed",
-  "drained",
-  "mashed",
-  "pureed",
-  "roasted",
-  "toasted",
-  "steamed",
-  "cooked",
-  "uncooked",
-  "raw",
-  "softened",
-  "melted",
-];
-
-const descriptorCorePattern = INGREDIENT_DESCRIPTOR_KEYWORDS.join("|");
-const descriptorSuffixPattern = new RegExp(
-  `^(.*)\\s+((?:[a-z-]+\\s+)*(?:${descriptorCorePattern}))$`,
-  "i"
-);
-
-const capitalizeDescriptorPhrase = (phrase: string) =>
-  phrase
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((word, idx) =>
-      idx === 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word.toLowerCase()
-    )
-    .join(" ");
-
-const reorderIngredientDescriptor = (value: string) => {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-
-  const commaParts = trimmed.split(",").map((part) => part.trim()).filter(Boolean);
-  if (commaParts.length > 1) {
-    const ingredientPart = commaParts[0];
-    const descriptorPart = commaParts.slice(1).join(" ").trim();
-    if (ingredientPart && descriptorPart) {
-      return `${capitalizeDescriptorPhrase(descriptorPart)} ${ingredientPart}`.trim();
-    }
-  }
-
-  const suffixMatch = trimmed.match(descriptorSuffixPattern);
-  if (suffixMatch) {
-    const ingredientPart = suffixMatch[1]?.trim();
-    const descriptorPart = suffixMatch[2]?.trim();
-    if (ingredientPart && descriptorPart) {
-      return `${capitalizeDescriptorPhrase(descriptorPart)} ${ingredientPart}`.trim();
-    }
-  }
-
-  return trimmed;
-};
-
-const normalizeIngredientName = (value: string) =>
-  reorderIngredientDescriptor(value.replace(/^of\s+/i, "").trim());
-
-// Helper to parse ingredient strings into structured data
-function parseIngredientToJson(ingredient: string) {
-  const cleaned = ingredient?.trim() ?? "";
-
-  if (!cleaned) {
-    return { ingredient_name: "", quantity: "", unit: "" };
-  }
-
-  const quantityPattern = "(\\d+(?:\\.\\d+)?|\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+)";
-  const unitPattern =
-    "(cups?|cup|tbsp|tablespoons?|tsp|teaspoons?|g|grams?|kg|kilograms?|ml|l|liters?|oz|ounces?|lbs?|pounds?)";
-
-  const patterns = [
-    new RegExp(`^${quantityPattern}\\s*${unitPattern}(?:\\s+of)?\\s+(.+)$`, "i"),
-    new RegExp(`^(.+?)\\s*-\\s*${quantityPattern}\\s*${unitPattern}$`, "i"),
-    new RegExp(`^${quantityPattern}\\s+(.+)$`, "i"),
-  ];
-
-  for (const [index, pattern] of patterns.entries()) {
-    const match = cleaned.match(pattern);
-    if (!match) continue;
-
-    if (index === 0) {
-      return {
-        ingredient_name: normalizeIngredientName(match[3]),
-        quantity: match[1],
-        unit: match[2].toLowerCase(),
-      };
-    }
-
-    if (index === 1) {
-      return {
-        ingredient_name: normalizeIngredientName(match[1]),
-        quantity: match[2],
-        unit: match[3].toLowerCase(),
-      };
-    }
-
-    return {
-      ingredient_name: normalizeIngredientName(match[2]),
-      quantity: match[1],
-      unit: "",
-    };
-  }
-
-  return {
-    ingredient_name: normalizeIngredientName(cleaned),
-    quantity: "",
-    unit: "",
-  };
-}
 
 // Animated Text Component for typing effect (memoized)
 const AnimatedTypingTextBase = ({ text, styles }: { text: string; styles: ScreenStyles }) => {
@@ -503,163 +383,6 @@ const ChatImageViewBase = ({ uri, style, palette }: ChatImageViewProps) => {
 };
 const ChatImageView = React.memo(ChatImageViewBase);
 
-/**
- * Extract JSON from a string that may contain surrounding text.
- * Handles: ```json ... ```, text before JSON, mixed content.
- */
-function extractJson(s: string): string {
-  // First, try to extract from markdown code block
-  const codeBlockMatch = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim();
-  }
-
-  // Try to find a JSON object anywhere in the string
-  const jsonMatch = s.match(/\{[\s\S]*\}/);
-  if (jsonMatch) {
-    return jsonMatch[0].trim();
-  }
-
-  // Fallback: just clean up the string
-  return s.trim();
-}
-
-/**
- * Detect if a string contains raw JSON that was meant to be a recipe.
- * This is a safety check to NEVER show raw JSON to users.
- * Checks ANYWHERE in the string, not just at the start.
- */
-function looksLikeRawRecipeJson(s: string): boolean {
-  const lower = s.toLowerCase();
-
-  // Check for JSON-like patterns anywhere in the string
-  const hasJsonStart = s.includes('{') && s.includes('}');
-  if (!hasJsonStart) return false;
-
-  // Check for recipe-like field names (with quotes, indicating JSON)
-  const recipeIndicators = ['"mealname"', '"ingredients"', '"instructions"', '"headersummary"', '"calories"', '"servings"', '"mealtype"'];
-  const matchCount = recipeIndicators.filter(indicator => lower.includes(indicator)).length;
-
-  return matchCount >= 2;
-}
-
-/**
- * Sanitize AI response for display - removes any JSON/code blocks.
- * Returns clean, human-readable text only.
- */
-function sanitizeForDisplay(s: string): string {
-  let cleaned = s;
-
-  // Remove markdown code blocks (```json ... ```)
-  cleaned = cleaned.replace(/```(?:json)?[\s\S]*?```/gi, '');
-
-  // Remove any JSON objects { ... }
-  cleaned = cleaned.replace(/\{[\s\S]*?\}/g, '');
-
-  // Clean up extra whitespace and newlines
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
-
-  return cleaned;
-}
-
-/**
- * Get a fallback message when JSON is detected but can't be parsed.
- */
-function getFallbackMessage(originalText: string): string {
-  // Try to extract any friendly intro text before the JSON
-  const introMatch = originalText.match(/^([^{`]*?)(?:```|{)/);
-  if (introMatch && introMatch[1].trim().length > 20) {
-    const intro = introMatch[1].trim();
-    // Remove trailing "Here's the recipe:" type phrases
-    const cleanIntro = intro.replace(/[.!]?\s*(here'?s?\s*(the|your)?\s*recipe:?|let me show you:?|check this out:?)?\s*$/i, '').trim();
-    if (cleanIntro.length > 15) {
-      return `${cleanIntro}. I've prepared the recipe for you - tap below to view the details.`;
-    }
-  }
-  return "I've got a delicious recipe ready for you! Let me know if you'd like me to walk you through it step by step.";
-}
-
-function tryParseRecipe(s: string): RecipeCard | null {
-  try {
-    const obj = JSON.parse(extractJson(s));
-
-    // Check for essential recipe fields only (not optional ones)
-    const hasEssentialFields =
-      typeof obj?.mealName === "string" &&
-      Array.isArray(obj?.ingredients) &&
-      Array.isArray(obj?.instructions);
-
-    if (hasEssentialFields) {
-      // Build recipe with defaults for any missing optional fields
-      const recipe: RecipeCard = {
-        mealName: obj.mealName,
-        headerSummary: obj.headerSummary || obj.mealName,
-        mealType: obj.mealType || 'Dinner',
-        servings: Number(obj.servings) || 2,
-        calories: Number(obj.calories) || 400,
-        dailyCaloriePercentage: obj.dailyCaloriePercentage ?? undefined,
-        prepTimeMinutes: Number(obj.prepTimeMinutes) || 10,
-        cookTimeMinutes: Number(obj.cookTimeMinutes) || 15,
-        totalTimeMinutes: Number(obj.totalTimeMinutes) || Number(obj.prepTimeMinutes || 10) + Number(obj.cookTimeMinutes || 15),
-        proteinGrams: Number(obj.proteinGrams) || 20,
-        fatGrams: Number(obj.fatGrams) || 18,
-        carbGrams: Number(obj.carbGrams) || 35,
-        mealReasoning: obj.mealReasoning || undefined,
-        notes: obj.notes || "",
-        ingredients: obj.ingredients,
-        instructions: obj.instructions,
-        optionalAdditions: Array.isArray(obj.optionalAdditions) ? obj.optionalAdditions : [],
-        finalNote: obj.finalNote || "",
-        pantryCheck: obj.pantryCheck && Array.isArray(obj.pantryCheck.usedFromPantry)
-          ? obj.pantryCheck
-          : { usedFromPantry: [] },
-        shoppingListMinimal: Array.isArray(obj.shoppingListMinimal) ? obj.shoppingListMinimal : [],
-        cuisine: typeof obj.cuisine === "string" ? obj.cuisine : undefined,
-        difficulty: typeof obj.difficulty === "string" ? obj.difficulty : undefined,
-      };
-      return recipe;
-    }
-
-    // Legacy fallback: check for headerSummary instead of mealName
-    const legacyShape =
-      typeof obj?.headerSummary === "string" &&
-      Array.isArray(obj?.ingredients) &&
-      Array.isArray(obj?.instructions);
-
-    if (legacyShape) {
-      const fallbackName = obj.headerSummary;
-      return {
-        mealName: fallbackName,
-        headerSummary: fallbackName,
-        mealType: obj.mealType || 'Dinner',
-        servings: Number(obj.servings) || 2,
-        calories: Number(obj.calories) || 400,
-        dailyCaloriePercentage: obj.dailyCaloriePercentage ?? undefined,
-        prepTimeMinutes: Number(obj.prepTimeMinutes) || 10,
-        cookTimeMinutes: Number(obj.cookTimeMinutes) || 15,
-        totalTimeMinutes: Number(obj.totalTimeMinutes) || 25,
-        proteinGrams: Number(obj.proteinGrams) || 20,
-        fatGrams: Number(obj.fatGrams) || 18,
-        carbGrams: Number(obj.carbGrams) || 35,
-        mealReasoning: obj.mealReasoning || undefined,
-        notes: obj.notes || "",
-        ingredients: obj.ingredients,
-        instructions: obj.instructions,
-        optionalAdditions: Array.isArray(obj.optionalAdditions) ? obj.optionalAdditions : [],
-        finalNote: obj.finalNote || "",
-        pantryCheck: obj.pantryCheck && Array.isArray(obj.pantryCheck.usedFromPantry)
-          ? obj.pantryCheck
-          : { usedFromPantry: [] },
-        shoppingListMinimal: Array.isArray(obj.shoppingListMinimal) ? obj.shoppingListMinimal : [],
-        cuisine: typeof obj.cuisine === "string" ? obj.cuisine : undefined,
-        difficulty: typeof obj.difficulty === "string" ? obj.difficulty : undefined,
-      };
-    }
-  } catch {
-    // ignore parse errors
-  }
-  return null;
-}
 
 /**
  * Parse explore mode responses to extract meal suggestions.
@@ -717,6 +440,83 @@ function isExploreResponse(text: string): boolean {
   const hasMealKeywords = /ideas?|options?|suggestions?|could make|here are|based on|i see|looks like|tap one/i.test(text);
 
   return hasBullets && hasMealKeywords;
+}
+
+/**
+ * Try to parse JSON from response.reply and check if it's a valid RecipeCard
+ * Returns the parsed RecipeCard if valid, null otherwise
+ * 
+ * IMPROVED: Now handles JSON that doesn't start at the beginning of the string,
+ * including JSON wrapped in markdown code fences or with explanatory text
+ */
+function tryParseRecipeCardFromReply(reply: string): RecipeCard | null {
+  if (!reply || typeof reply !== 'string') {
+    return null;
+  }
+  
+  const trimmed = reply.trim();
+  
+  // Remove markdown code fences if present (```json ... ``` or ``` ... ```)
+  let cleanedContent = trimmed
+    .replace(/^```(?:json)?\s*\n?/i, '') // Remove opening fence
+    .replace(/\n?```\s*$/i, '') // Remove closing fence
+    .trim();
+
+  // Find the first { and last } to extract JSON (don't require it to start at beginning)
+  const firstBrace = cleanedContent.indexOf('{');
+  const lastBrace = cleanedContent.lastIndexOf('}');
+  
+  // If we don't find braces, this isn't JSON
+  if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
+    return null;
+  }
+  
+  // Extract the JSON portion (may have text before/after)
+  const jsonString = cleanedContent.substring(firstBrace, lastBrace + 1);
+
+  try {
+    const parsed = JSON.parse(jsonString);
+    
+    // Check if it has the required RecipeCard fields
+    // Handle both 'calories' and 'kcal' field names
+    const hasCalories = typeof parsed.calories === 'number' || typeof parsed.kcal === 'number';
+    const hasRequiredFields = (
+      parsed &&
+      typeof parsed === 'object' &&
+      (parsed.mealName || parsed.headerSummary) &&
+      parsed.mealType &&
+      typeof parsed.servings === 'number' &&
+      hasCalories &&
+      Array.isArray(parsed.ingredients) &&
+      Array.isArray(parsed.instructions)
+    );
+    
+    if (hasRequiredFields) {
+      // Normalize the calories field if it's named 'kcal'
+      if (parsed.kcal !== undefined && parsed.calories === undefined) {
+        parsed.calories = parsed.kcal;
+      }
+      console.log('[tryParseRecipeCardFromReply] Successfully parsed RecipeCard');
+      return parsed as RecipeCard;
+    } else {
+      console.log('[tryParseRecipeCardFromReply] Missing required fields. Has:', {
+        mealName: !!parsed.mealName,
+        headerSummary: !!parsed.headerSummary,
+        mealType: !!parsed.mealType,
+        servings: typeof parsed.servings,
+        calories: typeof parsed.calories,
+        kcal: typeof parsed.kcal,
+        ingredients: Array.isArray(parsed.ingredients),
+        instructions: Array.isArray(parsed.instructions),
+      });
+    }
+  } catch (e) {
+    // Not valid JSON or doesn't match RecipeCard structure
+    console.log('[tryParseRecipeCardFromReply] JSON parse error:', e, 'Reply preview:', trimmed.substring(0, 200));
+    return null;
+  }
+
+  return null;
 }
 
 /** --- HOISTED: TypingIndicator (memoized) --- */
@@ -946,18 +746,18 @@ const ExpandableSection = React.memo(ExpandableSectionBase);
 
 /** --- HOISTED: RecipeCardView (memoized) --- */
 type RecipeCardViewProps = {
-  data: RecipeCard;
-  onMatchGrocery: (r: RecipeCard) => void;
-  onSaveMeal: (r: RecipeCard) => void;
+  data: Meal;
+  onMatchGrocery?: (meal: Meal) => void;
+  onSaveMeal?: (meal: Meal) => void;
   isSaving?: boolean;
+  isLoading?: boolean;
   palette: Palette;
   styles: ScreenStyles;
 };
 
-function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false, palette, styles }: RecipeCardViewProps) {
+function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false, isLoading = false, palette, styles }: RecipeCardViewProps) {
   const cardFadeAnim = useRef(new Animated.Value(0)).current;
   const cardSlideAnim = useRef(new Animated.Value(30)).current;
-  const title = data.mealName?.trim() || data.headerSummary?.trim() || "AI Meal";
 
   useEffect(() => {
     Animated.parallel([
@@ -965,6 +765,42 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
       Animated.spring(cardSlideAnim, { toValue: 0, tension: 50, friction: 8, useNativeDriver: true }),
     ]).start();
   }, [cardFadeAnim, cardSlideAnim]);
+
+  // Loading state
+  if (isLoading || !data) {
+    return (
+      <Animated.View
+        style={[
+          styles.messageBubble,
+          styles.aiMessage,
+          styles.cardRoot,
+          { opacity: cardFadeAnim, transform: [{ translateY: cardSlideAnim }] },
+        ]}
+      >
+        <View style={{ padding: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={palette.primary} />
+          <Text style={[styles.headerSummaryText, { marginTop: 12 }]}>Loading meal...</Text>
+        </View>
+      </Animated.View>
+    );
+  }
+
+  // Empty state
+  if (!data.ingredients || data.ingredients.length === 0) {
+    return (
+      <Animated.View
+        style={[
+          styles.messageBubble,
+          styles.aiMessage,
+          styles.cardRoot,
+          { opacity: cardFadeAnim, transform: [{ translateY: cardSlideAnim }] },
+        ]}
+      >
+        <Text style={styles.headerSummaryText}>{data.name || "Meal"}</Text>
+        <Text style={[styles.bulletText, { marginTop: 12, textAlign: 'center' }]}>No ingredients available</Text>
+      </Animated.View>
+    );
+  }
 
   return (
     <Animated.View
@@ -975,19 +811,21 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
         { opacity: cardFadeAnim, transform: [{ translateY: cardSlideAnim }] },
       ]}
     >
-      <Text style={styles.headerSummaryText}>{title}</Text>
+      <Text style={styles.headerSummaryText}>{data.name || "Meal"}</Text>
 
       <View style={styles.metaChipsRow}>
         <View style={styles.metaChip}>
           <Ionicons name="restaurant" size={14} style={styles.metaChipIconPrimary} />
           <Text style={styles.metaChipText}>{data.mealType}</Text>
         </View>
-        <View style={styles.metaChipServings}>
-          <Ionicons name="people-outline" size={14} style={styles.metaChipIconAccent} />
-          <Text style={[styles.metaChipText, styles.metaChipTextServings]}>
-            {data.servings} serving{data.servings === 1 ? '' : 's'}
-          </Text>
-        </View>
+        {data.servings !== undefined && (
+          <View style={styles.metaChipServings}>
+            <Ionicons name="people-outline" size={14} style={styles.metaChipIconAccent} />
+            <Text style={[styles.metaChipText, styles.metaChipTextServings]}>
+              {data.servings} serving{data.servings === 1 ? '' : 's'}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Stats Grid - Always visible */}
@@ -995,123 +833,76 @@ function RecipeCardViewBase({ data, onMatchGrocery, onSaveMeal, isSaving = false
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Calories</Text>
-            <Text style={styles.statValue}>{Math.round(data.calories)} kcal</Text>
+            <Text style={styles.statValue}>{data.calories} kcal</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Protein</Text>
-            <Text style={styles.statValue}>{Math.round(data.proteinGrams)} g</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Fats</Text>
-            <Text style={styles.statValue}>{Math.round(data.fatGrams)} g</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Carbs</Text>
-            <Text style={styles.statValue}>{Math.round(data.carbGrams)} g</Text>
-          </View>
+          {data.macros?.protein !== undefined && (
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Protein</Text>
+              <Text style={styles.statValue}>{data.macros.protein} g</Text>
+            </View>
+          )}
+          {data.macros?.fats !== undefined && (
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Fats</Text>
+              <Text style={styles.statValue}>{data.macros.fats} g</Text>
+            </View>
+          )}
+          {data.macros?.carbs !== undefined && (
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>Carbs</Text>
+              <Text style={styles.statValue}>{data.macros.carbs} g</Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.timeRow}>
-          <View style={styles.timeBlock}>
-            <Text style={styles.timeLabel}>Prep</Text>
-            <Text style={styles.timeValue}>{data.prepTimeMinutes} min</Text>
+        {data.totalTime !== undefined && (
+          <View style={styles.timeRow}>
+            <View style={styles.timeBlock}>
+              <Text style={styles.timeLabel}>Time</Text>
+              <Text style={styles.timeValue}>{data.totalTime} min</Text>
+            </View>
           </View>
-          <View style={styles.timeBlock}>
-            <Text style={styles.timeLabel}>Cook</Text>
-            <Text style={styles.timeValue}>{data.cookTimeMinutes} min</Text>
-          </View>
-          <View style={styles.timeBlock}>
-            <Text style={styles.timeLabel}>Total</Text>
-            <Text style={styles.timeValue}>{data.totalTimeMinutes} min</Text>
-          </View>
-        </View>
-      </ExpandableSection>
-
-      {/*{data.notes ? (
-        <ExpandableSection title="Chef Notes" icon="bulb-outline" defaultExpanded={false}>
-          <Text style={styles.bulletText}>{data.notes}</Text>
-        </ExpandableSection>
-      ) : null}*/}
-
-      <ExpandableSection title="Ingredients" icon="list-outline" defaultExpanded={true} palette={palette} styles={styles}>
-        {data.ingredients.map((sec, i) => (
-          <View key={i} style={{ marginTop: i > 0 ? 8 : 0 }}>
-            {!!sec.title && <Text style={styles.subTitle}>{sec.title}</Text>}
-            {sec.items.map((line, j) => (
-              <Text key={j} style={styles.bulletText}>• {line}</Text>
-            ))}
-          </View>
-        ))}
-      </ExpandableSection>
-
-      <ExpandableSection title="Instructions" icon="reader-outline" defaultExpanded={true} palette={palette} styles={styles}>
-        {data.instructions.map((stepLines, idx) => (
-          <View key={idx} style={{ marginTop: idx > 0 ? 10 : 0 }}>
-            <Text style={styles.stepNumber}>{idx + 1}.</Text>
-            {stepLines.map((ln, k) => (
-              <Text key={k} style={styles.bulletText}>{ln}</Text>
-            ))}
-          </View>
-        ))}
-      </ExpandableSection>
-
-      {data.optionalAdditions?.length ? (
-        <ExpandableSection title="Optional Additions" icon="add-circle-outline" defaultExpanded={false} palette={palette} styles={styles}>
-          {data.optionalAdditions.map((ln, i) => (
-            <Text key={i} style={styles.bulletText}>• {ln}</Text>
-          ))}
-        </ExpandableSection>
-      ) : null}
-
-      <ExpandableSection title="Pantry Check" icon="home-outline" defaultExpanded={false} palette={palette} styles={styles}>
-        <Text style={styles.bulletText}>
-          Used from pantry: {data.pantryCheck?.usedFromPantry?.join(", ") || "None"}
-        </Text>
-      </ExpandableSection>
-
-      <ExpandableSection title="Shopping List" icon="cart-outline" defaultExpanded={false} palette={palette} styles={styles}>
-        {data.shoppingListMinimal?.length ? (
-          data.shoppingListMinimal.map((ln, i) => (
-            <Text key={i} style={styles.bulletText}>• {ln}</Text>
-          ))
-        ) : (
-          <Text style={styles.bulletText}>Nothing needed</Text>
         )}
       </ExpandableSection>
 
-      {/*{data.finalNote ? (
-        <ExpandableSection title="Final Note" icon="heart-outline" defaultExpanded={false}>
-          <Text style={styles.bulletText}>{data.finalNote}</Text>
+      <ExpandableSection title="Ingredients" icon="list-outline" defaultExpanded={true} palette={palette} styles={styles}>
+        {data.ingredients.map((ing, i) => (
+          <Text key={i} style={styles.bulletText}>
+            • {ing.name} {ing.amount} {ing.unit || 'g'}
+          </Text>
+        ))}
+      </ExpandableSection>
+
+      {data.instructions && data.instructions.length > 0 && (
+        <ExpandableSection title="Instructions" icon="reader-outline" defaultExpanded={true} palette={palette} styles={styles}>
+          {data.instructions.map((step, idx) => (
+            <View key={idx} style={{ marginTop: idx > 0 ? 10 : 0 }}>
+              <Text style={styles.stepNumber}>{idx + 1}.</Text>
+              <Text style={styles.bulletText}>{step}</Text>
+            </View>
+          ))}
         </ExpandableSection>
-      ) : null}*/}
+      )}
 
-      <View style={styles.cardActionsRow}>
-        {/*}
-        <TouchableOpacity
-          style={[styles.matchGroceryButton, styles.cardActionButton]}
-          onPress={() => onMatchGrocery(data)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="cart-outline" size={20} color="#FFF" />
-          <Text style={styles.matchGroceryText}>Match My Grocery</Text>
-        </TouchableOpacity>*/}
-
-        <TouchableOpacity
-          style={[styles.saveMealButton, styles.cardActionButton, isSaving && styles.saveMealButtonDisabled]}
-          onPress={() => onSaveMeal(data)}
-          activeOpacity={0.8}
-          disabled={isSaving}
-        >
-          {isSaving ? (
-            <ActivityIndicator size="small" color={palette.primary} />
-          ) : (
-            <>
-              <Ionicons name="bookmark-outline" size={20} style={styles.metaChipIconPrimary} />
-              <Text style={styles.saveMealText}>Save Meal</Text>
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+      {onSaveMeal && (
+        <View style={styles.cardActionsRow}>
+          <TouchableOpacity
+            style={[styles.saveMealButton, styles.cardActionButton, isSaving && styles.saveMealButtonDisabled]}
+            onPress={() => onSaveMeal(data)}
+            activeOpacity={0.8}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color={palette.primary} />
+            ) : (
+              <>
+                <Ionicons name="bookmark-outline" size={20} style={styles.metaChipIconPrimary} />
+                <Text style={styles.saveMealText}>Save Meal</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -1252,6 +1043,7 @@ export default function ChatAIScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [cooldownRemaining, setCooldownRemaining] = useState(0);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const bottomNavInset = useBottomNavInset();
 
   // Keyboard visibility tracking
@@ -1588,9 +1380,7 @@ type RecipeCard = {
   servings: number; // integer >=1
   calories: number; // target kcal for THIS meal based on daily allocation
   dailyCaloriePercentage: number; // what % of daily calories this meal uses (e.g. 35)
-  prepTimeMinutes: number; // >= 1
-  cookTimeMinutes: number; // >= 0
-  totalTimeMinutes: number; // MUST equal prepTimeMinutes + cookTimeMinutes
+  totalTimeMinutes: number; // Total time in minutes
   proteinGrams: number; // meal-level protein target in grams
   fatGrams: number; // meal-level fat target in grams
   carbGrams: number; // meal-level carb target in grams
@@ -1687,6 +1477,45 @@ GENERATE MODE Rules:
   }, [messages]);
 
   // Load a specific conversation
+  // Transform backend meal object to RecipeCard format
+  // Handles both RecipeCard-compatible objects and other backend formats
+  const transformBackendMealToRecipeCard = (meal: any): RecipeCard => {
+    // If already in RecipeCard format, return as-is
+    if (meal.mealName && Array.isArray(meal.ingredients) && Array.isArray(meal.instructions)) {
+      return meal as RecipeCard;
+    }
+
+    // Transform from other backend formats if needed
+    // This is a flexible transformer that handles common variations
+    const toNumber = (value: unknown, fallback = 0) => {
+      const num = typeof value === "number" ? value : Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    };
+
+    return {
+      mealName: meal.name || meal.mealName || meal.headerSummary || "AI Meal",
+      headerSummary: meal.headerSummary || meal.name || meal.mealName || "AI Meal",
+      cuisine: meal.cuisine,
+      mealType: meal.mealType || meal.meal_type || 'Dinner',
+      difficulty: meal.difficulty,
+      servings: toNumber(meal.servings, 2),
+      calories: toNumber(meal.calories, 400),
+      dailyCaloriePercentage: meal.dailyCaloriePercentage,
+      totalTimeMinutes: toNumber(meal.totalTimeMinutes || meal.totalTime || meal.total_time, 25),
+      proteinGrams: toNumber(meal.proteinGrams || meal.protein || (meal.macros?.protein), 20),
+      fatGrams: toNumber(meal.fatGrams || meal.fats || (meal.macros?.fats), 18),
+      carbGrams: toNumber(meal.carbGrams || meal.carbs || (meal.macros?.carbs), 35),
+      mealReasoning: meal.mealReasoning,
+      notes: meal.notes || "",
+      ingredients: meal.ingredients || [],
+      instructions: meal.instructions || [],
+      optionalAdditions: meal.optionalAdditions || [],
+      finalNote: meal.finalNote || "",
+      pantryCheck: meal.pantryCheck || { usedFromPantry: [] },
+      shoppingListMinimal: meal.shoppingListMinimal || [],
+    };
+  };
+
   const loadConversation = async (conversationId: number) => {
     try {
       const { messages: apiMessages } = await getConversation(conversationId);
@@ -1745,29 +1574,55 @@ GENERATE MODE Rules:
             content = cleanUserPromptText(content);
           }
 
-          // Try to parse as recipe
-          const recipe = tryParseRecipe(content);
-          if (recipe && msg.role === 'assistant') {
-            return { id: uid(), kind: "ai_recipe", recipe };
-          }
-
-          // For AI messages from history, mark them to skip animation
+          // For AI messages from history, check if meal data exists
           if (msg.role === 'assistant') {
-            // SAFETY: If this looks like raw JSON that should have been a recipe, hide it
-            if (looksLikeRawRecipeJson(content)) {
+            // Check if message has meal data (from backend structured response)
+            // Note: Historical messages may not have meal data if they were created before backend support
+            const mealData = (msg as any).meal;
+            if (mealData) {
+              // Transform backend meal format to RecipeCard if needed
+              const recipe = transformBackendMealToRecipeCard(mealData);
               return {
                 id: uid(),
-                kind: 'ai_text',
-                text: getFallbackMessage(content),
+                kind: "ai_recipe",
+                recipe,
                 isFromHistory: true,
               } as ChatMessage;
             }
-            // SAFETY: Always sanitize AI text to remove any JSON that might have slipped through
-            const sanitizedContent = sanitizeForDisplay(content);
+            
+            // CRITICAL FIX: Try to parse JSON from content (historical messages may have JSON stored as text)
+            // This prevents raw JSON from being displayed to users
+            const parsedRecipe = tryParseRecipeCardFromReply(content);
+            if (parsedRecipe) {
+              // Successfully parsed RecipeCard from JSON content
+              console.log('[ChatAI] Successfully parsed RecipeCard from history message content');
+              return {
+                id: uid(),
+                kind: "ai_recipe",
+                recipe: parsedRecipe,
+                isFromHistory: true,
+              } as ChatMessage;
+            }
+            
+            // Check if it's an explore response with suggestions
+            if (isExploreResponse(content)) {
+              const suggestions = parseSuggestions(content);
+              if (suggestions && suggestions.length > 0) {
+                return {
+                  id: uid(),
+                  kind: "ai_suggestions",
+                  text: content,
+                  suggestions,
+                  isFromHistory: true,
+                } as ChatMessage;
+              }
+            }
+            
+            // No meal data and not JSON - render as text
             return {
               id: uid(),
               kind: 'ai_text',
-              text: sanitizedContent || content,
+              text: content,
               isFromHistory: true,
             } as ChatMessage;
           }
@@ -2114,6 +1969,11 @@ GENERATE MODE Rules:
       return;
     }
 
+    // Blur input field when sending message
+    inputRef.current?.blur();
+    setIsInputExpanded(false);
+    Keyboard.dismiss();
+
     // STEP 4: Update last message time
     setLastMessageTime(now);
 
@@ -2144,6 +2004,11 @@ GENERATE MODE Rules:
     // Store conversation_id before the async call to ensure we preserve it on error
     const conversationIdBeforeSend = currentConversationId;
 
+    // Create AbortController for this request
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    setIsSubmitting(true);
+
     try {
       // CONVERSATION LIFECYCLE RULES:
       // 1. If currentConversationId exists: This is a FOLLOW-UP message
@@ -2162,6 +2027,7 @@ GENERATE MODE Rules:
         conversationId: currentConversationId,
         // MULTIMODAL: Include image if one was attached
         image: imageToSend,
+        signal: abortController.signal,
       });
 
       // Lock in the conversation_id after first response
@@ -2183,53 +2049,62 @@ GENERATE MODE Rules:
       setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
 
       // Append AI response (do NOT re-append user message)
-      // Priority: Recipe JSON > Explore suggestions > Plain text
-      // SAFETY: Always sanitize before displaying to prevent JSON leakage
-      const recipe = tryParseRecipe(response.reply);
-      if (recipe) {
-        // GENERATE MODE: Full recipe response
+      // Check if backend provided structured meal object
+      if (response.meal) {
+        // Backend provided structured meal - render as recipe card
+        // Transform backend meal format to RecipeCard if needed
+        const recipe = transformBackendMealToRecipeCard(response.meal);
         setLastSuggestedMeals([]);
         setMessages((prev) => [
           ...prev,
           { id: uid(), kind: "ai_recipe", recipe },
         ]);
-      } else if (looksLikeRawRecipeJson(response.reply)) {
-        // SAFETY: Detected raw JSON that should have been a recipe
-        // Use friendly fallback message instead of showing raw JSON
-        console.log('[ChatAI] Raw JSON detected but failed to parse as recipe');
-        const fallbackText = getFallbackMessage(response.reply);
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_text", text: fallbackText },
-        ]);
-      } else if (isExploreResponse(response.reply)) {
-        // EXPLORE MODE: Parse and display suggestions with tappable chips
-        const suggestions = parseSuggestions(response.reply);
-        // Sanitize the text to remove any accidental JSON
-        const sanitizedText = sanitizeForDisplay(response.reply);
-        if (suggestions && suggestions.length > 0) {
-          setLastSuggestedMeals(suggestions);
+      } else {
+        // Try to parse JSON from response.reply (backend may return JSON in reply field)
+        const parsedRecipe = tryParseRecipeCardFromReply(response.reply);
+        if (parsedRecipe) {
+          // Successfully parsed RecipeCard from JSON reply
+          console.log('[ChatAI] Successfully parsed RecipeCard from JSON reply');
+          setLastSuggestedMeals([]);
           setMessages((prev) => [
             ...prev,
-            { id: uid(), kind: "ai_suggestions", text: sanitizedText, suggestions },
+            { id: uid(), kind: "ai_recipe", recipe: parsedRecipe },
           ]);
+        } else if (isExploreResponse(response.reply)) {
+          // EXPLORE MODE: Parse and display suggestions with tappable chips
+          const suggestions = parseSuggestions(response.reply);
+          if (suggestions && suggestions.length > 0) {
+            setLastSuggestedMeals(suggestions);
+            setMessages((prev) => [
+              ...prev,
+              { id: uid(), kind: "ai_suggestions", text: response.reply, suggestions },
+            ]);
+          } else {
+            // Has explore keywords but couldn't parse suggestions
+            setMessages((prev) => [
+              ...prev,
+              { id: uid(), kind: "ai_text", text: response.reply },
+            ]);
+          }
         } else {
-          // Has explore keywords but couldn't parse suggestions
+          // Plain text response (refusals, follow-ups, etc.)
           setMessages((prev) => [
             ...prev,
-            { id: uid(), kind: "ai_text", text: sanitizedText },
+            { id: uid(), kind: "ai_text", text: response.reply },
           ]);
         }
-      } else {
-        // Plain text response (refusals, follow-ups, etc.)
-        // SAFETY: Sanitize to remove any JSON that might have slipped through
-        const sanitizedText = sanitizeForDisplay(response.reply);
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_text", text: sanitizedText || response.reply },
-        ]);
       }
     } catch (error: any) {
+      // Check if request was cancelled
+      if (error?.message === 'CANCELLED') {
+        console.log('[ChatAI] Request was cancelled by user');
+        // Remove typing indicator and user message
+        setMessages((prev) => prev.filter((msg) => msg.id !== typingId && msg.id !== userId));
+        setIsSubmitting(false);
+        abortControllerRef.current = null;
+        return;
+      }
+
       console.log('[ChatAI] Failed to send message:', error);
 
       // CRITICAL: Remove typing indicator but KEEP messages and conversation_id
@@ -2264,8 +2139,25 @@ GENERATE MODE Rules:
       }
 
       showToast('error', errorMessage);
+    } finally {
+      setIsSubmitting(false);
+      abortControllerRef.current = null;
     }
   };
+
+  // Handle stop button - cancel ongoing request
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsSubmitting(false);
+    
+    // Remove typing indicator
+    setMessages((prev) => prev.filter((msg) => msg.id === "__typing__"));
+    
+    showToast('info', 'Generation stopped');
+  }, []);
 
   /**
    * Handle suggestion chip selection - instant confirmation flow
@@ -2335,29 +2227,31 @@ GENERATE MODE Rules:
       setMessages((prev) => prev.filter((msg) => msg.id !== typingId));
 
       // Append recipe or text response
-      // SAFETY: Always sanitize before displaying to prevent JSON leakage
-      const recipe = tryParseRecipe(response.reply);
-      if (recipe) {
+      // Check if backend provided structured meal object
+      if (response.meal) {
+        // Backend provided structured meal - render as recipe card
+        // Transform backend meal format to RecipeCard if needed
+        const recipe = transformBackendMealToRecipeCard(response.meal);
         setMessages((prev) => [
           ...prev,
           { id: uid(), kind: "ai_recipe", recipe },
         ]);
-      } else if (looksLikeRawRecipeJson(response.reply)) {
-        // SAFETY: Detected raw JSON that should have been a recipe
-        // Use friendly fallback message instead of showing raw JSON
-        console.log('[ChatAI] Raw JSON detected in suggestion response');
-        const fallbackText = getFallbackMessage(response.reply);
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_text", text: fallbackText },
-        ]);
       } else {
-        // SAFETY: Sanitize to remove any JSON that might have slipped through
-        const sanitizedText = sanitizeForDisplay(response.reply);
-        setMessages((prev) => [
-          ...prev,
-          { id: uid(), kind: "ai_text", text: sanitizedText || response.reply },
-        ]);
+        // Try to parse JSON from response.reply (backend may return JSON in reply field)
+        const parsedRecipe = tryParseRecipeCardFromReply(response.reply);
+        if (parsedRecipe) {
+          // Successfully parsed RecipeCard from JSON reply
+          setMessages((prev) => [
+            ...prev,
+            { id: uid(), kind: "ai_recipe", recipe: parsedRecipe },
+          ]);
+        } else {
+          // Plain text response
+          setMessages((prev) => [
+            ...prev,
+            { id: uid(), kind: "ai_text", text: response.reply },
+          ]);
+        }
       }
     } catch (error: any) {
       console.log('[ChatAI] Suggestion selection failed:', error);
@@ -2376,24 +2270,9 @@ GENERATE MODE Rules:
 
   const [savingMealId, setSavingMealId] = useState<string | null>(null);
 
-  const inferMealTypeFromSummary = (summary?: string): CreateMealInput['mealType'] => {
-    const text = summary?.toLowerCase() ?? '';
-    if (text.includes('breakfast')) return 'Breakfast';
-    if (text.includes('lunch')) return 'Lunch';
-    if (text.includes('snack')) return 'Snack';
-    if (text.includes('dessert') || text.includes('sweet')) return 'Dessert';
-    return 'Dinner';
-  };
-
-  const extractMealName = (summary?: string) => {
-    if (!summary) return 'AI Meal';
-    const firstLine = summary.split('\n')[0];
-    const firstSentence = firstLine.split(/[.!?]/)[0];
-    const sanitized = firstSentence.replace(/recipe|delicious|tasty/gi, '').trim();
-    return sanitized || 'AI Meal';
-  };
-
-  const buildMealInputFromRecipe = (recipe: RecipeCard): CreateMealInput => {
+  // Transform RecipeCard to CreateMealInput for saving meals
+  // This is a simple field mapping without any text parsing
+  const transformRecipeToMealInput = (recipe: RecipeCard): CreateMealInput => {
     const toNumber = (value: unknown, fallback = 0) => {
       const num = typeof value === "number" ? value : Number(value);
       return Number.isFinite(num) ? num : fallback;
@@ -2413,7 +2292,7 @@ GENERATE MODE Rules:
         dessert: 'Dessert',
       };
       const key = (value || '').toLowerCase();
-      return map[key] ?? inferMealTypeFromSummary(recipe.headerSummary);
+      return map[key] ?? 'Dinner';
     };
 
     const normalizeDifficulty = (value?: string): CreateMealInput['difficulty'] => {
@@ -2426,28 +2305,31 @@ GENERATE MODE Rules:
       return map[key] ?? 'Easy';
     };
 
+    // Extract ingredients from sections - assume items are already structured
     const allIngredients = (recipe.ingredients || []).flatMap((section) => section.items || []);
     const normalizedIngredients = allIngredients
       .map((item) => {
-        const parsed = parseIngredientToJson(item);
-        const rawName = parsed.ingredient_name || item;
-        const name = String(rawName).replace(/^•\s*/, '').trim();
-        const amountParts = [parsed.quantity, parsed.unit].map((part) => String(part || '').trim()).filter(Boolean);
-        const amount = amountParts.join(' ') || '1';
-        if (!name) {
-          return null;
+        // If item is already a string, treat it as name with default amount
+        if (typeof item === 'string') {
+          const name = item.replace(/^•\s*/, '').trim();
+          if (!name) return null;
+          return {
+            name,
+            amount: '1',
+            inPantry: false,
+          };
         }
-        return {
-          name,
-          amount,
-          inPantry: false,
-        };
+        // If item is an object, use it directly (backend may provide structured data)
+        if (typeof item === 'object' && item !== null) {
+          return {
+            name: String(item.name || item.ingredient_name || ''),
+            amount: String(item.amount || item.quantity || '1'),
+            inPantry: Boolean(item.inPantry || item.in_pantry || false),
+          };
+        }
+        return null;
       })
       .filter((ing): ing is { name: string; amount: string; inPantry: boolean } => Boolean(ing));
-
-    if (!normalizedIngredients.length) {
-      console.log('Meal is missing ingredients.');
-    }
 
     const instructions = (recipe.instructions || [])
       .map((stepLines) => {
@@ -2456,19 +2338,15 @@ GENERATE MODE Rules:
       })
       .filter(Boolean);
 
-    const prepTime = positiveInt(recipe.prepTimeMinutes, 10);
-    const cookTime = positiveInt(recipe.cookTimeMinutes, 10);
-    const totalTime = positiveInt(recipe.totalTimeMinutes, prepTime + cookTime);
+    const totalTime = positiveInt(recipe.totalTimeMinutes, 25);
 
-    const mealName = (recipe.mealName || extractMealName(recipe.headerSummary)).trim() || "AI Meal";
+    const mealName = (recipe.mealName || recipe.headerSummary || "AI Meal").trim();
 
     return {
       id: Date.now(),
       name: mealName,
       image: "restaurant-outline",
       calories: positiveInt(recipe.calories, 200),
-      prepTime,
-      cookTime,
       totalTime,
       mealType: normalizeMealType(recipe.mealType),
       cuisine: recipe.cuisine?.trim() || undefined,
@@ -2490,13 +2368,77 @@ GENERATE MODE Rules:
     };
   };
 
+  // Transform RecipeCard to Meal for display in RecipeCardView
+  // This transformation happens in the parent, not in the component
+  const transformRecipeCardToMeal = (recipe: RecipeCard): Meal => {
+    // Extract ingredients from sections - minimal transformation
+    const ingredients = (recipe.ingredients || []).flatMap((section) => 
+      (section.items || []).map((item) => {
+        if (typeof item === 'string') {
+          // Simple string handling - treat entire string as name with default amount
+          const trimmed = item.replace(/^•\s*/, '').trim();
+          return {
+            name: trimmed,
+            amount: '1',
+            unit: 'g',
+            inPantry: false,
+          };
+        }
+        if (typeof item === 'object' && item !== null) {
+          return {
+            name: String(item.name || item.ingredient_name || ''),
+            amount: item.amount || item.quantity || '1',
+            unit: item.unit || 'g',
+            inPantry: Boolean(item.inPantry || item.in_pantry || false),
+          };
+        }
+        return null;
+      }).filter(Boolean)
+    ).filter((ing): ing is { name: string; amount: string | number; unit?: string; inPantry?: boolean } => Boolean(ing));
+
+    // Flatten instructions from nested arrays
+    const instructions = (recipe.instructions || [])
+      .map((stepLines) => {
+        if (Array.isArray(stepLines)) {
+          return stepLines.filter(Boolean).join(' ').trim();
+        }
+        return String(stepLines).trim();
+      })
+      .filter(Boolean);
+
+    return {
+      id: Date.now(), // Temporary ID for display
+      name: recipe.mealName || recipe.headerSummary || "Meal",
+      image: undefined,
+      calories: recipe.calories || 0,
+      totalTime: recipe.totalTimeMinutes,
+      mealType: recipe.mealType,
+      cuisine: recipe.cuisine,
+      tags: undefined,
+      macros: {
+        protein: recipe.proteinGrams || 0,
+        fats: recipe.fatGrams || 0,
+        carbs: recipe.carbGrams || 0,
+      },
+      difficulty: recipe.difficulty,
+      servings: recipe.servings || 1,
+      dietCompatibility: [],
+      goalFit: [],
+      ingredients,
+      instructions,
+      cookingTools: [],
+      notes: recipe.notes || recipe.finalNote,
+      isFavorite: false,
+    };
+  };
+
   const handleSaveGeneratedMeal = async (messageId: string, recipe: RecipeCard) => {
     if (savingMealId) {
       return;
     }
 
     try {
-      const payload = buildMealInputFromRecipe(recipe);
+      const payload = transformRecipeToMealInput(recipe);
       setSavingMealId(messageId);
 
       // Generate and upload image to Supabase, then save URL to meal
@@ -2508,10 +2450,12 @@ GENERATE MODE Rules:
         console.log('[ChatAI] Image URL saved to meal:', imageUrl);
       } else {
         console.warn('[ChatAI] Image generation failed, using emoji fallback');
-        // Keep the emoji fallback from buildMealInputFromRecipe
+        // Emoji fallback is set in transformRecipeToMealInput
       }
 
       await createMealForSingleUser(payload);
+      // Invalidate React Query cache so meal lists update
+      invalidateQueries.meals();
       showToast('success', 'Meal saved to your collection! Redirecting...');
       router.push("/(main)/(home)/meals");
     } catch (error: any) {
@@ -2530,10 +2474,24 @@ GENERATE MODE Rules:
     const groceryList: any[] = [];
 
     // Extract all ingredients from the recipe
+    // Ingredients are already structured from backend, so use them directly
     recipe.ingredients.forEach((section) => {
       section.items.forEach((item) => {
-        const parsed = parseIngredientToJson(item);
-        groceryList.push(parsed);
+        // If item is a string, create a simple object
+        if (typeof item === 'string') {
+          groceryList.push({
+            ingredient_name: item.replace(/^•\s*/, '').trim(),
+            quantity: '',
+            unit: '',
+          });
+        } else if (typeof item === 'object' && item !== null) {
+          // If item is already an object, use it directly
+          groceryList.push({
+            ingredient_name: String(item.name || item.ingredient_name || ''),
+            quantity: String(item.quantity || item.amount || ''),
+            unit: String(item.unit || ''),
+          });
+        }
       });
     });
 
@@ -2577,8 +2535,7 @@ GENERATE MODE Rules:
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <TouchableWithoutFeedback onPress={dismissComposer} accessible={false}>
-        <View style={styles.screenContent}>
+      <View style={styles.screenContent}>
         <View style={styles.header}>
             <View style={styles.headerLeftActions}>
               <TouchableOpacity
@@ -2697,7 +2654,8 @@ GENERATE MODE Rules:
           messages.length === 0 && styles.emptyMessagesContent,
           { paddingBottom: bottomNavInset + 16 },
         ]}
-        onTouchStart={dismissComposer}
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
         onScrollBeginDrag={dismissComposer}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -2705,6 +2663,9 @@ GENERATE MODE Rules:
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={10}
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        alwaysBounceVertical={false}
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Text style={styles.emptyStateText}>How can I help you?</Text>
@@ -2732,6 +2693,39 @@ GENERATE MODE Rules:
             );
           }
           if (msg.kind === "ai_text") {
+            // SAFETY NET: If this is text that looks like JSON, try to parse it and render as recipe card
+            // This catches edge cases where JSON parsing failed during message loading
+            // Check if content looks like JSON (has braces and mealName field)
+            if (msg.text && msg.text.trim().includes('{') && msg.text.trim().includes('"mealName"')) {
+              const parsedRecipe = tryParseRecipeCardFromReply(msg.text);
+              if (parsedRecipe) {
+                // Successfully parsed - render as recipe card instead of raw JSON
+                console.warn('[ChatAI] Safety net: Detected and parsed JSON in ai_text message - rendering as recipe card');
+                const meal = transformRecipeCardToMeal(parsedRecipe);
+                return (
+                  <RecipeCardView
+                    data={meal}
+                    onSaveMeal={() => handleSaveGeneratedMeal(msg.id, parsedRecipe)}
+                    isSaving={savingMealId === msg.id}
+                    palette={palette}
+                    styles={styles}
+                  />
+                );
+              }
+              // JSON-like but failed to parse - hide the raw JSON and show friendly message
+              if (msg.text.trim().startsWith('{') || (msg.text.includes('"mealName"') && msg.text.includes('"ingredients"'))) {
+                console.warn('[ChatAI] Safety net: Detected JSON-like content but parsing failed - hiding raw JSON');
+                return (
+                  <View style={[styles.messageBubble, styles.aiMessage]}>
+                    <Text style={styles.messageText}>
+                      Recipe card could not be displayed. Please try asking for the recipe again.
+                    </Text>
+                  </View>
+                );
+              }
+            }
+
+            // Normal text rendering
             return (
               <View style={[styles.messageBubble, styles.aiMessage]}>
                 {msg.isTyping ? (
@@ -2762,10 +2756,10 @@ GENERATE MODE Rules:
             );
           }
           if (msg.kind === "ai_recipe") {
+            const meal = transformRecipeCardToMeal(msg.recipe);
             return (
               <RecipeCardView
-                data={msg.recipe}
-                onMatchGrocery={handleMatchGrocery}
+                data={meal}
                 onSaveMeal={() => handleSaveGeneratedMeal(msg.id, msg.recipe)}
                 isSaving={savingMealId === msg.id}
                 palette={palette}
@@ -2824,6 +2818,7 @@ GENERATE MODE Rules:
                 isInputExpanded ? styles.inputExpanded : styles.inputCollapsed,
               ]}
               placeholder="Write your message"
+              editable={!isSubmitting}
               placeholderTextColor="#B4B8BF"
               value={message}
               onChangeText={(text) => {
@@ -2852,14 +2847,20 @@ GENERATE MODE Rules:
           <TouchableOpacity
             style={[
               styles.sendFab,
-              // Disable visual when: over limit, submitting, or image without text
-              (characterCount.isOverLimit || (selectedImage !== null && !message.trim())) && styles.sendFabDisabled
+              // Show stop button style when submitting
+              isSubmitting && styles.stopFab,
+              // Disable visual when: over limit, or image without text (but not when submitting)
+              !isSubmitting && (characterCount.isOverLimit || (selectedImage !== null && !message.trim())) && styles.sendFabDisabled
             ]}
-            onPress={handleSendMessage}
-            // Disable button when: over limit, submitting, or image attached without text
-            disabled={characterCount.isOverLimit || isSubmitting || !!(selectedImage && !message.trim())}
+            onPress={isSubmitting ? handleStopGeneration : handleSendMessage}
+            // Disable button when: over limit, or image attached without text (but allow stop when submitting)
+            disabled={!isSubmitting && (characterCount.isOverLimit || !!(selectedImage && !message.trim()))}
           >
-            <Ionicons name="send" size={22} color="#FFF" />
+            {isSubmitting ? (
+              <Ionicons name="stop" size={22} color="#FFF" />
+            ) : (
+              <Ionicons name="send" size={22} color="#FFF" />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -2981,7 +2982,6 @@ GENERATE MODE Rules:
         topOffset={60}
       />
       </View>
-      </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
   );
 }
@@ -3309,6 +3309,9 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     shadowOffset: { width: 0, height: 2 },
     elevation: 3,
     marginBottom: 0,
+  },
+  stopFab: {
+    backgroundColor: palette.error,
   },
   modalOverlay: {
     flex: 1,

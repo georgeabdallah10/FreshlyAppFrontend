@@ -409,10 +409,10 @@ const FamilyMemberFlow = ({ onBack, onComplete, showBackButton = false }: Family
         <TouchableOpacity
           style={styles.backButton}
           onPress={onBack}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
+          hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
         >
-          <Ionicons name="arrow-back" size={24} color={palette.text} />
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
       )}
       <Text style={styles.title}>Add a Family Member</Text>
@@ -915,6 +915,7 @@ const createPalette = (colors: ColorTokens) => ({
   text: colors.textPrimary,
   textMuted: colors.textSecondary,
   primary: colors.primary,
+  primaryLight: withAlpha(colors.primary, 0.12),
   success: colors.success,
   warning: colors.warning,
   error: colors.error,
@@ -947,18 +948,23 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
       marginBottom: 48,
     },
     backButton: {
-      flexDirection: "row",
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: palette.primaryLight,
       alignItems: "center",
-      alignSelf: "flex-start",
+      justifyContent: "center",
       marginBottom: 16,
-      paddingVertical: 8,
-      paddingHorizontal: 0,
+      shadowColor: "#000",
+      shadowOpacity: 0.08,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 1,
     },
-    backButtonText: {
-      fontSize: 17,
-      color: palette.text,
-      fontWeight: "500",
-      marginLeft: 4,
+    backIcon: {
+      fontSize: 22,
+      color: palette.primary,
+      fontWeight: "600",
     },
     illustrationContainer: {
       alignItems: "center",

@@ -256,6 +256,24 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
   // Skip button position animation
   const skipButtonPosition = useRef(new Animated.Value(0)).current; // 0 = bottom, 1 = top
 
+  // Track which step we've animated to, to prevent duplicate animations
+  const animatedStepRef = useRef(-1);
+  // Track previous visible state to detect when tutorial becomes visible again (for restart)
+  const prevVisibleRef = useRef(false);
+
+  // Reset to first step when tutorial becomes visible (for restart functionality)
+  // This ensures the tutorial always starts from step 0 when restarted
+  useEffect(() => {
+    // If tutorial becomes visible (transitions from false to true), reset to first step
+    if (visible && !prevVisibleRef.current) {
+      setCurrentStepIndex(0);
+      // Reset the animation ref so animations work correctly on restart
+      animatedStepRef.current = -1;
+    }
+    // Update the previous visible state
+    prevVisibleRef.current = visible;
+  }, [visible]);
+
   const currentStep = TUTORIAL_STEPS[currentStepIndex];
   const targetMeasurement = targetMeasurements[currentStep?.targetKey];
 
@@ -265,11 +283,15 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
   // Check if current step is the congratulations step
   const isCongratulationsStep = currentStepIndex === TUTORIAL_STEPS.length - 1;
 
+  // Check if current step is Grocery Lists or Quick Meals (keep skip button at bottom for these)
+  const isGroceryOrQuickMealsStep = currentStep && ['grocery', 'quickMeals'].includes(currentStep.targetKey);
+
   // Check if card will be positioned in lower half of screen (and thus might overlap skip button)
   const isCardInLowerHalf = targetMeasurement ? (targetMeasurement.y + targetMeasurement.height) > (SCREEN_HEIGHT / 2) : false;
 
   // Move skip button up if card is in lower half or it's a bottom nav step
-  const shouldMoveSkipButtonUp = isBottomNavStep || isCardInLowerHalf;
+  // BUT keep it at bottom for Grocery Lists and Quick Meals steps
+  const shouldMoveSkipButtonUp = !isGroceryOrQuickMealsStep && (isBottomNavStep || isCardInLowerHalf);
 
   // Calculate responsive card height based on screen size
   const getCardHeight = () => {
@@ -364,9 +386,6 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
       ]).start();
     }
   }, [visible]);
-
-  // Track which step we've animated to, to prevent duplicate animations
-  const animatedStepRef = useRef(-1);
 
   // Animate spotlight position/size when step changes
   useEffect(() => {
@@ -729,59 +748,57 @@ const HomeTutorial: React.FC<HomeTutorialProps> = ({
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Skip Button - Hidden for congratulations */}
-      {!isCongratulationsStep && (
+      {/* Skip Button - Always visible */}
+      <Animated.View
+        style={[
+          {
+            position: 'absolute',
+            bottom: responsive.hp(Platform.OS === 'ios' ? 60 : 40),
+            left: 0,
+            right: 0,
+            alignItems: 'center',
+          },
+          {
+            opacity: overlayOpacity,
+          },
+        ]}
+      >
         <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              bottom: responsive.hp(Platform.OS === 'ios' ? 60 : 40),
-              left: 0,
-              right: 0,
-              alignItems: 'center',
-            },
-            {
-              opacity: overlayOpacity,
-            },
-          ]}
+          style={{
+            transform: [
+              {
+                translateY: skipButtonPosition.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, -(SCREEN_HEIGHT - responsive.hp(Platform.OS === 'ios' ? 180 : 140))],
+                }),
+              },
+            ],
+          }}
         >
-          <Animated.View
+          <TouchableOpacity
             style={{
-              transform: [
-                {
-                  translateY: skipButtonPosition.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -(SCREEN_HEIGHT - responsive.hp(Platform.OS === 'ios' ? 180 : 140))],
-                  }),
-                },
-              ],
+              paddingVertical: responsive.hp(12),
+              paddingHorizontal: responsive.wp(24),
+              backgroundColor: 'rgba(255, 255, 255, 0.2)',
+              borderRadius: responsive.wp(24),
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.3)',
             }}
+            onPress={handleSkip}
+            activeOpacity={0.8}
           >
-            <TouchableOpacity
+            <Text
               style={{
-                paddingVertical: responsive.hp(12),
-                paddingHorizontal: responsive.wp(24),
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                borderRadius: responsive.wp(24),
-                borderWidth: 1,
-                borderColor: 'rgba(255, 255, 255, 0.3)',
+                fontSize: responsive.fp(responsive.isSmallDevice ? 13 : 15),
+                fontWeight: '600',
+                color: '#FFFFFF',
               }}
-              onPress={handleSkip}
-              activeOpacity={0.8}
             >
-              <Text
-                style={{
-                  fontSize: responsive.fp(responsive.isSmallDevice ? 13 : 15),
-                  fontWeight: '600',
-                  color: '#FFFFFF',
-                }}
-              >
-                Skip Tutorial
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
+              Skip Tutorial
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
-      )}
+      </Animated.View>
     </View>
   );
 };

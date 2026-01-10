@@ -585,8 +585,6 @@ const AllGroceryScanner = () => {
           <TouchableOpacity style={styles.backButton} onPress={resetScanner}>
             <Ionicons name="arrow-back" size={24} color={palette.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Confirm Items</Text>
-          <View style={styles.backButton} />
         </View>
 
         <ScrollView
@@ -599,7 +597,7 @@ const AllGroceryScanner = () => {
           bounces={true}
         >
           <Text style={styles.confirmationTitle}>
-            Found {scannedItems.length} items
+            Found {scannedItems.length} {scannedItems.length === 1 ? 'item' : 'items'}
           </Text>
           <Text style={styles.confirmationSubtitle}>
             Review and edit before adding to pantry
@@ -673,7 +671,7 @@ const AllGroceryScanner = () => {
             >
               <Ionicons name="add-circle" size={24} color={palette.onPrimary} />
               <Text style={styles.addToPantryText}>
-                Add {scannedItems.length} Items to Pantry
+                Add {scannedItems.length} {scannedItems.length === 1 ? 'Item' : 'Items'} to Pantry
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -888,8 +886,9 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
     header: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
+      justifyContent: "flex-start",
       paddingVertical: 16,
+      paddingHorizontal: 20,
       borderBottomWidth: 1,
       borderBottomColor: palette.border,
       backgroundColor: palette.card,
@@ -994,6 +993,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
     },
     confirmationScrollContent: {
       paddingHorizontal: 20,
+      paddingTop: 20,
     },
     confirmationTitle: {
       fontSize: 24,

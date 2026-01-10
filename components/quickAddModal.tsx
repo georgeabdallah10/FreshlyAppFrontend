@@ -27,7 +27,7 @@ import {
 
 import { useThemeContext } from "@/context/ThemeContext";
 import { ColorTokens } from "@/theme/colors";
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 // Same options as pantry.tsx
 const UNIT_OPTIONS = [
@@ -723,46 +723,50 @@ export const AddProductModal: React.FC<AddProductModalProps> = ({
         Found {scannedItems.length} items. Review before adding to pantry.
       </Text>
 
-      <FlatList
-        data={scannedItems}
-        keyExtractor={(item) => item.id}
-        style={styles.itemsList}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item, index }) => {
-          const colors = [palette.primary, palette.warning, palette.text];
-          const color = colors[index % 3];
+      <View style={styles.itemsListContainer}>
+        <FlatList
+          data={scannedItems}
+          keyExtractor={(item) => item.id}
+          style={styles.itemsList}
+          contentContainerStyle={styles.itemsListContent}
+          showsVerticalScrollIndicator={true}
+          nestedScrollEnabled={true}
+          renderItem={({ item, index }) => {
+            const colors = [palette.primary, palette.warning, palette.text];
+            const color = colors[index % 3];
 
-          return (
-            <View style={[styles.itemCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
-              <View style={styles.itemInfo}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemDetails}>
-                  {item.quantity} {item.unit} • {item.category}
-                </Text>
-                {item.confidence && (
-                  <Text style={[styles.itemConfidence, { color: getConfidenceColor(item.confidence) }]}>
-                    {Math.round(item.confidence * 100)}% confidence
+            return (
+              <View style={[styles.itemCard, { borderLeftColor: color, borderLeftWidth: 3 }]}>
+                <View style={styles.itemInfo}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemDetails}>
+                    {item.quantity} {item.unit} • {item.category}
                   </Text>
-                )}
+                  {item.confidence && (
+                    <Text style={[styles.itemConfidence, { color: getConfidenceColor(item.confidence) }]}>
+                      {Math.round(item.confidence * 100)}% confidence
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.itemActions}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleEditItem(item)}
+                  >
+                    <Ionicons name="pencil" size={18} color={palette.textMuted} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => handleRemoveItem(item.id)}
+                  >
+                    <Ionicons name="trash" size={18} color={palette.error} />
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.itemActions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => handleEditItem(item)}
-                >
-                  <Ionicons name="pencil" size={18} color={palette.textMuted} />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveItem(item.id)}
-                >
-                  <Ionicons name="trash" size={18} color={palette.error} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
+      </View>
 
       <TouchableOpacity
         style={[styles.addAllButton, scannedItems.length === 0 && styles.disabledButton]}
@@ -999,6 +1003,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     padding: 24,
     paddingBottom: 40,
     minHeight: 250,
+    flexDirection: "column",
   },
   modalHandle: {
     width: 40,
@@ -1309,8 +1314,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
 
   /* ===== Confirmation Modal Styles ===== */
   confirmationModalContent: {
-    maxHeight: "80%",
-    minHeight: 400,
+    maxHeight: "85%",
   },
   confirmSubtitle: {
     fontSize: 14,
@@ -1319,9 +1323,15 @@ const createStyles = (palette: ReturnType<typeof createPalette>) => StyleSheet.c
     marginBottom: 16,
     marginTop: -16,
   },
-  itemsList: {
-    maxHeight: 350,
+  itemsListContainer: {
+    height: Math.min(height * 0.45, 400),
     marginBottom: 16,
+  },
+  itemsList: {
+    flex: 1,
+  },
+  itemsListContent: {
+    paddingBottom: 8,
   },
   itemCard: {
     flexDirection: "row",

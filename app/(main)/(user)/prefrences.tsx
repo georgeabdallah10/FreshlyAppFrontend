@@ -1400,7 +1400,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
       paddingHorizontal: 30,
       paddingTop: 80,
       paddingBottom: 60,
-      justifyContent: "space-between",
+      justifyContent: "flex-start",
       alignItems: "center",
     },
     welcomeTitle: {
@@ -1410,13 +1410,15 @@ const createStyles = (palette: ReturnType<typeof createPalette>) =>
       lineHeight: 50,
       textAlign: "center",
       alignSelf: "center",
+      marginBottom: 20,
     },
     logoContainer: {
       alignItems: "center",
+      marginTop: 0,
     },
     logoImage: {
-      width: 260,
-      height: 260,
+      width: 320,
+      height: 320,
     },
     welcomeNextButton: {
       width: "100%",

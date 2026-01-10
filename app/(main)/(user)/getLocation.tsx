@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   Animated,
+  Dimensions,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -29,6 +30,7 @@ interface ToastState {
   message: string;
   title?: string;
   buttons?: ToastButton[];
+  topOffset?: number;
 }
 
 type LocationResult = {
@@ -76,9 +78,10 @@ const LocationScreens = () => {
     type: ToastType,
     message: string,
     title?: string,
-    buttons?: ToastButton[]
+    buttons?: ToastButton[],
+    topOffset?: number
   ) => {
-    setToast({ visible: true, type, message, title, buttons });
+    setToast({ visible: true, type, message, title, buttons, topOffset });
   };
 
   const hideToast = () => {
@@ -86,6 +89,11 @@ const LocationScreens = () => {
   };
 
   const handleSkip = () => {
+    // Calculate centered position (middle of screen)
+    const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+    const estimatedToastHeight = 220; // Approximate height of the toast with buttons
+    const centeredTopOffset = SCREEN_HEIGHT / 2 - estimatedToastHeight / 2;
+    
     showToast(
       "confirm",
       "Without a location, features like grocery matching, local store recommendations, and delivery options won't be available.",
@@ -108,7 +116,8 @@ const LocationScreens = () => {
           },
           style: "destructive",
         },
-      ]
+      ],
+      centeredTopOffset
     );
   };
 
@@ -335,6 +344,7 @@ const LocationScreens = () => {
           title={toast.title}
           buttons={toast.buttons}
           onHide={hideToast}
+          topOffset={toast.topOffset}
         />
       </View>
     );
@@ -395,6 +405,7 @@ const LocationScreens = () => {
         title={toast.title}
         buttons={toast.buttons}
         onHide={hideToast}
+        topOffset={toast.topOffset}
       />
     </View>
   );

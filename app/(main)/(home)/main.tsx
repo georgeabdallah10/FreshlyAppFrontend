@@ -12,7 +12,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -162,8 +161,8 @@ const HomeDashboard = () => {
       title: "Pantry",
       subtitle: "Track what you have",
       iconName: "nutrition-outline",
-      iconColor: palette.primary,
-      bgColor: palette.cardPrimaryTint,
+      iconColor: palette.pantryGreen,
+      bgColor: palette.cardPantryTint,
       onPress: () => router.push("/(main)/(home)/pantry"),
     },
     {
@@ -171,8 +170,8 @@ const HomeDashboard = () => {
       title: "Meal Plans",
       subtitle: "Your favorite meals",
       iconName: "restaurant-outline",
-      iconColor: palette.blue,
-      bgColor: palette.cardBlueTint,
+      iconColor: palette.groceryOrange,
+      bgColor: palette.cardGroceryTint,
       onPress: () => router.push("/(main)/(home)/meals"),
     },
     {
@@ -180,8 +179,8 @@ const HomeDashboard = () => {
       title: "Grocery Lists",
       subtitle: "Upload Groceries",
       iconName: "cart-outline",
-      iconColor: palette.text,
-      bgColor: palette.cardNeutralTint,
+      iconColor: palette.quickMealsOrange,
+      bgColor: palette.cardQuickMealsTint,
       onPress: () => router.push("/(main)/(home)/groceryLists"),
     },
     {
@@ -189,8 +188,8 @@ const HomeDashboard = () => {
       title: "Quick Meals",
       subtitle: "Whip it up!",
       iconName: "flash-outline",
-      iconColor: palette.orange,
-      bgColor: palette.cardOrangeTint,
+      iconColor: palette.mealPlansGreen,
+      bgColor: palette.cardMealPlansTint,
       onPress: () => router.push("/(main)/(home)/quickMeals"),
     },
   ];
@@ -240,11 +239,9 @@ const HomeDashboard = () => {
         </View>
       </View>
 
-      {/* Scrollable Content */}
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavInset + 20 }]}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={!showTutorial}
+      {/* Content */}
+      <View
+        style={[styles.scrollContent, { paddingBottom: bottomNavInset + 20 }]}
       >
         {/* Welcome Text */}
         <Text style={styles.welcomeText}>
@@ -310,7 +307,7 @@ const HomeDashboard = () => {
           <Text style={styles.startChatArrow}>→</Text>
         </TouchableOpacity>
       </View>
-      </ScrollView>
+      </View>
 
       {/* Toast for navigation messages */}
       <ToastBanner
@@ -337,12 +334,13 @@ const createPalette = (colors: ColorTokens) => {
   // Determine if dark mode based on background color
   const isDark = colors.background === '#111827';
 
-  // Blue for Meal Plans (calm, muted)
-  const blue = isDark ? '#60A5FA' : '#3B82F6';
-  const blueMuted = isDark ? '#4B7FBF' : '#2563EB';
-
-  // Orange for Quick Meals (warm, energetic - use warning)
-  const orange = colors.warning;
+  // Distinct greens - Pantry: lime/mint green, Meal Plans: emerald green
+  const pantryGreen = isDark ? '#84CC16' : '#65A30D'; // Lime green
+  const mealPlansGreen = isDark ? '#10B981' : '#059669'; // Emerald green
+  
+  // Distinct oranges - Grocery Lists: amber orange, Quick Meals: vibrant orange
+  const groceryOrange = isDark ? '#F59E0B' : '#D97706'; // Amber orange
+  const quickMealsOrange = isDark ? '#FB923C' : '#F97316'; // Vibrant orange
 
   // Darker green for All Features section
   const allFeaturesGreen = isDark ? '#059669' : '#047857';
@@ -354,19 +352,20 @@ const createPalette = (colors: ColorTokens) => {
     text: colors.textPrimary,
     textMuted: colors.textSecondary,
     primary: colors.primary,
-    // Blue for Meal Plans
-    blue,
-    blueMuted,
-    // Orange for Quick Meals
-    orange,
+    // Distinct greens
+    pantryGreen,
+    mealPlansGreen,
+    // Distinct oranges
+    groceryOrange,
+    quickMealsOrange,
     // Darker green for All Features
     allFeaturesGreen,
     // Card backgrounds
-    cardPrimaryTint: withAlpha(colors.primary, 0.14),      // Pantry - green tint
-    cardBlueTint: withAlpha(blue, 0.14),                   // Meal Plans - blue tint
-    cardNeutralTint: withAlpha(colors.textSecondary, 0.10), // Grocery Lists - neutral
-    cardOrangeTint: withAlpha(orange, 0.16),               // Quick Meals - orange tint
-    cardAllFeaturesTint: withAlpha(allFeaturesGreen, 0.12), // All Features section
+    cardPantryTint: withAlpha(pantryGreen, 0.14),              // Pantry - lime green tint
+    cardMealPlansTint: withAlpha(mealPlansGreen, 0.14),        // Meal Plans - emerald green tint
+    cardGroceryTint: withAlpha(groceryOrange, 0.14),           // Grocery Lists - amber orange tint
+    cardQuickMealsTint: withAlpha(quickMealsOrange, 0.16),     // Quick Meals - vibrant orange tint
+    cardAllFeaturesTint: withAlpha(allFeaturesGreen, 0.12),     // All Features section
   };
 };
 
@@ -461,7 +460,7 @@ const createStyles = (palette: ReturnType<typeof createPalette>, insets: { top: 
       color: palette.primary,
     },
     welcomeAccentSecondary: {
-      color: palette.orange,
+      color: palette.quickMealsOrange,
     },
     menuGrid: {
       flexDirection: "row",

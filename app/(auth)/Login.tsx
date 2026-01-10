@@ -543,9 +543,9 @@ export default function LoginScreen(): React.JSX.Element {
               />
               <Text style={styles.brandName}>SAVR</Text>
               <Text style={styles.welcomeText}>
-                <Text style={styles.welcomeAccentPrimary}>Smarter Shopping.</Text>
+                <Text style={styles.welcomeAccentSecondary}>Smarter Shopping.</Text>
                 {"\n"}
-                <Text style={styles.welcomeAccentSecondary}>Healthier Living.</Text>
+                <Text style={styles.welcomeAccentPrimary}>Healthier Living.</Text>
               </Text>
             </View>
           </Animated.View>

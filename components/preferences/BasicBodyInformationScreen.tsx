@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
     Animated,
     StyleSheet,
@@ -8,6 +8,8 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useThemeContext } from "@/context/ThemeContext";
+import { ColorTokens } from "@/theme/colors";
 
 type BasicBodyInformationScreenProps = {
   age: number | null;
@@ -31,6 +33,28 @@ type BasicBodyInformationScreenProps = {
 type HeightUnit = "cm" | "ft";
 type WeightUnit = "kg" | "lbs";
 
+const withAlpha = (hex: string, alpha: number) => {
+  const normalized = hex.replace("#", "");
+  const bigint = parseInt(normalized, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const createPalette = (colors: ColorTokens) => ({
+  background: colors.background,
+  card: colors.card,
+  cardAlt: withAlpha(colors.textSecondary, 0.06),
+  border: colors.border,
+  text: colors.textPrimary,
+  textMuted: colors.textSecondary,
+  primary: colors.primary,
+  success: colors.success,
+  warning: colors.warning,
+  error: colors.error,
+});
+
 const BasicBodyInformationScreen: React.FC<
   BasicBodyInformationScreenProps
 > = ({
@@ -48,6 +72,10 @@ const BasicBodyInformationScreen: React.FC<
   onAthleteToggle,
   onTrainingLevelChange,
 }) => {
+  const { theme } = useThemeContext();
+  const palette = useMemo(() => createPalette(theme.colors), [theme.colors]);
+  const styles = useMemo(() => createStyles(palette), [palette]);
+  
   const [focusedField, setFocusedField] = useState<
     "age" | "height" | "weight" | null
   >(null);
@@ -236,8 +264,8 @@ const BasicBodyInformationScreen: React.FC<
           style={styles.input}
           keyboardType="numeric"
           value={age !== null ? String(age) : ""}
-          placeholder="10-120 years"
-          placeholderTextColor="#B0B0B0"
+            placeholder="10-120 years"
+            placeholderTextColor={palette.textMuted}
           onFocus={() => setFocusedField("age")}
           onBlur={() => setFocusedField(null)}
           onChangeText={(text) => onChange("age", text)}
@@ -260,24 +288,24 @@ const BasicBodyInformationScreen: React.FC<
               ? genderAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: isMale
-                    ? ["rgba(0, 200, 83, 0.15)", "#FFFFFF"]
-                    : ["#FFFFFF", "rgba(253, 129, 0, 0.15)"],
+                    ? [withAlpha(palette.success, 0.15), palette.card]
+                    : [palette.card, withAlpha(palette.warning, 0.15)],
                 })
-              : "#FFFFFF";
+              : palette.card;
             const borderColor = hasSelection
               ? genderAnim.interpolate({
                   inputRange: [0, 1],
                   outputRange: isMale
-                    ? ["rgba(0, 200, 83, 0.35)", "#EEEFF3"]
-                    : ["#EEEFF3", "rgba(253, 129, 0, 0.35)"],
+                    ? [withAlpha(palette.success, 0.35), palette.border]
+                    : [palette.border, withAlpha(palette.warning, 0.35)],
                 })
-              : "#EEEFF3";
+              : palette.border;
             const textColor = hasSelection
               ? genderAnim.interpolate({
                   inputRange: [0, 1],
-                  outputRange: isMale ? ["#00C853", "#111111"] : ["#111111", "#FD8100"],
+                  outputRange: isMale ? [palette.success, palette.text] : [palette.text, palette.warning],
                 })
-              : "#111111";
+              : palette.text;
             return (
               <TouchableOpacity
                 key={option.id}
@@ -318,8 +346,8 @@ const BasicBodyInformationScreen: React.FC<
               onAthleteToggle(val);
               if (!val) onTrainingLevelChange(null);
             }}
-            thumbColor={isAthlete ? "#00C853" : "#FFFFFF"}
-            trackColor={{ false: "#E5E7EB", true: "#C8F8DF" }}
+            thumbColor={isAthlete ? palette.success : palette.card}
+            trackColor={{ false: palette.border, true: withAlpha(palette.success, 0.3) }}
           />
         </View>
 
@@ -368,12 +396,12 @@ const BasicBodyInformationScreen: React.FC<
               width: switchWidth ? switchWidth / 2 - 10 : "46%",
               backgroundColor:
                 unitSystem === "imperial"
-                  ? "rgba(16, 185, 129, 0.15)"
-                  : "rgba(249, 115, 22, 0.12)",
+                  ? withAlpha(palette.success, 0.15)
+                  : withAlpha(palette.warning, 0.12),
               borderColor:
                 unitSystem === "imperial"
-                  ? "rgba(16, 185, 129, 0.35)"
-                  : "rgba(249, 115, 22, 0.35)",
+                  ? withAlpha(palette.success, 0.35)
+                  : withAlpha(palette.warning, 0.35),
               transform: [
                 {
                   translateX: unitThumbAnim.interpolate({
@@ -437,7 +465,7 @@ const BasicBodyInformationScreen: React.FC<
             keyboardType="numeric"
             value={height !== null ? String(height) : ""}
             placeholder={getHeightPlaceholder()}
-            placeholderTextColor="#B0B0B0"
+            placeholderTextColor={palette.textMuted}
             onFocus={() => setFocusedField("height")}
             onBlur={() => setFocusedField(null)}
             onChangeText={(text) => onChange("height", text)}
@@ -449,7 +477,7 @@ const BasicBodyInformationScreen: React.FC<
               keyboardType="numeric"
               value={heightFeet}
               placeholder="ft"
-              placeholderTextColor="#B0B0B0"
+              placeholderTextColor={palette.textMuted}
               maxLength={1}
               onFocus={() => setFocusedField("height")}
               onBlur={() => setFocusedField(null)}
@@ -461,7 +489,7 @@ const BasicBodyInformationScreen: React.FC<
               keyboardType="numeric"
               value={heightInches}
               placeholder="in"
-              placeholderTextColor="#B0B0B0"
+              placeholderTextColor={palette.textMuted}
               maxLength={2}
               onFocus={() => setFocusedField("height")}
               onBlur={() => setFocusedField(null)}
@@ -504,7 +532,7 @@ const BasicBodyInformationScreen: React.FC<
           keyboardType="numeric"
           value={getWeightValue()}
           placeholder={getWeightPlaceholder()}
-          placeholderTextColor="#B0B0B0"
+          placeholderTextColor={palette.textMuted}
           onFocus={() => setFocusedField("weight")}
           onBlur={() => setFocusedField(null)}
           onChangeText={(text) => {
@@ -536,234 +564,235 @@ const BasicBodyInformationScreen: React.FC<
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#F7F8FA",
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    marginBottom: 24,
-  },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#111111",
-    marginBottom: 8,
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    color: "#666666",
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  inputGroup: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-    marginBottom: 16,
-  },
-  inputGroupFocused: {
-    borderColor: "#00C853",
-  },
-  inputGroupError: {
-    borderColor: "#FF3B30",
-  },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666666",
-  },
-  input: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  helperText: {
-    fontSize: 12,
-    color: "#9CA3AF",
-  },
-  unitChip: {
-    backgroundColor: "#EEF7F2",
-    color: "#0A8F5D",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  genderContainer: {
-    marginBottom: 16,
-  },
-  genderTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666666",
-    marginBottom: 12,
-  },
-  genderRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  genderOption: {
-    flex: 1,
-  },
-  genderAnimated: {
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  genderOptionSelected: {
-    borderColor: "#FD8100",
-    backgroundColor: "#FFF4EC",
-  },
-  genderLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#111111",
-  },
-  genderLabelSelected: {
-    color: "#FD8100",
-  },
-  heightSplitRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  heightSplitInput: {
-    width: 72,
-    backgroundColor: "#E0E4EB",
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    textAlign: "center",
-  },
-  heightDelimiter: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#666666",
-  },
-  heightRestrictionText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#666666",
-  },
-  heightRestrictionTextInvalid: {
-    color: "#FF3B30",
-  },
-  errorText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#FF3B30",
-  },
-  weightRestrictionText: {
-    marginTop: 6,
-    fontSize: 12,
-    color: "#666666",
-  },
-  weightRestrictionTextInvalid: {
-    color: "#FF3B30",
-  },
-  unitSwitch: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255, 255, 255, 0.7)",
-    borderRadius: 14,
-    padding: 4,
-    paddingRight: 6,
-    marginTop: -4,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.12)",
-    overflow: "hidden",
-  },
-  unitThumb: {
-    position: "absolute",
-    top: 3,
-    bottom: 3,
-    left: 3,
-    borderRadius: 10,
-    backgroundColor: "rgba(16, 185, 129, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.25)",
-    shadowColor: "#10B981",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  unitOption: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  unitLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#6B7280",
-  },
-  unitLabelActive: {
-    color: "#0A8F5D",
-  },
-  unitLabelActiveOrange: {
-    color: "#F97316",
-  },
-  unitHint: {
-    fontSize: 11,
-    color: "#9CA3AF",
-  },
-  trainingSection: {
-    marginTop: 12,
-    gap: 8,
-  },
-  trainingTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  trainingRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  trainingOption: {
-    flex: 1,
-    backgroundColor: "#F7F8FA",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#EEEFF3",
-  },
-  trainingOptionActive: {
-    borderColor: "#00C853",
-    backgroundColor: "#E8F8F2",
-  },
-  trainingLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#111111",
-  },
-  trainingLabelActive: {
-    color: "#00C853",
-  },
-  trainingSub: {
-    fontSize: 12,
-    color: "#6B7280",
-    marginTop: 4,
-  },
-  trainingSubActive: {
-    color: "#0A8F5D",
-  },
-});
+const createStyles = (palette: ReturnType<typeof createPalette>) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: palette.cardAlt,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 24,
+    },
+    cardTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: palette.text,
+      marginBottom: 8,
+    },
+    cardSubtitle: {
+      fontSize: 14,
+      color: palette.textMuted,
+      marginBottom: 20,
+      lineHeight: 20,
+    },
+    inputGroup: {
+      backgroundColor: palette.card,
+      borderRadius: 16,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+      marginBottom: 16,
+    },
+    inputGroupFocused: {
+      borderColor: palette.success,
+    },
+    inputGroupError: {
+      borderColor: palette.error,
+    },
+    labelRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.textMuted,
+    },
+    input: {
+      fontSize: 18,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    helperText: {
+      fontSize: 12,
+      color: palette.textMuted,
+    },
+    unitChip: {
+      backgroundColor: withAlpha(palette.success, 0.1),
+      color: palette.success,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    genderContainer: {
+      marginBottom: 16,
+    },
+    genderTitle: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: palette.textMuted,
+      marginBottom: 12,
+    },
+    genderRow: {
+      flexDirection: "row",
+      gap: 12,
+    },
+    genderOption: {
+      flex: 1,
+    },
+    genderAnimated: {
+      borderRadius: 12,
+      borderWidth: 1,
+      paddingVertical: 12,
+      alignItems: "center",
+      backgroundColor: palette.card,
+    },
+    genderOptionSelected: {
+      borderColor: palette.warning,
+      backgroundColor: withAlpha(palette.warning, 0.1),
+    },
+    genderLabel: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: palette.text,
+    },
+    genderLabelSelected: {
+      color: palette.warning,
+    },
+    heightSplitRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    heightSplitInput: {
+      width: 72,
+      backgroundColor: withAlpha(palette.textMuted, 0.1),
+      borderRadius: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      textAlign: "center",
+    },
+    heightDelimiter: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: palette.textMuted,
+    },
+    heightRestrictionText: {
+      marginTop: 6,
+      fontSize: 12,
+      color: palette.textMuted,
+    },
+    heightRestrictionTextInvalid: {
+      color: palette.error,
+    },
+    errorText: {
+      marginTop: 6,
+      fontSize: 12,
+      color: palette.error,
+    },
+    weightRestrictionText: {
+      marginTop: 6,
+      fontSize: 12,
+      color: palette.textMuted,
+    },
+    weightRestrictionTextInvalid: {
+      color: palette.error,
+    },
+    unitSwitch: {
+      flexDirection: "row",
+      alignItems: "center",
+      alignSelf: "flex-start",
+      backgroundColor: withAlpha(palette.card, 0.7),
+      borderRadius: 14,
+      padding: 4,
+      paddingRight: 6,
+      marginTop: -4,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: withAlpha(palette.success, 0.12),
+      overflow: "hidden",
+    },
+    unitThumb: {
+      position: "absolute",
+      top: 3,
+      bottom: 3,
+      left: 3,
+      borderRadius: 10,
+      backgroundColor: withAlpha(palette.success, 0.15),
+      borderWidth: 1,
+      borderColor: withAlpha(palette.success, 0.25),
+      shadowColor: palette.success,
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+    },
+    unitOption: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 6,
+    },
+    unitLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.textMuted,
+    },
+    unitLabelActive: {
+      color: palette.success,
+    },
+    unitLabelActiveOrange: {
+      color: palette.warning,
+    },
+    unitHint: {
+      fontSize: 11,
+      color: palette.textMuted,
+    },
+    trainingSection: {
+      marginTop: 12,
+      gap: 8,
+    },
+    trainingTitle: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    trainingRow: {
+      flexDirection: "row",
+      gap: 8,
+    },
+    trainingOption: {
+      flex: 1,
+      backgroundColor: palette.cardAlt,
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: palette.border,
+    },
+    trainingOptionActive: {
+      borderColor: palette.success,
+      backgroundColor: withAlpha(palette.success, 0.1),
+    },
+    trainingLabel: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: palette.text,
+    },
+    trainingLabelActive: {
+      color: palette.success,
+    },
+    trainingSub: {
+      fontSize: 12,
+      color: palette.textMuted,
+      marginTop: 4,
+    },
+    trainingSubActive: {
+      color: palette.success,
+    },
+  });
 
 export default BasicBodyInformationScreen;

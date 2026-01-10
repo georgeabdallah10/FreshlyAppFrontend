@@ -664,10 +664,10 @@ export default function CreateAccountScreen(): React.JSX.Element {
                 resizeMode="contain"
               />
               <Text style={styles.brandName}>SAVR</Text>
-              <Text style={[styles.welcomeLine, styles.welcomeAccentPrimary]}>
+              <Text style={[styles.welcomeLine, styles.welcomeAccentSecondary]}>
                 Smarter Shopping.
               </Text>
-              <Text style={[styles.welcomeLine, styles.welcomeAccentSecondary]}>
+              <Text style={[styles.welcomeLine, styles.welcomeAccentPrimary]}>
                 Healthier Living.
               </Text>
             </View>

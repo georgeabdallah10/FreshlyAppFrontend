@@ -3,9 +3,7 @@
  * SYNC RESULT MODAL
  * ============================================
  *
- * Displays the results of a grocery list sync with pantry.
  * Shows items removed, items updated, and updated timestamp.
- * Supports dark/light mode and smooth animations.
  */
 
 import React, { useEffect, useRef } from "react";
